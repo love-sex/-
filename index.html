@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>代办事项管理</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📋 待办事项</h1>
+            <p class="subtitle">高效管理您的任务</p>
+        </header>
+
+        <div class="input-section">
+            <div class="input-group">
+                <input type="text" id="taskInput" placeholder="输入新的待办事项...">
+                <select id="prioritySelect">
+                    <option value="low">🔽 低优先级</option>
+                    <option value="medium" selected>⚪ 中优先级</option>
+                    <option value="high">🔺 高优先级</option>
+                </select>
+                <select id="categorySelect">
+                    <option value="默认">📁 默认分类</option>
+                </select>
+                <input type="date" id="dueDateInput">
+                <button id="addTaskBtn">添加任务</button>
+            </div>
+        </div>
+
+        <div class="filter-section">
+            <div class="filter-group">
+                <button class="filter-btn active" data-filter="all">全部</button>
+                <button class="filter-btn" data-filter="pending">待完成</button>
+                <button class="filter-btn" data-filter="completed">已完成</button>
+                <select id="filterCategory">
+                    <option value="all">所有分类</option>
+                </select>
+                <select id="sortSelect">
+                    <option value="date">按日期排序</option>
+                    <option value="priority">按优先级排序</option>
+                    <option value="name">按名称排序</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="stats-section">
+            <div class="stat-item">
+                <div class="stat-number" id="totalTasks">0</div>
+                <div class="stat-label">📊 总任务</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="pendingTasks">0</div>
+                <div class="stat-label">⏳ 待完成</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="completedTasks">0</div>
+                <div class="stat-label">✅ 已完成</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="completionRate">0%</div>
+                <div class="stat-label">🎯 完成率</div>
+            </div>
+        </div>
+
+        <div class="category-section">
+            <h3>任务分类</h3>
+            <div class="category-list" id="categoryList">
+                <span class="category-tag active" data-category="all">全部</span>
+            </div>
+            <div class="category-input-group">
+                <input type="text" id="categoryInput" placeholder="添加新分类...">
+                <button id="addCategoryBtn">添加</button>
+            </div>
+        </div>
+
+        <div class="task-list" id="taskList">
+            <!-- 任务动态添加到这里 -->
+        </div>
+        <div class="empty-state" id="emptyState">
+            <div class="empty-icon">📝</div>
+            <p>暂无待办事项</p>
+            <p class="empty-hint">添加您的第一个任务吧！</p>
+        </div>
+
+        <div class="action-buttons">
+            <button id="selectAllBtn" class="secondary-btn">全选</button>
+            <button id="deleteSelectedBtn" class="secondary-btn danger-btn">删除选中</button>
+            <button id="clearCompletedBtn" class="secondary-btn">清空已完成</button>
+            <button id="exportBtn" class="secondary-btn">导出数据</button>
+            <button id="importBtn" class="secondary-btn">
+                <input type="file" id="fileInput" accept=".json" style="display: none;">
+                导入数据
+            </button>
+        </div>
+    </div>
+
+    <div class="notification" id="notification"></div>
+
+    <script>
+        // 清理旧格式的LocalStorage数据以兼容新版本
+        try {
+            const oldData = localStorage.getItem('todoTasks');
+            if (oldData) {
+                const parsed = JSON.parse(oldData);
+                if (Array.isArray(parsed)) {
+                    // 旧格式，需要清除
+                    localStorage.removeItem('todoTasks');
+                }
+            }
+        } catch (e) {}
+    </script>
+    <script src="script.js"></script>
+</body>
+</html>
