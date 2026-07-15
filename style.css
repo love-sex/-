@@ -131,10 +131,19 @@ body {
 /* === 头部 === */
 header {
     background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-800) 100%);
-    padding: var(--space-10) var(--space-8);
+    padding: var(--space-8);
     text-align: center;
     position: relative;
     overflow: hidden;
+}
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    position: relative;
+    z-index: 1;
 }
 
 header::before {
@@ -159,6 +168,7 @@ header h1 {
     color: white;
     margin-bottom: var(--space-2);
     position: relative;
+    z-index: 1;
     letter-spacing: -0.025em;
 }
 
@@ -167,6 +177,7 @@ header .subtitle {
     font-size: 1.1rem;
     font-weight: 400;
     position: relative;
+    z-index: 1;
 }
 
 /* === 输入区域 === */
@@ -1011,3 +1022,122 @@ button {
         --gray-900: #f8fafc;
     }
 }
+
+/* ============================================
+   登录/注册页面样式
+   ============================================ */
+.auth-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-6);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    animation: fadeIn 0.5s ease-out;
+}
+.auth-box {
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--shadow-2xl);
+    width: 100%;
+    max-width: 420px;
+    padding: var(--space-10);
+    animation: slideUp 0.5s ease-out;
+}
+.auth-header { text-align: center; margin-bottom: var(--space-8); }
+.auth-logo { font-size: 3.5rem; margin-bottom: var(--space-3); animation: float 3s ease-in-out infinite; }
+.auth-header h1 {
+    font-size: 1.8rem; font-weight: 800;
+    background: linear-gradient(135deg, var(--primary-600), var(--primary-800));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; margin-bottom: var(--space-2);
+}
+.auth-header p { color: var(--gray-500); font-size: 1rem; }
+.auth-form { display: flex; flex-direction: column; gap: var(--space-5); }
+.auth-form.hidden { display: none; }
+.form-group { display: flex; flex-direction: column; gap: var(--space-2); }
+.form-group label { font-size: 0.9rem; font-weight: 600; color: var(--gray-700); }
+.form-group input {
+    padding: var(--space-4) var(--space-5);
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-xl);
+    font-size: 1rem;
+    background: white;
+    transition: all var(--transition-base);
+}
+.form-group input:focus {
+    outline: none; border-color: var(--primary-400);
+    box-shadow: 0 0 0 4px var(--primary-100);
+}
+.auth-btn {
+    padding: var(--space-4); border-radius: var(--radius-xl);
+    font-size: 1.05rem; font-weight: 700;
+    margin-top: var(--space-2); transition: all var(--transition-base);
+}
+.login-btn {
+    background: linear-gradient(135deg, var(--primary-500), var(--primary-700));
+    color: white; box-shadow: 0 4px 15px rgba(99,102,241,0.4);
+}
+.login-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(99,102,241,0.5); }
+.register-btn {
+    background: linear-gradient(135deg, var(--success), #059669);
+    color: white; box-shadow: 0 4px 15px rgba(16,185,129,0.4);
+}
+.register-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(16,185,129,0.5); }
+.auth-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+.auth-switch { text-align: center; margin-top: var(--space-4); font-size: 0.9rem; color: var(--gray-600); }
+.auth-switch a { color: var(--primary-600); font-weight: 600; text-decoration: none; }
+.auth-switch a:hover { color: var(--primary-700); text-decoration: underline; }
+.auth-error {
+    background: var(--danger-light); color: var(--danger);
+    padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg);
+    font-size: 0.9rem; text-align: center; margin-top: var(--space-4);
+    display: none; font-weight: 500;
+}
+.auth-error.show { display: block; animation: shake 0.5s ease-in-out; }
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+/* === 用户信息栏 === */
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+}
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+}
+.user-greeting {
+    color: rgba(255,255,255,0.9);
+    font-size: 0.95rem;
+}
+.user-greeting strong { color: white; }
+.logout-btn {
+    padding: var(--space-2) var(--space-5);
+    background: rgba(255,255,255,0.2);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: var(--radius-full);
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all var(--transition-base);
+    backdrop-filter: blur(4px);
+}
+.logout-btn:hover {
+    background: rgba(255,255,255,0.3);
+    transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+    .header-content { flex-direction: column; text-align: center; }
+    .user-info { width: 100%; justify-content: center; }
+}
+
+.hidden { display: none !important; }

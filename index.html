@@ -3,14 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>代办事项管理</title>
+    <title>待办事项管理</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
+    <!-- ========== 登录/注册页面 ========== -->
+    <div class="auth-container" id="authContainer">
+        <div class="auth-box">
+            <div class="auth-header">
+                <div class="auth-logo">📋</div>
+                <h1>待办事项</h1>
+                <p>高效管理您的任务</p>
+            </div>
+
+            <!-- 登录表单 -->
+            <form class="auth-form" id="loginForm">
+                <div class="form-group">
+                    <label for="loginUsername">👤 用户名</label>
+                    <input type="text" id="loginUsername" placeholder="请输入用户名" required minlength="2" maxlength="20">
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">🔒 密码</label>
+                    <input type="password" id="loginPassword" placeholder="请输入密码" required minlength="6">
+                </div>
+                <button type="submit" class="auth-btn login-btn">登 录</button>
+                <div class="auth-switch">
+                    还没有账号？<a href="#" id="showRegister">立即注册</a>
+                </div>
+            </form>
+
+            <!-- 注册表单 -->
+            <form class="auth-form hidden" id="registerForm">
+                <div class="form-group">
+                    <label for="regUsername">👤 用户名</label>
+                    <input type="text" id="regUsername" placeholder="2-20个字符" required minlength="2" maxlength="20">
+                </div>
+                <div class="form-group">
+                    <label for="regPassword">🔒 密码</label>
+                    <input type="password" id="regPassword" placeholder="至少6位密码" required minlength="6">
+                </div>
+                <div class="form-group">
+                    <label for="regPasswordConfirm">🔒 确认密码</label>
+                    <input type="password" id="regPasswordConfirm" placeholder="再次输入密码" required minlength="6">
+                </div>
+                <button type="submit" class="auth-btn register-btn">注 册</button>
+                <div class="auth-switch">
+                    已有账号？<a href="#" id="showLogin">立即登录</a>
+                </div>
+            </form>
+
+            <div class="auth-error" id="authError"></div>
+        </div>
+    </div>
+
+    <!-- ========== 主应用页面 ========== -->
+    <div class="container hidden" id="mainApp">
         <header>
-            <h1>📋 待办事项</h1>
-            <p class="subtitle">高效管理您的任务</p>
+            <div class="header-content">
+                <div>
+                    <h1>📋 待办事项</h1>
+                    <p class="subtitle">高效管理您的任务</p>
+                </div>
+                <div class="user-info">
+                    <span class="user-greeting">👋 你好，<strong id="currentUsername">用户</strong></span>
+                    <button class="logout-btn" id="logoutBtn">退出登录</button>
+                </div>
+            </div>
         </header>
 
         <div class="input-section">
@@ -98,19 +156,6 @@
 
     <div class="notification" id="notification"></div>
 
-    <script>
-        // 清理旧格式的LocalStorage数据以兼容新版本
-        try {
-            const oldData = localStorage.getItem('todoTasks');
-            if (oldData) {
-                const parsed = JSON.parse(oldData);
-                if (Array.isArray(parsed)) {
-                    // 旧格式，需要清除
-                    localStorage.removeItem('todoTasks');
-                }
-            }
-        } catch (e) {}
-    </script>
     <script src="script.js"></script>
 </body>
 </html>
