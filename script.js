@@ -1,65 +1,110 @@
 /* ============================================
-   待办事项管理 - 带用户认证
+   待办事项管理 - 纯前端localStorage版本
    ============================================ */
 
-const API_BASE = '';  // 同域请求
+const DB_KEY = 'todoApp_users';
+const TOKEN_KEY = 'todoApp_token';
+const USER_KEY = 'todoApp_currentUser';
 
-// ==================== API工具 ====================
-async function api(endpoint, options = {}) {
-    const token = localStorage.getItem('authToken');
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    const res = await fetch(`${API_BASE}${endpoint}`, {
-        ...options,
-        headers: { ...headers, ...options.headers }
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-        throw new Error(data.error || `请求失败: ${res.status}`);
+// ==================== 工具函数 ====================
+function hashPassword(password) {
+    let hash = 0;
+    const salted = password + '_todo_salt_2024';
+    for (let i = 0; i < salted.length; i++) {
+        const char = salted.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
     }
+    return Math.abs(hash).toString(36) + '_' + salted.length;
+}
+
+function createToken(username) {
+    const data = btoa(unescape(encodeURIComponent(JSON.stringify({
+        username,
+        exp: Date.now() + 24 * 60 * 60 * 1000
+    }))));
     return data;
+}
+
+function verifyToken(token) {
+    if (!token) return null;
+    try {
+        const payload = JSON.parse(decodeURIComponent(escape(atob(token))));
+        if (payload.exp < Date.now()) return null;
+        return payload.username;
+    } catch {
+        return null;
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function getUsers() {
+    try {
+        return JSON.parse(localStorage.getItem(DB_KEY)) || {};
+    } catch { return {}; }
+}
+
+function saveUsers(users) {
+    localStorage.setItem(DB_KEY, JSON.stringify(users));
 }
 
 // ==================== 认证管理器 ====================
 class AuthManager {
     constructor() {
-        this.token = localStorage.getItem('authToken');
-        this.username = localStorage.getItem('authUser') || null;
+        this.token = localStorage.getItem(TOKEN_KEY);
+        this.username = localStorage.getItem(USER_KEY);
     }
 
     isLoggedIn() {
-        return !!this.token;
-    }
-
-    async login(username, password) {
-        const data = await api('/api/login', {
-            method: 'POST',
-            body: JSON.stringify({ username, password })
-        });
-        this.token = data.token;
-        this.username = data.user.username;
-        localStorage.setItem('authToken', this.token);
-        localStorage.setItem('authUser', this.username);
-        return data;
+        return !!this.token && !!this.username;
     }
 
     async register(username, password) {
-        const data = await api('/api/register', {
-            method: 'POST',
-            body: JSON.stringify({ username, password })
-        });
-        this.token = data.token;
-        this.username = data.user.username;
-        localStorage.setItem('authToken', this.token);
-        localStorage.setItem('authUser', this.username);
-        return data;
+        const users = getUsers();
+        if (users[username]) {
+            throw new Error('用户名已存在');
+        }
+
+        users[username] = {
+            password: hashPassword(password),
+            createdAt: new Date().toISOString(),
+            tasks: [],
+            categories: ['默认']
+        };
+        saveUsers(users);
+
+        this.token = createToken(username);
+        this.username = username;
+        localStorage.setItem(TOKEN_KEY, this.token);
+        localStorage.setItem(USER_KEY, username);
+
+        return { username };
+    }
+
+    async login(username, password) {
+        const users = getUsers();
+        const user = users[username];
+
+        if (!user || user.password !== hashPassword(password)) {
+            throw new Error('用户名或密码错误');
+        }
+
+        this.token = createToken(username);
+        this.username = username;
+        localStorage.setItem(TOKEN_KEY, this.token);
+        localStorage.setItem(USER_KEY, username);
+
+        return { username };
     }
 
     logout() {
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('authUser');
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
         this.token = null;
         this.username = null;
         location.reload();
@@ -69,6 +114,7 @@ class AuthManager {
 // ==================== 待办事项管理器 ====================
 class TodoManager {
     constructor() {
+        this.auth = new AuthManager();
         this.tasks = [];
         this.categories = ['默认'];
         this.currentFilter = 'all';
@@ -76,31 +122,49 @@ class TodoManager {
         this.currentSort = 'date';
         this.selectedTasks = new Set();
         this.nextId = 1;
-        this.auth = new AuthManager();
         this.init();
     }
 
-    // 初始化
     async init() {
         this.setupAuthUI();
 
         if (this.auth.isLoggedIn()) {
-            try {
-                await this.loadTasks();
-                this.showMainApp();
-            } catch (e) {
-                // Token过期或无效
-                this.auth.logout();
-                return;
-            }
+            this.loadUserData();
+            this.showMainApp();
         } else {
             this.showAuth();
         }
     }
 
+    loadUserData() {
+        const users = getUsers();
+        const user = users[this.auth.username];
+        if (user) {
+            this.tasks = user.tasks || [];
+            this.categories = user.categories && user.categories.length > 0 ? user.categories : ['默认'];
+            this.calculateNextId();
+        }
+    }
+
+    saveUserData() {
+        const users = getUsers();
+        if (users[this.auth.username]) {
+            users[this.auth.username].tasks = this.tasks;
+            users[this.auth.username].categories = this.categories;
+            saveUsers(users);
+        }
+    }
+
+    calculateNextId() {
+        if (this.tasks.length > 0) {
+            this.nextId = Math.max(...this.tasks.map(t => t.id)) + 1;
+        } else {
+            this.nextId = 1;
+        }
+    }
+
     // ==================== 认证UI ====================
     setupAuthUI() {
-        // 表单切换
         document.getElementById('showRegister')?.addEventListener('click', (e) => {
             e.preventDefault();
             document.getElementById('loginForm').classList.add('hidden');
@@ -115,16 +179,14 @@ class TodoManager {
             this.clearAuthError();
         });
 
-        // 登录表单
         document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
             const username = document.getElementById('loginUsername').value.trim();
             const password = document.getElementById('loginPassword').value;
-
             try {
                 this.setAuthLoading(true);
                 await this.auth.login(username, password);
-                await this.loadTasks();
+                this.loadUserData();
                 this.showMainApp();
                 this.clearAuthError();
             } catch (err) {
@@ -134,13 +196,18 @@ class TodoManager {
             }
         });
 
-        // 注册表单
         document.getElementById('registerForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
             const username = document.getElementById('regUsername').value.trim();
             const password = document.getElementById('regPassword').value;
             const confirm = document.getElementById('regPasswordConfirm').value;
 
+            if (username.length < 2 || username.length > 20) {
+                return this.showAuthError('用户名长度应为2-20个字符');
+            }
+            if (password.length < 6) {
+                return this.showAuthError('密码长度至少6位');
+            }
             if (password !== confirm) {
                 return this.showAuthError('两次密码输入不一致');
             }
@@ -148,7 +215,7 @@ class TodoManager {
             try {
                 this.setAuthLoading(true);
                 await this.auth.register(username, password);
-                await this.loadTasks();
+                this.loadUserData();
                 this.showMainApp();
                 this.clearAuthError();
             } catch (err) {
@@ -158,91 +225,58 @@ class TodoManager {
             }
         });
 
-        // 退出登录
         document.getElementById('logoutBtn')?.addEventListener('click', () => {
             this.auth.logout();
         });
     }
 
     showAuth() {
-        document.getElementById('authContainer').classList.remove('hidden');
-        document.getElementById('mainApp').classList.add('hidden');
+        document.getElementById('authContainer')?.classList.remove('hidden');
+        document.getElementById('mainApp')?.classList.add('hidden');
     }
 
     showMainApp() {
-        document.getElementById('authContainer').classList.add('hidden');
-        document.getElementById('mainApp').classList.remove('hidden');
-        document.getElementById('currentUsername').textContent = this.auth.username;
+        document.getElementById('authContainer')?.classList.add('hidden');
+        document.getElementById('mainApp')?.classList.remove('hidden');
+        const el = document.getElementById('currentUsername');
+        if (el) el.textContent = this.auth.username;
         this.setupEventListeners();
-        this.renderTasks();
         this.renderCategories();
-        this.updateStats();
-        this.updateActionButtons();
+        this.updateUI();
         this.setupDragAndDrop();
         this.showNotification(`欢迎回来，${this.auth.username}！`, 'success');
     }
 
     showAuthError(msg) {
         const el = document.getElementById('authError');
-        el.textContent = msg;
-        el.classList.add('show');
+        if (el) {
+            el.textContent = msg;
+            el.classList.add('show');
+        }
     }
 
     clearAuthError() {
         const el = document.getElementById('authError');
-        el.textContent = '';
-        el.classList.remove('show');
+        if (el) {
+            el.textContent = '';
+            el.classList.remove('show');
+        }
     }
 
     setAuthLoading(loading) {
         document.querySelectorAll('.auth-btn').forEach(btn => {
             btn.disabled = loading;
-            btn.textContent = loading ? '处理中...' : (btn.classList.contains('login-btn') ? '登 录' : '注 册');
+            btn.textContent = loading ? '处理中...' : (btn.classList.contains('login-btn') ? '登录' : '注册');
         });
-    }
-
-    // ==================== API操作 ====================
-    async loadTasks() {
-        try {
-            const data = await api('/api/tasks');
-            this.tasks = data.tasks || [];
-            this.calculateNextId();
-        } catch {
-            this.tasks = [];
-        }
-    }
-
-    async saveTasks() {
-        try {
-            await api('/api/tasks', {
-                method: 'POST',
-                body: JSON.stringify({ tasks: this.tasks })
-            });
-        } catch (err) {
-            this.showNotification('保存失败: ' + err.message, 'error');
-        }
-    }
-
-    calculateNextId() {
-        if (this.tasks.length > 0) {
-            this.nextId = Math.max(...this.tasks.map(t => t.id)) + 1;
-        } else {
-            this.nextId = 1;
-        }
     }
 
     // ==================== 事件监听 ====================
     setupEventListeners() {
-        // 添加任务
-        const addTaskBtn = document.getElementById('addTaskBtn');
-        const taskInput = document.getElementById('taskInput');
-
-        addTaskBtn?.addEventListener('click', () => this.addTask());
-        taskInput?.addEventListener('keypress', (e) => {
+        document.getElementById('addTaskBtn')?.addEventListener('click', () => this.addTask());
+        document.getElementById('taskInput')?.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.addTask();
         });
 
-        // 筛选器
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -252,27 +286,23 @@ class TodoManager {
             });
         });
 
-        // 分类筛选
         document.getElementById('filterCategory')?.addEventListener('change', (e) => {
             this.currentCategory = e.target.value;
-            this.renderCategories();  // 同步标签激活状态
+            this.renderCategories();
             this.renderTasks();
             this.updateActionButtons();
         });
 
-        // 排序
         document.getElementById('sortSelect')?.addEventListener('change', (e) => {
             this.currentSort = e.target.value;
             this.renderTasks();
         });
 
-        // 分类管理
         document.getElementById('addCategoryBtn')?.addEventListener('click', () => this.addCategory());
         document.getElementById('categoryInput')?.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.addCategory();
         });
 
-        // 操作按钮
         document.getElementById('selectAllBtn')?.addEventListener('click', () => this.toggleSelectAll());
         document.getElementById('deleteSelectedBtn')?.addEventListener('click', () => this.deleteSelected());
         document.getElementById('clearCompletedBtn')?.addEventListener('click', () => this.clearCompleted());
@@ -282,17 +312,14 @@ class TodoManager {
         });
         document.getElementById('fileInput')?.addEventListener('change', (e) => this.importData(e));
 
-        // 分类标签点击
         document.getElementById('categoryList')?.addEventListener('click', (e) => {
             const tag = e.target.closest('.category-tag');
             if (tag) {
                 this.currentCategory = tag.dataset.category;
-                this.renderCategories();  // 同步更新标签激活状态和下拉框
+                this.renderCategories();
                 this.renderTasks();
                 this.updateActionButtons();
             }
-
-            // 删除分类
             const delBtn = e.target.closest('.delete-btn');
             if (delBtn) {
                 e.stopPropagation();
@@ -341,7 +368,7 @@ class TodoManager {
                 }
                 const newOrderIds = Array.from(taskList.querySelectorAll('.task-item')).map(el => parseInt(el.dataset.id));
                 this.tasks.sort((a, b) => newOrderIds.indexOf(a.id) - newOrderIds.indexOf(b.id));
-                this.saveTasks();
+                this.saveUserData();
                 this.updateUI();
             }
         });
@@ -388,7 +415,7 @@ class TodoManager {
             this.categories.push(task.category);
         }
 
-        this.saveTasks();
+        this.saveUserData();
         this.updateUI();
 
         taskInput.value = '';
@@ -400,7 +427,7 @@ class TodoManager {
         if (confirm('确定要删除这个任务吗？')) {
             this.tasks = this.tasks.filter(task => task.id !== id);
             this.selectedTasks.delete(id);
-            this.saveTasks();
+            this.saveUserData();
             this.updateUI();
             this.showNotification('任务已删除', 'info');
         }
@@ -442,7 +469,7 @@ class TodoManager {
             const selectedCount = this.selectedTasks.size;
             this.tasks = this.tasks.filter(task => !this.selectedTasks.has(task.id));
             this.selectedTasks.clear();
-            this.saveTasks();
+            this.saveUserData();
             this.updateUI();
             this.showNotification(`已删除 ${selectedCount} 个任务`, 'info');
         }
@@ -452,7 +479,7 @@ class TodoManager {
         const task = this.tasks.find(t => t.id === id);
         if (task) {
             task.completed = !task.completed;
-            this.saveTasks();
+            this.saveUserData();
             this.updateUI();
         }
     }
@@ -465,7 +492,7 @@ class TodoManager {
             }
             this.tasks = this.tasks.filter(task => !task.completed);
             this.selectedTasks.clear();
-            this.saveTasks();
+            this.saveUserData();
             this.updateUI();
             this.showNotification(`已清空 ${completedCount} 个已完成任务`, 'info');
         }
@@ -484,7 +511,7 @@ class TodoManager {
                     <h3>✏️ 编辑任务</h3>
                 </div>
                 <div class="modal-body">
-                    <input type="text" id="editTitle" class="modal-input" value="${this.escapeHtml(task.title)}" placeholder="任务标题">
+                    <input type="text" id="editTitle" class="modal-input" value="${escapeHtml(task.title)}" placeholder="任务标题">
                     <select id="editPriority" class="modal-input">
                         <option value="low" ${task.priority === 'low' ? 'selected' : ''}>🔽 低优先级</option>
                         <option value="medium" ${task.priority === 'medium' ? 'selected' : ''}>⚪ 中优先级</option>
@@ -492,12 +519,12 @@ class TodoManager {
                     </select>
                     <input type="date" id="editDueDate" class="modal-input" value="${task.dueDate || ''}">
                     <select id="editCategory" class="modal-input">
-                        ${this.categories.map(cat => `<option value="${this.escapeHtml(cat)}" ${task.category === cat ? 'selected' : ''}>${this.escapeHtml(cat)}</option>`).join('')}
+                        ${this.categories.map(cat => `<option value="${escapeHtml(cat)}" ${task.category === cat ? 'selected' : ''}>${escapeHtml(cat)}</option>`).join('')}
                     </select>
                     <div style="display:flex;align-items:center;gap:12px;margin-top:8px;">
-                        <label style="font-size:0.9rem;color:var(--gray-600);">进度:</label>
+                        <label style="font-size:0.9rem;color:#374151;">进度:</label>
                         <input type="range" id="editProgress" min="0" max="100" value="${task.progress}" style="flex:1;">
-                        <span id="progressValue" style="min-width:40px;font-weight:600;color:var(--primary-600);">${task.progress}%</span>
+                        <span id="progressValue" style="min-width:40px;font-weight:600;">${task.progress}%</span>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -509,7 +536,6 @@ class TodoManager {
 
         document.body.appendChild(modal);
 
-        // 进度条实时显示
         const progressInput = modal.querySelector('#editProgress');
         const progressValue = modal.querySelector('#progressValue');
         progressInput?.addEventListener('input', () => {
@@ -539,7 +565,7 @@ class TodoManager {
                 this.categories.push(task.category);
             }
 
-            this.saveTasks();
+            this.saveUserData();
             this.updateUI();
             this.renderCategories();
             this.showNotification('任务已更新', 'success');
@@ -555,6 +581,7 @@ class TodoManager {
         if (this.categories.includes(name)) return this.showNotification('该分类已存在', 'error');
 
         this.categories.push(name);
+        this.saveUserData();
         this.renderCategories();
         input.value = '';
         this.showNotification(`分类"${name}"添加成功！`, 'success');
@@ -567,7 +594,7 @@ class TodoManager {
                 if (task.category === name) task.category = '默认';
             });
             if (this.currentCategory === name) this.currentCategory = 'all';
-            this.saveTasks();
+            this.saveUserData();
             this.updateUI();
             this.renderCategories();
             this.showNotification('分类已删除', 'info');
@@ -617,10 +644,10 @@ class TodoManager {
         taskItem.innerHTML = `
             <input type="checkbox" class="task-checkbox" ${isSelected ? 'checked' : ''} onchange="window.todoManager.toggleTaskSelection(${task.id}, event)" title="选择任务" />
             <div class="task-content">
-                <div class="task-title">${this.escapeHtml(task.title)}</div>
+                <div class="task-title">${escapeHtml(task.title)}</div>
                 <div class="task-meta">
                     <span class="task-priority ${priorityClass}">${priorityLabels[priorityClass]}优先级</span>
-                    <span class="task-category">📁 ${this.escapeHtml(task.category)}</span>
+                    <span class="task-category">📁 ${escapeHtml(task.category)}</span>
                     <span class="task-due-date ${isOverdue ? 'overdue' : ''}">📅 ${dueDateStr}</span>
                 </div>
                 <div class="progress-bar">
@@ -646,29 +673,28 @@ class TodoManager {
         if (!categoryList) return;
 
         const currentFilter = this.currentCategory || 'all';
+        const currentSelectValue = categorySelect ? categorySelect.value : '默认';
 
         categoryList.innerHTML = `<span class="category-tag ${currentFilter === 'all' || currentFilter === '全部' ? 'active' : ''}" data-category="全部">全部</span>`;
         filterCategory.innerHTML = '<option value="all">所有分类</option>';
         categorySelect.innerHTML = '';
 
         this.categories.forEach(cat => {
-            // 分类标签
             const tag = document.createElement('span');
             tag.className = `category-tag ${currentFilter === cat ? 'active' : ''}`;
             tag.dataset.category = cat;
-            tag.innerHTML = `${this.escapeHtml(cat)} <span class="delete-btn" title="删除">✕</span>`;
+            tag.innerHTML = `${escapeHtml(cat)} <span class="delete-btn" title="删除">✕</span>`;
             categoryList.appendChild(tag);
 
-            // 筛选下拉
             const filterOpt = document.createElement('option');
             filterOpt.value = cat;
             filterOpt.textContent = cat;
             filterCategory.appendChild(filterOpt);
 
-            // 创建任务下拉
             const selectOpt = document.createElement('option');
             selectOpt.value = cat;
             selectOpt.textContent = cat;
+            if (cat === currentSelectValue) selectOpt.selected = true;
             categorySelect.appendChild(selectOpt);
         });
 
@@ -789,7 +815,7 @@ class TodoManager {
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = async (e) => {
+        reader.onload = (e) => {
             try {
                 const data = JSON.parse(e.target.result);
                 if (Array.isArray(data.tasks)) {
@@ -805,7 +831,7 @@ class TodoManager {
                         });
                     }
 
-                    await this.saveTasks();
+                    this.saveUserData();
                     this.updateUI();
                     this.renderCategories();
                     this.showNotification(`成功导入 ${this.tasks.length} 个任务`, 'success');
@@ -821,12 +847,6 @@ class TodoManager {
     }
 
     // ==================== 工具函数 ====================
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
     showNotification(message, type = 'info') {
         const notification = document.getElementById('notification');
         if (!notification) return;
