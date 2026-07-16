@@ -1,13 +1,13 @@
 {
   "name": "todo-app",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "待办事项管理工具",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "node server.js",
+    "start": "node server.js"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["todo", "productivity"],
+  "author": "love-sex",
   "license": "ISC",
   "type": "commonjs"
 }

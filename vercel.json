@@ -2,7 +2,19 @@
     "version": 2,
     "public": true,
     "trailingSlash": false,
+    "framework": null,
+    "installCommand": "npm install",
+    "buildCommand": "",
+    "outputDirectory": ".",
     "rewrites": [
         { "source": "/(.*)", "destination": "/index.html" }
+    ],
+    "headers": [
+        {
+            "source": "/(.*)",
+            "headers": [
+                { "key": "Cache-Control", "value": "no-cache" }
+            ]
+        }
     ]
 }
