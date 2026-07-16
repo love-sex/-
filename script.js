@@ -812,14 +812,17 @@ class TodoManager {
     }
 
     async exportImage() {
-        const taskList = document.getElementById('taskList');
-        const emptyState = document.getElementById('emptyState');
-        if (!taskList) return;
+        if (typeof html2canvas === 'undefined') {
+            this.showNotification('图片库未加载，请刷新页面重试', 'error');
+            return;
+        }
 
         if (this.tasks.length === 0) {
             this.showNotification('没有任务可以导出', 'warning');
             return;
         }
+
+        this.showNotification('正在生成图片，请稍候...', 'info');
 
         // 创建一个临时容器用于截图
         const container = document.createElement('div');
@@ -885,23 +888,32 @@ class TodoManager {
 
         document.body.appendChild(container);
 
+        // 等待一下确保DOM渲染完成
+        await new Promise(resolve => setTimeout(resolve, 100));
+
         try {
             const canvas = await html2canvas(container, {
                 scale: 2,
                 backgroundColor: '#ffffff',
-                useCORS: true
+                useCORS: true,
+                logging: false
             });
 
             const link = document.createElement('a');
             link.download = `todo-${this.auth.username}-${Date.now()}.png`;
             link.href = canvas.toDataURL('image/png');
+            document.body.appendChild(link);
             link.click();
+            document.body.removeChild(link);
 
             this.showNotification('图片导出成功！', 'success');
         } catch (err) {
+            console.error('Export image error:', err);
             this.showNotification('图片导出失败: ' + err.message, 'error');
         } finally {
-            document.body.removeChild(container);
+            if (container.parentNode) {
+                document.body.removeChild(container);
+            }
         }
     }
 
