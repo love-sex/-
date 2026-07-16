@@ -19,17 +19,17 @@ function hashPassword(password) {
 }
 
 function createToken(username) {
-    const data = btoa(unescape(encodeURIComponent(JSON.stringify({
+    const data = {
         username,
         exp: Date.now() + 24 * 60 * 60 * 1000
-    }))));
-    return data;
+    };
+    return btoa(encodeURIComponent(JSON.stringify(data)));
 }
 
 function verifyToken(token) {
     if (!token) return null;
     try {
-        const payload = JSON.parse(decodeURIComponent(escape(atob(token))));
+        const payload = JSON.parse(decodeURIComponent(atob(token)));
         if (payload.exp < Date.now()) return null;
         return payload.username;
     } catch {
