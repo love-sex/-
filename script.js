@@ -307,6 +307,7 @@ class TodoManager {
         document.getElementById('deleteSelectedBtn')?.addEventListener('click', () => this.deleteSelected());
         document.getElementById('clearCompletedBtn')?.addEventListener('click', () => this.clearCompleted());
         document.getElementById('exportBtn')?.addEventListener('click', () => this.exportData());
+        document.getElementById('exportImageBtn')?.addEventListener('click', () => this.exportImage());
         document.getElementById('importBtn')?.addEventListener('click', () => {
             document.getElementById('fileInput')?.click();
         });
@@ -808,6 +809,100 @@ class TodoManager {
         a.click();
         URL.revokeObjectURL(url);
         this.showNotification('数据已导出', 'success');
+    }
+
+    async exportImage() {
+        const taskList = document.getElementById('taskList');
+        const emptyState = document.getElementById('emptyState');
+        if (!taskList) return;
+
+        if (this.tasks.length === 0) {
+            this.showNotification('没有任务可以导出', 'warning');
+            return;
+        }
+
+        // 创建一个临时容器用于截图
+        const container = document.createElement('div');
+        container.id = 'export-container';
+        container.style.cssText = `
+            position: fixed; left: -9999px; top: 0; width: 600px;
+            background: white; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+
+        // 标题
+        const header = document.createElement('div');
+        header.style.cssText = 'text-align:center;margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid #6366f1;';
+        header.innerHTML = `
+            <h1 style="font-size:24px;color:#1e293b;margin:0;">📋 待办事项</h1>
+            <p style="color:#64748b;margin:8px 0 0;">用户: ${escapeHtml(this.auth.username)} | ${new Date().toLocaleDateString('zh-CN')}</p>
+        `;
+        container.appendChild(header);
+
+        // 统计
+        const total = this.tasks.length;
+        const completed = this.tasks.filter(t => t.completed).length;
+        const pending = total - completed;
+        const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+        const stats = document.createElement('div');
+        stats.style.cssText = 'display:flex;justify-content:space-around;margin-bottom:20px;padding:12px;background:#f8fafc;border-radius:12px;';
+        stats.innerHTML = `
+            <div style="text-align:center;"><div style="font-size:20px;font-weight:700;color:#6366f1;">${total}</div><div style="font-size:12px;color:#64748b;">总任务</div></div>
+            <div style="text-align:center;"><div style="font-size:20px;font-weight:700;color:#f59e0b;">${pending}</div><div style="font-size:12px;color:#64748b;">待完成</div></div>
+            <div style="text-align:center;"><div style="font-size:20px;font-weight:700;color:#10b981;">${completed}</div><div style="font-size:12px;color:#64748b;">已完成</div></div>
+            <div style="text-align:center;"><div style="font-size:20px;font-weight:700;color:#6366f1;">${rate}%</div><div style="font-size:12px;color:#64748b;">完成率</div></div>
+        `;
+        container.appendChild(stats);
+
+        // 任务列表
+        const list = document.createElement('div');
+        const filteredTasks = this.sortTasks(this.getFilteredTasks());
+        filteredTasks.forEach(task => {
+            const priorityLabels = { high: '高', medium: '中', low: '低' };
+            const priorityColors = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' };
+            const item = document.createElement('div');
+            item.style.cssText = `
+                display:flex;align-items:center;gap:12px;padding:12px;margin-bottom:8px;
+                border:1px solid #e2e8f0;border-radius:12px;
+                ${task.completed ? 'opacity:0.6;background:#f8fafc;' : 'background:white;'}
+            `;
+            item.innerHTML = `
+                <div style="width:24px;height:24px;border-radius:50%;border:2px solid ${task.completed ? '#10b981' : '#cbd5e1'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    ${task.completed ? '<span style="color:#10b981;font-size:14px;">✓</span>' : ''}
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:14px;font-weight:600;color:#1e293b;${task.completed ? 'text-decoration:line-through;' : ''}">${escapeHtml(task.title)}</div>
+                    <div style="font-size:12px;color:#64748b;margin-top:4px;">
+                        <span style="color:${priorityColors[task.priority || 'medium']};font-weight:600;">${priorityLabels[task.priority || 'medium']}优先级</span>
+                        &nbsp;|&nbsp; 📁 ${escapeHtml(task.category)}
+                        ${task.dueDate ? `&nbsp;|&nbsp; 📅 ${task.dueDate}` : ''}
+                    </div>
+                </div>
+            `;
+            list.appendChild(item);
+        });
+        container.appendChild(list);
+
+        document.body.appendChild(container);
+
+        try {
+            const canvas = await html2canvas(container, {
+                scale: 2,
+                backgroundColor: '#ffffff',
+                useCORS: true
+            });
+
+            const link = document.createElement('a');
+            link.download = `todo-${this.auth.username}-${Date.now()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+
+            this.showNotification('图片导出成功！', 'success');
+        } catch (err) {
+            this.showNotification('图片导出失败: ' + err.message, 'error');
+        } finally {
+            document.body.removeChild(container);
+        }
     }
 
     importData(event) {

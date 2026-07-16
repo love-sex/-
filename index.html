@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>待办事项管理</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
     <!-- ========== 登录/注册页面 ========== -->
@@ -146,10 +147,11 @@
             <button id="selectAllBtn" class="secondary-btn">全选</button>
             <button id="deleteSelectedBtn" class="secondary-btn danger-btn">删除选中</button>
             <button id="clearCompletedBtn" class="secondary-btn">清空已完成</button>
-            <button id="exportBtn" class="secondary-btn">导出数据</button>
+            <button id="exportBtn" class="secondary-btn">📋 导出JSON</button>
+            <button id="exportImageBtn" class="secondary-btn">🖼️ 导出图片</button>
             <button id="importBtn" class="secondary-btn">
                 <input type="file" id="fileInput" accept=".json" style="display: none;">
-                导入数据
+                📥 导入数据
             </button>
         </div>
     </div>
