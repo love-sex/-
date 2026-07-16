@@ -1,8 +1,10 @@
 {
     "version": 2,
     "public": true,
-    "trailingSlash": false,
-    "rewrites": [
-        { "source": "/(.*)", "destination": "/index.html" }
+    "framework": null,
+    "outputDirectory": ".",
+    "routes": [
+        { "handle": "filesystem" },
+        { "src": "/(.*)", "dest": "/index.html" }
     ]
 }
