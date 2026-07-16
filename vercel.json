@@ -2,9 +2,10 @@
     "version": 2,
     "public": true,
     "framework": null,
+    "buildCommand": "echo 'No build needed'",
     "outputDirectory": ".",
-    "routes": [
-        { "handle": "filesystem" },
-        { "src": "/(.*)", "dest": "/index.html" }
+    "installCommand": "echo 'No install needed'",
+    "rewrites": [
+        { "source": "/(.*)", "destination": "/index.html" }
     ]
 }
