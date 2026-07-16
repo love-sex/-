@@ -899,14 +899,33 @@ class TodoManager {
                 logging: false
             });
 
-            const link = document.createElement('a');
-            link.download = `todo-${this.auth.username}-${Date.now()}.png`;
-            link.href = canvas.toDataURL('image/png');
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            const dataUrl = canvas.toDataURL('image/png');
 
-            this.showNotification('图片导出成功！', 'success');
+            // 检测是否为手机
+            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+            if (isMobile) {
+                // 手机上直接显示图片页面，用户可以长按保存
+                const w = window.open('', '_blank');
+                if (w) {
+                    w.document.write(`
+                        <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <title>长按图片保存到相册</title>
+                        <body style="margin:0;background:#1e293b;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;">
+                        <p style="color:#fff;padding:16px;text-align:center;font-size:16px;">
+                        👇 <b>长按下方图片</b> → 选择<b>"保存到相册"</b></p>
+                        <img src="${dataUrl}" style="max-width:100%;height:auto;"></body></html>
+                    `);
+                    this.showNotification('请在弹出的页面长按图片保存', 'info');
+                } else {
+                    // 弹窗被拦截，直接下载
+                    this.downloadImage(dataUrl);
+                }
+            } else {
+                // 电脑直接下载
+                this.downloadImage(dataUrl);
+                this.showNotification('图片导出成功！', 'success');
+            }
         } catch (err) {
             console.error('Export image error:', err);
             this.showNotification('图片导出失败: ' + err.message, 'error');
@@ -914,7 +933,15 @@ class TodoManager {
             if (container.parentNode) {
                 document.body.removeChild(container);
             }
-        }
+        } }
+
+    downloadImage(dataUrl) {
+        const link = document.createElement('a');
+        link.download = `todo-${this.auth.username}-${Date.now()}.png`;
+        link.href = dataUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 
     importData(event) {
