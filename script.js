@@ -5,6 +5,65 @@
 const DB_KEY = 'todoApp_users';
 const TOKEN_KEY = 'todoApp_token';
 const USER_KEY = 'todoApp_currentUser';
+const IDX_DB_NAME = 'todoApp_media';
+const IDX_STORE = 'videos';
+
+// ==================== IndexedDB 视频存储 ====================
+function openIndexedDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(IDX_DB_NAME, 1);
+        request.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(IDX_STORE)) {
+                db.createObjectStore(IDX_STORE);
+            }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function saveVideoToIndexedDB(id, data) {
+    try {
+        const db = await openIndexedDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(IDX_STORE, 'readwrite');
+            tx.objectStore(IDX_STORE).put(data, id);
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => reject(tx.error);
+        });
+    } catch {
+        return false;
+    }
+}
+
+async function getVideoFromIndexedDB(id) {
+    try {
+        const db = await openIndexedDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(IDX_STORE, 'readonly');
+            const req = tx.objectStore(IDX_STORE).get(id);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    } catch {
+        return null;
+    }
+}
+
+async function deleteVideoFromIndexedDB(id) {
+    try {
+        const db = await openIndexedDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(IDX_STORE, 'readwrite');
+            tx.objectStore(IDX_STORE).delete(id);
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => reject(tx.error);
+        });
+    } catch {
+        return false;
+    }
+}
 
 // ==================== 工具函数 ====================
 function hashPassword(password) {
@@ -73,6 +132,7 @@ const DEFAULT_THEME = {
     headerFrom: '#667eea',
     headerTo: '#764ba2',
     bgImage: '',
+    bgVideoId: '',
     bgOpacity: 15,
     bgBlur: 5,
     glassEffect: false,
@@ -142,43 +202,42 @@ class ThemeManager {
             header.style.display = '';
         }
 
+        // 加载视频背景（从IndexedDB）
+        if (s.bgVideoId) {
+            const existingVideo = document.getElementById('custom-bg-video');
+            if (!existingVideo) {
+                const video = document.createElement('video');
+                video.id = 'custom-bg-video';
+                video.autoplay = true;
+                video.loop = true;
+                video.muted = false;
+                video.playsInline = true;
+                video.style.cssText = `
+                    position: fixed; inset: 0; z-index: -2;
+                    width: 100%; height: 100%;
+                    object-fit: cover;
+                    opacity: ${s.bgOpacity / 100};
+                    filter: blur(${s.bgBlur}px);
+                    pointer-events: none;
+                `;
+                document.body.insertBefore(video, document.body.firstChild);
+                // 从IndexedDB加载视频
+                getVideoFromIndexedDB(s.bgVideoId).then(data => {
+                    if (data) {
+                        const url = URL.createObjectURL(new Blob([data], { type: 'video/mp4' }));
+                        video.src = url;
+                        video.play().catch(() => { video.muted = true; video.play(); });
+                    }
+                });
+            }
+        }
+
         // 背景图片/视频 - 添加半透明遮罩保证文字可读
         const existingBg = document.getElementById('custom-bg-image');
         const existingVideo = document.getElementById('custom-bg-video');
-        if (s.bgImage) {
+        if (s.bgImage && !s.bgVideoId) {
             const isVideo = s.bgImage.startsWith('data:video');
             if (isVideo) {
-                // 视频背景
-                if (!existingVideo) {
-                    const video = document.createElement('video');
-                    video.id = 'custom-bg-video';
-                    video.autoplay = true;
-                    video.loop = true;
-                    video.muted = false;
-                    video.playsInline = true;
-                    video.style.cssText = `
-                        position: fixed; inset: 0; z-index: -2;
-                        width: 100%; height: 100%;
-                        object-fit: cover;
-                        opacity: ${s.bgOpacity / 100};
-                        filter: blur(${s.bgBlur}px);
-                        pointer-events: none;
-                    `;
-                    const source = document.createElement('source');
-                    source.src = s.bgImage;
-                    video.appendChild(source);
-                    document.body.insertBefore(video, document.body.firstChild);
-                    // 尝试播放（处理浏览器自动播放策略）
-                    video.play().catch(() => {
-                        video.muted = true;
-                        video.play();
-                    });
-                } else {
-                    existingVideo.style.opacity = s.bgOpacity / 100;
-                    existingVideo.style.filter = `blur(${s.bgBlur}px)`;
-                }
-                if (existingBg) existingBg.remove();
-            } else {
                 // 图片背景
                 if (!existingBg) {
                     const bgDiv = document.createElement('div');
@@ -213,7 +272,7 @@ class ThemeManager {
             }
         } else {
             if (existingBg) existingBg.remove();
-            if (existingVideo) existingVideo.remove();
+            if (existingVideo) { existingVideo.pause(); existingVideo.remove(); }
             const overlay = document.getElementById('custom-bg-overlay');
             if (overlay) overlay.remove();
         }
@@ -257,6 +316,7 @@ class ThemeManager {
 
     removeBgImage() {
         this.settings.bgImage = '';
+        this.settings.bgVideoId = '';
         this.applySettings();
         this.saveSettings();
     }
@@ -712,25 +772,42 @@ class TodoManager {
 
             const isVideo = file.type.startsWith('video/');
             const reader = new FileReader();
-            reader.onload = (ev) => {
-                this.theme.setBgImage(ev.target.result);
+            reader.onload = async (ev) => {
                 if (isVideo) {
+                    // 保存视频到IndexedDB
+                    const videoId = 'bg_' + Date.now();
+                    await saveVideoToIndexedDB(videoId, ev.target.result);
+                    this.theme.settings.bgVideoId = videoId;
+                    this.theme.settings.bgImage = '';
+                    this.theme.applySettings();
+                    this.theme.saveSettings();
+                    // 显示预览
                     document.getElementById('bgVideoPreview').classList.remove('hidden');
                     document.getElementById('bgVideoPreview').src = ev.target.result;
                     document.getElementById('bgImagePreview').style.display = 'none';
+                    document.getElementById('removeBgBtn').classList.remove('hidden');
+                    this.showNotification('背景视频已设置，声音已开启', 'success');
                 } else {
+                    // 图片直接存localStorage
+                    this.theme.settings.bgVideoId = '';
+                    this.theme.setBgImage(ev.target.result);
                     this.updateBgPreview(ev.target.result);
                     document.getElementById('bgVideoPreview').classList.add('hidden');
+                    document.getElementById('removeBgBtn').classList.remove('hidden');
+                    this.showNotification('背景图片已设置', 'success');
                 }
-                document.getElementById('removeBgBtn').classList.remove('hidden');
-                this.showNotification(isVideo ? '背景视频已设置' : '背景图片已设置', 'success');
             };
-            reader.readAsDataURL(file);
+            reader.readAsArrayBuffer(file);
             e.target.value = '';
         });
 
         // 移除背景图片/视频
-        document.getElementById('removeBgBtn')?.addEventListener('click', () => {
+        document.getElementById('removeBgBtn')?.addEventListener('click', async () => {
+            // 删除IndexedDB中的视频
+            if (this.theme.settings.bgVideoId) {
+                await deleteVideoFromIndexedDB(this.theme.settings.bgVideoId);
+            }
+            this.theme.settings.bgVideoId = '';
             this.theme.removeBgImage();
             document.getElementById('bgImagePreview').style.backgroundImage = '';
             document.getElementById('bgImagePreview').style.display = 'none';
@@ -828,16 +905,19 @@ class TodoManager {
         });
 
         // 同步背景预览
-        if (s.bgImage) {
-            const isVideo = s.bgImage.startsWith('data:video');
-            if (isVideo) {
-                document.getElementById('bgVideoPreview').classList.remove('hidden');
-                document.getElementById('bgVideoPreview').src = s.bgImage;
-                document.getElementById('bgImagePreview').style.display = 'none';
-            } else {
-                this.updateBgPreview(s.bgImage);
-                document.getElementById('bgVideoPreview').classList.add('hidden');
-            }
+        if (s.bgVideoId) {
+            // 从IndexedDB加载视频预览
+            document.getElementById('bgVideoPreview').classList.remove('hidden');
+            document.getElementById('bgImagePreview').style.display = 'none';
+            document.getElementById('removeBgBtn').classList.remove('hidden');
+            getVideoFromIndexedDB(s.bgVideoId).then(data => {
+                if (data) {
+                    document.getElementById('bgVideoPreview').src = URL.createObjectURL(new Blob([data]));
+                }
+            });
+        } else if (s.bgImage) {
+            this.updateBgPreview(s.bgImage);
+            document.getElementById('bgVideoPreview').classList.add('hidden');
             document.getElementById('removeBgBtn').classList.remove('hidden');
         }
 

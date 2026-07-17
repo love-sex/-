@@ -1393,34 +1393,41 @@ body.dark-mode .bg-controls label { color: #94a3b8; }
     transition: background var(--transition-base);
 }
 
-/* 自定义主题删除按钮 */
+/* 自定义主题容器 */
 .theme-preset {
     position: relative;
 }
+.theme-preset.custom {
+    padding-right: 22px !important;
+}
+
+/* 自定义主题删除按钮 - 始终可见 */
 .theme-preset .delete-theme-btn {
     position: absolute;
-    top: -6px;
-    right: -6px;
-    width: 20px;
-    height: 20px;
-    background: var(--danger);
+    top: -5px;
+    right: -5px;
+    width: 18px;
+    height: 18px;
+    background: #ef4444;
     color: white;
     border: 2px solid white;
     border-radius: 50%;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     cursor: pointer;
     display: none;
     align-items: center;
     justify-content: center;
     z-index: 10;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    line-height: 1;
+    transition: all 0.15s ease;
 }
-.theme-preset.custom:hover .delete-theme-btn {
+.theme-preset.custom .delete-theme-btn {
     display: flex;
 }
-.theme-preset.custom .delete-theme-btn:hover {
+.theme-preset .delete-theme-btn:hover {
     background: #dc2626;
-    transform: scale(1.1);
+    transform: scale(1.15);
 }
 
 /* === 忘记密码链接 === */
