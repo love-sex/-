@@ -638,7 +638,6 @@ class TodoManager {
         const canvas = document.getElementById('dynamicBgCanvas');
         if (!canvas) return;
 
-        // 如果有自定义背景图片/视频，隐藏动态背景
         if (this.theme.settings.bgImage || this.theme.settings.bgVideoId) {
             canvas.style.display = 'none';
             return;
@@ -647,7 +646,11 @@ class TodoManager {
         canvas.style.display = 'block';
         const ctx = canvas.getContext('2d');
         let particles = [];
-        let mouseX = 0, mouseY = 0;
+        let orbs = [];
+        let ripples = [];
+        let mouseX = -1000, mouseY = -1000;
+        let prevMouseX = 0, prevMouseY = 0;
+        let mouseSpeed = 0;
         let animationId = null;
 
         const resize = () => {
@@ -659,28 +662,106 @@ class TodoManager {
 
         // 鼠标交互
         const onMouseMove = (e) => {
+            prevMouseX = mouseX;
+            prevMouseY = mouseY;
             mouseX = e.clientX;
             mouseY = e.clientY;
+            mouseSpeed = Math.sqrt((mouseX - prevMouseX) ** 2 + (mouseY - prevMouseY) ** 2);
+
+            // 快速移动时产生涟漪
+            if (mouseSpeed > 8 && ripples.length < 6) {
+                ripples.push({ x: mouseX, y: mouseY, radius: 0, opacity: 0.5 });
+            }
         };
         document.addEventListener('mousemove', onMouseMove);
 
-        // 粒子类
+        // 点击产生大涟漪
+        const onClick = (e) => {
+            ripples.push({ x: e.clientX, y: e.clientY, radius: 0, opacity: 0.8, big: true });
+        };
+        document.addEventListener('click', onClick);
+
+        // 漂浮光球
+        class Orb {
+            constructor() { this.reset(); }
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.radius = Math.random() * 60 + 30;
+                this.speedX = (Math.random() - 0.5) * 0.4;
+                this.speedY = (Math.random() - 0.5) * 0.4;
+                this.hue = Math.random() * 40 + 210;
+                this.pulse = Math.random() * Math.PI * 2;
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.pulse += 0.01;
+                if (this.x < -this.radius) this.x = canvas.width + this.radius;
+                if (this.x > canvas.width + this.radius) this.x = -this.radius;
+                if (this.y < -this.radius) this.y = canvas.height + this.radius;
+                if (this.y > canvas.height + this.radius) this.y = -this.radius;
+            }
+            draw() {
+                const r = this.radius + Math.sin(this.pulse) * 8;
+                const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, r);
+                gradient.addColorStop(0, `hsla(${this.hue}, 80%, 60%, 0.08)`);
+                gradient.addColorStop(0.5, `hsla(${this.hue}, 70%, 50%, 0.04)`);
+                gradient.addColorStop(1, `hsla(${this.hue}, 60%, 40%, 0)`);
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+            }
+        }
+
+        // 粒子
         class Particle {
             constructor() { this.reset(); }
             reset() {
                 this.x = Math.random() * canvas.width;
                 this.y = Math.random() * canvas.height;
-                this.size = Math.random() * 2.5 + 1;
-                this.speedX = (Math.random() - 0.5) * 0.6;
-                this.speedY = (Math.random() - 0.5) * 0.6;
-                this.opacity = Math.random() * 0.5 + 0.2;
-                this.hue = Math.random() * 60 + 220;
+                this.baseSize = Math.random() * 2 + 0.5;
+                this.size = this.baseSize;
+                this.speedX = (Math.random() - 0.5) * 0.5;
+                this.speedY = (Math.random() - 0.5) * 0.5;
+                this.baseOpacity = Math.random() * 0.4 + 0.15;
+                this.opacity = this.baseOpacity;
+                this.hue = Math.random() * 50 + 210;
+                this.angle = Math.random() * Math.PI * 2;
             }
             update() {
-                this.x += this.speedX;
-                this.y += this.speedY;
-                if (this.x < 0 || this.x > canvas.width) this.speedX *= -1;
-                if (this.y < 0 || this.y > canvas.height) this.speedY *= -1;
+                // 围绕自转
+                this.angle += 0.005;
+                this.x += this.speedX + Math.cos(this.angle) * 0.2;
+                this.y += this.speedY + Math.sin(this.angle) * 0.2;
+
+                // 边界回弹
+                if (this.x < 0) { this.x = 0; this.speedX *= -1; }
+                if (this.x > canvas.width) { this.x = canvas.width; this.speedX *= -1; }
+                if (this.y < 0) { this.y = 0; this.speedY *= -1; }
+                if (this.y > canvas.height) { this.y = canvas.height; this.speedY *= -1; }
+
+                // 鼠标引力/排斥
+                const dx = this.x - mouseX;
+                const dy = this.y - mouseY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 150 && dist > 0) {
+                    const force = (150 - dist) / 150;
+                    // 近处排斥，远处吸引
+                    if (dist < 60) {
+                        this.x += (dx / dist) * force * 2;
+                        this.y += (dy / dist) * force * 2;
+                    } else {
+                        this.x -= (dx / dist) * force * 0.5;
+                        this.y -= (dy / dist) * force * 0.5;
+                    }
+                    this.size = this.baseSize + force * 4;
+                    this.opacity = Math.min(this.baseOpacity + force * 0.6, 0.9);
+                } else {
+                    this.size += (this.baseSize - this.size) * 0.05;
+                    this.opacity += (this.baseOpacity - this.opacity) * 0.05;
+                }
             }
             draw() {
                 ctx.beginPath();
@@ -690,54 +771,77 @@ class TodoManager {
             }
         }
 
-        // 初始化粒子
-        const count = Math.min(60, Math.floor((canvas.width * canvas.height) / 12000));
-        for (let i = 0; i < count; i++) particles.push(new Particle());
+        // 初始化
+        const orbCount = Math.min(5, Math.floor((canvas.width * canvas.height) / 200000));
+        for (let i = 0; i < orbCount; i++) orbs.push(new Orb());
+
+        const particleCount = Math.min(80, Math.floor((canvas.width * canvas.height) / 8000));
+        for (let i = 0; i < particleCount; i++) particles.push(new Particle());
 
         const animate = () => {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             // 深色渐变背景
             const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-            grad.addColorStop(0, '#0c1222');
-            grad.addColorStop(0.5, '#1a2744');
-            grad.addColorStop(1, '#0c1222');
+            grad.addColorStop(0, '#0a0f1e');
+            grad.addColorStop(0.5, '#15203a');
+            grad.addColorStop(1, '#0a0f1e');
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 绘制粒子和连线
-            for (let i = 0; i < particles.length; i++) {
-                const p = particles[i];
-                p.update();
-                p.draw();
+            // 绘制光球
+            orbs.forEach(orb => { orb.update(); orb.draw(); });
 
-                // 连线
+            // 绘制涟漪
+            for (let i = ripples.length - 1; i >= 0; i--) {
+                const r = ripples[i];
+                r.radius += r.big ? 3 : 2;
+                r.opacity -= 0.008;
+                if (r.opacity <= 0) { ripples.splice(i, 1); continue; }
+                ctx.beginPath();
+                ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(100, 180, 255, ${r.opacity})`;
+                ctx.lineWidth = r.big ? 2 : 1;
+                ctx.stroke();
+
+                // 涟漪内部光晕
+                const rGrad = ctx.createRadialGradient(r.x, r.y, 0, r.x, r.y, r.radius);
+                rGrad.addColorStop(0, `rgba(100, 180, 255, ${r.opacity * 0.1})`);
+                rGrad.addColorStop(1, 'rgba(100, 180, 255, 0)');
+                ctx.fillStyle = rGrad;
+                ctx.fill();
+            }
+
+            // 绘制粒子连线
+            for (let i = 0; i < particles.length; i++) {
                 for (let j = i + 1; j < particles.length; j++) {
-                    const p2 = particles[j];
-                    const dx = p.x - p2.x;
-                    const dy = p.y - p2.y;
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < 100) {
+                    if (dist < 80) {
                         ctx.beginPath();
-                        ctx.moveTo(p.x, p.y);
-                        ctx.lineTo(p2.x, p2.y);
-                        ctx.strokeStyle = `rgba(100, 150, 220, ${0.12 * (1 - dist / 100)})`;
-                        ctx.lineWidth = 0.5;
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.strokeStyle = `rgba(120, 170, 240, ${0.15 * (1 - dist / 80)})`;
+                        ctx.lineWidth = 0.6;
                         ctx.stroke();
                     }
                 }
+            }
 
-                // 鼠标交互
-                const dx = p.x - mouseX;
-                const dy = p.y - mouseY;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < 120) {
-                    p.size = Math.min(p.size + 0.15, 4);
-                    p.opacity = Math.min(p.opacity + 0.03, 0.7);
-                } else {
-                    p.size = Math.max(p.size - 0.02, 1);
-                    p.opacity = Math.max(p.opacity - 0.01, 0.2);
-                }
+            // 绘制粒子
+            particles.forEach(p => { p.update(); p.draw(); });
+
+            // 鼠标光晕
+            if (mouseX > 0 && mouseY > 0) {
+                const mouseGlow = ctx.createRadialGradient(mouseX, mouseY, 0, mouseX, mouseY, 80);
+                mouseGlow.addColorStop(0, 'rgba(100, 160, 255, 0.08)');
+                mouseGlow.addColorStop(0.5, 'rgba(80, 140, 220, 0.03)');
+                mouseGlow.addColorStop(1, 'rgba(60, 120, 200, 0)');
+                ctx.fillStyle = mouseGlow;
+                ctx.beginPath();
+                ctx.arc(mouseX, mouseY, 80, 0, Math.PI * 2);
+                ctx.fill();
             }
 
             animationId = requestAnimationFrame(animate);
@@ -749,6 +853,7 @@ class TodoManager {
         this._bgCleanup = () => {
             if (animationId) cancelAnimationFrame(animationId);
             document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('click', onClick);
         };
     }
 
