@@ -651,7 +651,8 @@ class TodoManager {
         const SEASON_DURATION = 3 * 60 * 1000;
         const TRANSITION_DURATION = 2000;
         let seasonStartTime = Date.now();
-        let nextParticles = SEASONS = [
+        let nextParticles = [];
+        const SEASONS = [
             { name:'Spring', emoji:'S', colors:['#fce4ec','#f8bbd0','#f48fb1','#e1bee7'], bgTop:'#2d1b4e', bgBottom:'#1a1a2e', count:60 },
             { name:'Summer', emoji:'Su', colors:['#bbdefb','#90caf9','#64b5f6','#4fc3f7'], bgTop:'#0d2b4e', bgBottom:'#0a1929', count:50 },
             { name:'Autumn', emoji:'A', colors:['#ffcc80','#ffb74d','#ffa726','#ff8a65'], bgTop:'#3e2723', bgBottom:'#1a1a1a', count:70 },
