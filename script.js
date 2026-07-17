@@ -204,32 +204,34 @@ class ThemeManager {
 
         // 加载视频背景（从IndexedDB）
         if (s.bgVideoId) {
-            const existingVideo = document.getElementById('custom-bg-video');
-            if (!existingVideo) {
-                const video = document.createElement('video');
+            // 移除旧的图片背景
+            if (existingBg) existingBg.remove();
+
+            let video = document.getElementById('custom-bg-video');
+            if (!video) {
+                video = document.createElement('video');
                 video.id = 'custom-bg-video';
                 video.autoplay = true;
                 video.loop = true;
                 video.muted = false;
                 video.playsInline = true;
                 video.style.cssText = `
-                    position: fixed; inset: 0; z-index: -2;
-                    width: 100%; height: 100%;
+                    position: fixed; top: 0; left: 0; z-index: -2;
+                    width: 100vw; height: 100vh;
                     object-fit: cover;
                     opacity: ${s.bgOpacity / 100};
                     filter: blur(${s.bgBlur}px);
                     pointer-events: none;
                 `;
                 document.body.insertBefore(video, document.body.firstChild);
-                // 从IndexedDB加载视频
-                getVideoFromIndexedDB(s.bgVideoId).then(data => {
-                    if (data) {
-                        const url = URL.createObjectURL(new Blob([data], { type: 'video/mp4' }));
-                        video.src = url;
-                        video.play().catch(() => { video.muted = true; video.play(); });
-                    }
-                });
             }
+            // 从IndexedDB加载视频（直接是Data URL）
+            getVideoFromIndexedDB(s.bgVideoId).then(data => {
+                if (data) {
+                    video.src = data;
+                    video.play().catch(() => { video.muted = true; video.play(); });
+                }
+            });
         }
 
         // 背景图片/视频 - 添加半透明遮罩保证文字可读
@@ -672,16 +674,17 @@ class TodoManager {
         const canvas = document.getElementById('dynamicBgCanvas');
         if (!canvas) return;
 
-        // 如果有自定义背景图片/视频，不显示动态背景
+        // 如果有自定义背景图片/视频，隐藏动态背景
         if (this.theme.settings.bgImage || this.theme.settings.bgVideoId) {
-            canvas.classList.add('hidden');
+            canvas.style.display = 'none';
             return;
         }
 
-        canvas.classList.remove('hidden');
+        canvas.style.display = 'block';
         const ctx = canvas.getContext('2d');
         let particles = [];
-        let animationId;
+        let mouseX = 0, mouseY = 0;
+        let animationId = null;
 
         const resize = () => {
             canvas.width = window.innerWidth;
@@ -690,19 +693,24 @@ class TodoManager {
         resize();
         window.addEventListener('resize', resize);
 
-        // 创建粒子
+        // 鼠标交互
+        const onMouseMove = (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        };
+        document.addEventListener('mousemove', onMouseMove);
+
+        // 粒子类
         class Particle {
-            constructor() {
-                this.reset();
-            }
+            constructor() { this.reset(); }
             reset() {
                 this.x = Math.random() * canvas.width;
                 this.y = Math.random() * canvas.height;
-                this.size = Math.random() * 3 + 1;
-                this.speedX = (Math.random() - 0.5) * 0.8;
-                this.speedY = (Math.random() - 0.5) * 0.8;
+                this.size = Math.random() * 2.5 + 1;
+                this.speedX = (Math.random() - 0.5) * 0.6;
+                this.speedY = (Math.random() - 0.5) * 0.6;
                 this.opacity = Math.random() * 0.5 + 0.2;
-                this.hue = Math.random() * 60 + 220; // 蓝紫色系
+                this.hue = Math.random() * 60 + 220;
             }
             update() {
                 this.x += this.speedX;
@@ -713,71 +721,71 @@ class TodoManager {
             draw() {
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fillStyle = `hsla(${this.hue}, 70%, 60%, ${this.opacity})`;
+                ctx.fillStyle = `hsla(${this.hue}, 70%, 65%, ${this.opacity})`;
                 ctx.fill();
             }
         }
 
         // 初始化粒子
-        const particleCount = Math.min(80, Math.floor(canvas.width * canvas.height / 10000));
-        for (let i = 0; i < particleCount; i++) {
-            particles.push(new Particle());
-        }
-
-        // 鼠标交互
-        let mouseX = 0, mouseY = 0;
-        canvas.addEventListener('mousemove', (e) => {
-            mouseX = e.clientX;
-            mouseY = e.clientY;
-        });
+        const count = Math.min(60, Math.floor((canvas.width * canvas.height) / 12000));
+        for (let i = 0; i < count; i++) particles.push(new Particle());
 
         const animate = () => {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 绘制渐变背景
-            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-            gradient.addColorStop(0, '#0f172a');
-            gradient.addColorStop(0.5, '#1e293b');
-            gradient.addColorStop(1, '#0f172a');
-            ctx.fillStyle = gradient;
+            // 深色渐变背景
+            const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            grad.addColorStop(0, '#0c1222');
+            grad.addColorStop(0.5, '#1a2744');
+            grad.addColorStop(1, '#0c1222');
+            ctx.fillStyle = grad;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 绘制粒子连线
+            // 绘制粒子和连线
             for (let i = 0; i < particles.length; i++) {
-                particles[i].update();
-                particles[i].draw();
+                const p = particles[i];
+                p.update();
+                p.draw();
 
-                // 粒子间连线
+                // 连线
                 for (let j = i + 1; j < particles.length; j++) {
-                    const dx = particles[i].x - particles[j].x;
-                    const dy = particles[i].y - particles[j].y;
+                    const p2 = particles[j];
+                    const dx = p.x - p2.x;
+                    const dy = p.y - p2.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < 120) {
+                    if (dist < 100) {
                         ctx.beginPath();
-                        ctx.moveTo(particles[i].x, particles[i].y);
-                        ctx.lineTo(particles[j].x, particles[j].y);
-                        ctx.strokeStyle = `rgba(148, 163, 184, ${0.15 * (1 - dist / 120)})`;
+                        ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(p2.x, p2.y);
+                        ctx.strokeStyle = `rgba(100, 150, 220, ${0.12 * (1 - dist / 100)})`;
                         ctx.lineWidth = 0.5;
                         ctx.stroke();
                     }
                 }
 
                 // 鼠标交互
-                const dx = particles[i].x - mouseX;
-                const dy = particles[i].y - mouseY;
+                const dx = p.x - mouseX;
+                const dy = p.y - mouseY;
                 const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < 150) {
-                    particles[i].size = Math.min(particles[i].size + 0.1, 5);
-                    particles[i].opacity = Math.min(particles[i].opacity + 0.02, 0.8);
+                if (dist < 120) {
+                    p.size = Math.min(p.size + 0.15, 4);
+                    p.opacity = Math.min(p.opacity + 0.03, 0.7);
+                } else {
+                    p.size = Math.max(p.size - 0.02, 1);
+                    p.opacity = Math.max(p.opacity - 0.01, 0.2);
                 }
             }
 
             animationId = requestAnimationFrame(animate);
         };
+
         animate();
 
-        // 保存引用以便清理
-        this._bgAnimationId = animationId;
+        // 保存引用
+        this._bgCleanup = () => {
+            if (animationId) cancelAnimationFrame(animationId);
+            document.removeEventListener('mousemove', onMouseMove);
+        };
     }
 
     // ==================== 内容隐藏/显示 ====================
@@ -917,33 +925,44 @@ class TodoManager {
             if (!file) return;
 
             const isVideo = file.type.startsWith('video/');
-            const reader = new FileReader();
-            reader.onload = async (ev) => {
-                if (isVideo) {
-                    // 保存视频到IndexedDB
+            const fileType = file.type;
+
+            if (isVideo) {
+                // 视频：使用 Data URL 存储到 IndexedDB
+                const reader = new FileReader();
+                reader.onload = async (ev) => {
                     const videoId = 'bg_' + Date.now();
+                    // 存储为 Data URL 字符串
                     await saveVideoToIndexedDB(videoId, ev.target.result);
                     this.theme.settings.bgVideoId = videoId;
                     this.theme.settings.bgImage = '';
                     this.theme.applySettings();
                     this.theme.saveSettings();
                     // 显示预览
-                    document.getElementById('bgVideoPreview').classList.remove('hidden');
-                    document.getElementById('bgVideoPreview').src = ev.target.result;
-                    document.getElementById('bgImagePreview').style.display = 'none';
-                    document.getElementById('removeBgBtn').classList.remove('hidden');
+                    const preview = document.getElementById('bgVideoPreview');
+                    if (preview) {
+                        preview.classList.remove('hidden');
+                        preview.src = ev.target.result;
+                    }
+                    const imgPreview = document.getElementById('bgImagePreview');
+                    if (imgPreview) imgPreview.style.display = 'none';
+                    document.getElementById('removeBgBtn')?.classList.remove('hidden');
                     this.showNotification('背景视频已设置，声音已开启', 'success');
-                } else {
-                    // 图片直接存localStorage
+                };
+                reader.readAsDataURL(file);
+            } else {
+                // 图片直接存localStorage
+                const reader = new FileReader();
+                reader.onload = (ev) => {
                     this.theme.settings.bgVideoId = '';
                     this.theme.setBgImage(ev.target.result);
                     this.updateBgPreview(ev.target.result);
-                    document.getElementById('bgVideoPreview').classList.add('hidden');
-                    document.getElementById('removeBgBtn').classList.remove('hidden');
+                    document.getElementById('bgVideoPreview')?.classList.add('hidden');
+                    document.getElementById('removeBgBtn')?.classList.remove('hidden');
                     this.showNotification('背景图片已设置', 'success');
-                }
-            };
-            reader.readAsArrayBuffer(file);
+                };
+                reader.readAsDataURL(file);
+            }
             e.target.value = '';
         });
 
@@ -1052,13 +1071,12 @@ class TodoManager {
 
         // 同步背景预览
         if (s.bgVideoId) {
-            // 从IndexedDB加载视频预览
             document.getElementById('bgVideoPreview').classList.remove('hidden');
             document.getElementById('bgImagePreview').style.display = 'none';
             document.getElementById('removeBgBtn').classList.remove('hidden');
             getVideoFromIndexedDB(s.bgVideoId).then(data => {
                 if (data) {
-                    document.getElementById('bgVideoPreview').src = URL.createObjectURL(new Blob([data]));
+                    document.getElementById('bgVideoPreview').src = data;
                 }
             });
         } else if (s.bgImage) {
