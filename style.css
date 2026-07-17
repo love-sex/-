@@ -1141,3 +1141,49 @@ button {
 }
 
 .hidden { display: none !important; }
+
+/* === 忘记密码链接 === */
+.forgot-link {
+    text-align: right;
+    margin-top: -8px;
+    margin-bottom: 8px;
+}
+.forgot-link a {
+    color: var(--primary-500);
+    font-size: 0.85rem;
+    text-decoration: none;
+    transition: color var(--transition-fast);
+}
+.forgot-link a:hover {
+    color: var(--primary-700);
+    text-decoration: underline;
+}
+
+/* === 找回密码表单 === */
+.forgot-info {
+    text-align: center;
+    margin-bottom: 20px;
+}
+.forgot-info h3 {
+    font-size: 1.2rem;
+    color: var(--gray-800);
+    margin-bottom: 8px;
+}
+.forgot-info p {
+    font-size: 0.85rem;
+    color: var(--gray-500);
+    line-height: 1.5;
+}
+.reset-btn {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+}
+.reset-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.5);
+}
+.reset-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}

@@ -28,6 +28,9 @@
                     <input type="password" id="loginPassword" placeholder="请输入密码" required minlength="6">
                 </div>
                 <button type="submit" class="auth-btn login-btn">登 录</button>
+                <div class="forgot-link">
+                    <a href="#" id="showForgot">忘记密码？</a>
+                </div>
                 <div class="auth-switch">
                     还没有账号？<a href="#" id="showRegister">立即注册</a>
                 </div>
@@ -47,9 +50,37 @@
                     <label for="regPasswordConfirm">🔒 确认密码</label>
                     <input type="password" id="regPasswordConfirm" placeholder="再次输入密码" required minlength="6">
                 </div>
+                <div class="form-group">
+                    <label for="regEmail">📧 邮箱（可选，用于找回密码）</label>
+                    <input type="email" id="regEmail" placeholder="example@email.com">
+                </div>
                 <button type="submit" class="auth-btn register-btn">注 册</button>
                 <div class="auth-switch">
                     已有账号？<a href="#" id="showLogin">立即登录</a>
+                </div>
+            </form>
+
+            <!-- 忘记密码表单 -->
+            <form class="auth-form hidden" id="forgotForm">
+                <div class="forgot-info">
+                    <h3>🔑 找回密码</h3>
+                    <p>请输入您的用户名和绑定的邮箱，我们将帮您重置密码。</p>
+                </div>
+                <div class="form-group">
+                    <label for="forgotUsername">👤 用户名</label>
+                    <input type="text" id="forgotUsername" placeholder="请输入用户名" required>
+                </div>
+                <div class="form-group">
+                    <label for="forgotEmail">📧 绑定邮箱</label>
+                    <input type="email" id="forgotEmail" placeholder="请输入绑定的邮箱" required>
+                </div>
+                <div class="form-group">
+                    <label for="forgotNewPassword">🔒 新密码</label>
+                    <input type="password" id="forgotNewPassword" placeholder="至少6位新密码" required minlength="6">
+                </div>
+                <button type="submit" class="auth-btn reset-btn">重置密码</button>
+                <div class="auth-switch">
+                    想起密码了？<a href="#" id="showLoginFromForgot">返回登录</a>
                 </div>
             </form>
 

@@ -78,7 +78,7 @@ class AuthManager {
         return !!this.token && !!this.username;
     }
 
-    async register(username, password) {
+    async register(username, password, email) {
         const users = getUsers();
         if (users[username]) {
             throw new Error('用户名已存在');
@@ -86,6 +86,7 @@ class AuthManager {
 
         users[username] = {
             password: hashPassword(password),
+            email: email || '',
             createdAt: new Date().toISOString(),
             tasks: [],
             categories: ['默认']
@@ -122,6 +123,28 @@ class AuthManager {
         this.token = null;
         this.username = null;
         location.reload();
+    }
+
+    // 通过邮箱重置密码
+    async resetPassword(username, email, newPassword) {
+        const users = getUsers();
+        const user = users[username];
+
+        if (!user) {
+            throw new Error('用户名不存在');
+        }
+        if (!user.email) {
+            throw new Error('该账号未绑定邮箱，无法找回密码');
+        }
+        if (user.email.toLowerCase() !== email.toLowerCase()) {
+            throw new Error('邮箱与绑定的邮箱不一致');
+        }
+
+        // 更新密码
+        user.password = hashPassword(newPassword);
+        saveUsers(users);
+
+        return { message: '密码重置成功' };
     }
 }
 
@@ -179,15 +202,37 @@ class TodoManager {
 
     // ==================== 认证UI ====================
     setupAuthUI() {
+        // 切换到注册
         document.getElementById('showRegister')?.addEventListener('click', (e) => {
             e.preventDefault();
             document.getElementById('loginForm').classList.add('hidden');
             document.getElementById('registerForm').classList.remove('hidden');
+            document.getElementById('forgotForm').classList.add('hidden');
             this.clearAuthError();
         });
 
+        // 切换到登录
         document.getElementById('showLogin')?.addEventListener('click', (e) => {
             e.preventDefault();
+            document.getElementById('registerForm').classList.add('hidden');
+            document.getElementById('forgotForm').classList.add('hidden');
+            document.getElementById('loginForm').classList.remove('hidden');
+            this.clearAuthError();
+        });
+
+        // 切换到忘记密码
+        document.getElementById('showForgot')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.add('hidden');
+            document.getElementById('forgotForm').classList.remove('hidden');
+            this.clearAuthError();
+        });
+
+        // 从忘记密码返回登录
+        document.getElementById('showLoginFromForgot')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('forgotForm').classList.add('hidden');
             document.getElementById('registerForm').classList.add('hidden');
             document.getElementById('loginForm').classList.remove('hidden');
             this.clearAuthError();
@@ -215,6 +260,7 @@ class TodoManager {
             const username = document.getElementById('regUsername').value.trim();
             const password = document.getElementById('regPassword').value;
             const confirm = document.getElementById('regPasswordConfirm').value;
+            const email = document.getElementById('regEmail').value.trim();
 
             if (username.length < 2 || username.length > 20) {
                 return this.showAuthError('用户名长度应为2-20个字符');
@@ -225,13 +271,52 @@ class TodoManager {
             if (password !== confirm) {
                 return this.showAuthError('两次密码输入不一致');
             }
+            // 验证邮箱格式（如果填写了）
+            if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                return this.showAuthError('邮箱格式不正确');
+            }
 
             try {
                 this.setAuthLoading(true);
-                await this.auth.register(username, password);
+                await this.auth.register(username, password, email);
                 this.loadUserData();
                 this.showMainApp();
                 this.clearAuthError();
+            } catch (err) {
+                this.showAuthError(err.message);
+            } finally {
+                this.setAuthLoading(false);
+            }
+        });
+
+        // 忘记密码表单提交
+        document.getElementById('forgotForm')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('forgotUsername').value.trim();
+            const email = document.getElementById('forgotEmail').value.trim();
+            const newPassword = document.getElementById('forgotNewPassword').value;
+
+            if (!username || !email) {
+                return this.showAuthError('请填写用户名和邮箱');
+            }
+            if (newPassword.length < 6) {
+                return this.showAuthError('新密码长度至少6位');
+            }
+
+            try {
+                this.setAuthLoading(true);
+                await this.auth.resetPassword(username, email, newPassword);
+                this.clearAuthError();
+                this.showAuthError('密码重置成功！请使用新密码登录');
+                // 清空表单
+                document.getElementById('forgotUsername').value = '';
+                document.getElementById('forgotEmail').value = '';
+                document.getElementById('forgotNewPassword').value = '';
+                // 2秒后返回登录
+                setTimeout(() => {
+                    document.getElementById('forgotForm').classList.add('hidden');
+                    document.getElementById('loginForm').classList.remove('hidden');
+                }, 2000);
             } catch (err) {
                 this.showAuthError(err.message);
             } finally {
