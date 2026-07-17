@@ -49,9 +49,23 @@ function getUsers() {
     } catch { return {}; }
 }
 
+// 数据迁移：清除旧格式数据（兼容旧版本token编码）
+function migrateData() {
+    const version = localStorage.getItem('todoApp_version');
+    if (version !== '2.0') {
+        // 清除旧数据，让用户重新注册
+        const keys = Object.keys(localStorage).filter(k => k.startsWith('todoApp_'));
+        keys.forEach(k => localStorage.removeItem(k));
+        localStorage.setItem('todoApp_version', '2.0');
+    }
+}
+
 function saveUsers(users) {
     localStorage.setItem(DB_KEY, JSON.stringify(users));
 }
+
+// ==================== 启动时数据迁移 ====================
+migrateData();
 
 // ==================== 认证管理器 ====================
 class AuthManager {
