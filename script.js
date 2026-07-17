@@ -193,90 +193,54 @@ class ThemeManager {
         // 预设主题只影响头部 header 渐变
         const header = document.querySelector('header');
         if (header) {
-            const from = s.headerFrom || '#667eea';
-            const to = s.headerTo || '#764ba2';
-            header.style.background = `linear-gradient(135deg, ${from} 0%, ${to} 100%)`;
-            // 强制重绘
-            header.style.display = 'none';
-            header.offsetHeight;
-            header.style.display = '';
+            header.style.background = `linear-gradient(135deg, ${s.headerFrom || '#667eea'}, ${s.headerTo || '#764ba2'})`;
         }
 
-        // 加载视频背景（从IndexedDB）
-        if (s.bgVideoId) {
-            // 移除旧的图片背景
-            if (existingBg) existingBg.remove();
-
-            let video = document.getElementById('custom-bg-video');
-            if (!video) {
-                video = document.createElement('video');
-                video.id = 'custom-bg-video';
-                video.autoplay = true;
-                video.loop = true;
-                video.muted = false;
-                video.playsInline = true;
-                video.style.cssText = `
-                    position: fixed; top: 0; left: 0; z-index: -2;
-                    width: 100vw; height: 100vh;
-                    object-fit: cover;
-                    opacity: ${s.bgOpacity / 100};
-                    filter: blur(${s.bgBlur}px);
-                    pointer-events: none;
-                `;
-                document.body.insertBefore(video, document.body.firstChild);
+        // 清理所有背景元素
+        ['custom-bg-image', 'custom-bg-video', 'custom-bg-overlay'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                if (id === 'custom-bg-video') { el.pause(); el.src = ''; }
+                el.remove();
             }
-            // 从IndexedDB加载视频（直接是Data URL）
+        });
+
+        // 动态背景控制
+        const canvas = document.getElementById('dynamicBgCanvas');
+        if (canvas) {
+            canvas.style.display = (s.bgImage || s.bgVideoId) ? 'none' : 'block';
+        }
+
+        // 视频背景
+        if (s.bgVideoId) {
             getVideoFromIndexedDB(s.bgVideoId).then(data => {
                 if (data) {
+                    const video = document.createElement('video');
+                    video.id = 'custom-bg-video';
+                    video.autoplay = true;
+                    video.loop = true;
+                    video.muted = false;
+                    video.playsInline = true;
+                    video.preload = 'auto';
+                    video.style.cssText = `position:fixed;top:0;left:0;width:100vw;height:100vh;object-fit:cover;opacity:${s.bgOpacity/100};filter:blur(${s.bgBlur}px);pointer-events:none;z-index:-2;`;
+                    document.body.insertBefore(video, document.body.firstChild);
                     video.src = data;
                     video.play().catch(() => { video.muted = true; video.play(); });
                 }
             });
         }
 
-        // 背景图片/视频 - 添加半透明遮罩保证文字可读
-        const existingBg = document.getElementById('custom-bg-image');
-        const existingVideo = document.getElementById('custom-bg-video');
+        // 图片背景
         if (s.bgImage && !s.bgVideoId) {
-            const isVideo = s.bgImage.startsWith('data:video');
-            if (isVideo) {
-                // 图片背景
-                if (!existingBg) {
-                    const bgDiv = document.createElement('div');
-                    bgDiv.id = 'custom-bg-image';
-                    bgDiv.style.cssText = `
-                        position: fixed; inset: 0; z-index: -1;
-                        background-image: url('${s.bgImage}');
-                        background-size: cover; background-position: center;
-                        opacity: ${s.bgOpacity / 100};
-                        filter: blur(${s.bgBlur}px);
-                        pointer-events: none;
-                    `;
-                    document.body.insertBefore(bgDiv, document.body.firstChild);
-                } else {
-                    existingBg.style.backgroundImage = `url('${s.bgImage}')`;
-                    existingBg.style.opacity = s.bgOpacity / 100;
-                    existingBg.style.filter = `blur(${s.bgBlur}px)`;
-                }
-                if (existingVideo) existingVideo.remove();
-            }
-            // 添加半透明遮罩层保证文字可读
-            let overlay = document.getElementById('custom-bg-overlay');
-            if (!overlay) {
-                overlay = document.createElement('div');
-                overlay.id = 'custom-bg-overlay';
-                overlay.style.cssText = `
-                    position: fixed; inset: 0; z-index: -1;
-                    background: rgba(255,255,255,0.85);
-                    pointer-events: none;
-                `;
-                document.body.insertBefore(overlay, document.body.firstChild);
-            }
-        } else {
-            if (existingBg) existingBg.remove();
-            if (existingVideo) { existingVideo.pause(); existingVideo.remove(); }
-            const overlay = document.getElementById('custom-bg-overlay');
-            if (overlay) overlay.remove();
+            const bg = document.createElement('div');
+            bg.id = 'custom-bg-image';
+            bg.style.cssText = `position:fixed;top:0;left:0;width:100vw;height:100vh;background-image:url('${s.bgImage}');background-size:cover;background-position:center;opacity:${s.bgOpacity/100};filter:blur(${s.bgBlur}px);pointer-events:none;z-index:-1;`;
+            document.body.insertBefore(bg, document.body.firstChild);
+
+            const overlay = document.createElement('div');
+            overlay.id = 'custom-bg-overlay';
+            overlay.style.cssText = `position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(255,255,255,0.82);pointer-events:none;z-index:-1;`;
+            document.body.insertBefore(overlay, document.body.firstChild);
         }
 
         // 效果
@@ -966,20 +930,34 @@ class TodoManager {
             e.target.value = '';
         });
 
-        // 移除背景图片/视频
+        // 移除背景图片/视频 - 彻底停止并清理
         document.getElementById('removeBgBtn')?.addEventListener('click', async () => {
+            // 先停止并移除视频元素（这是停止声音的关键）
+            const bgVideo = document.getElementById('custom-bg-video');
+            if (bgVideo) {
+                bgVideo.pause();
+                bgVideo.removeAttribute('src');
+                bgVideo.src = '';
+                bgVideo.load();
+                bgVideo.remove();
+            }
             // 删除IndexedDB中的视频
             if (this.theme.settings.bgVideoId) {
                 await deleteVideoFromIndexedDB(this.theme.settings.bgVideoId);
             }
             this.theme.settings.bgVideoId = '';
             this.theme.removeBgImage();
-            document.getElementById('bgImagePreview').style.backgroundImage = '';
-            document.getElementById('bgImagePreview').style.display = 'none';
-            document.getElementById('bgVideoPreview').classList.add('hidden');
-            document.getElementById('bgVideoPreview').src = '';
-            document.getElementById('removeBgBtn').classList.add('hidden');
-            this.showNotification('背景已移除', 'info');
+            // 清理预览
+            const imgPreview = document.getElementById('bgImagePreview');
+            if (imgPreview) { imgPreview.style.backgroundImage = ''; imgPreview.style.display = 'none'; }
+            const vidPreview = document.getElementById('bgVideoPreview');
+            if (vidPreview) { vidPreview.classList.add('hidden'); vidPreview.src = ''; }
+            const removeBtn = document.getElementById('removeBgBtn');
+            if (removeBtn) removeBtn.classList.add('hidden');
+            // 显示动态背景
+            const canvas = document.getElementById('dynamicBgCanvas');
+            if (canvas) canvas.style.display = 'block';
+            this.showNotification('背景已移除，声音已停止', 'info');
         });
 
         // 背景透明度
