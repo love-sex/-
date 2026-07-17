@@ -132,8 +132,14 @@ class ThemeManager {
 
         // 预设主题只影响头部 header 渐变
         const header = document.querySelector('header');
-        if (header && s.headerFrom && s.headerTo) {
-            header.style.background = `linear-gradient(135deg, ${s.headerFrom} 0%, ${s.headerTo} 100%)`;
+        if (header) {
+            const from = s.headerFrom || '#667eea';
+            const to = s.headerTo || '#764ba2';
+            header.style.background = `linear-gradient(135deg, ${from} 0%, ${to} 100%)`;
+            // 强制重绘
+            header.style.display = 'none';
+            header.offsetHeight;
+            header.style.display = '';
         }
 
         // 背景图片 - 添加半透明遮罩保证文字可读
@@ -215,12 +221,65 @@ class ThemeManager {
     }
 
     setPreset(themeName) {
+        // 先检查预设主题
         const preset = PRESET_THEMES[themeName];
         if (preset) {
             this.settings = { ...this.settings, ...preset };
             this.applySettings();
             this.saveSettings();
+            return;
         }
+        // 检查自定义主题
+        const customThemes = this.getCustomThemes();
+        const custom = customThemes[themeName];
+        if (custom) {
+            this.settings = { ...this.settings, ...custom, mode: themeName };
+            this.applySettings();
+            this.saveSettings();
+        }
+    }
+
+    getCustomThemes() {
+        try {
+            return JSON.parse(localStorage.getItem('todoApp_customThemes')) || {};
+        } catch { return {}; }
+    }
+
+    saveCustomTheme(name, colorFrom, colorTo) {
+        const customs = this.getCustomThemes();
+        customs[name] = {
+            primaryColor: colorFrom,
+            headerFrom: colorFrom,
+            headerTo: colorTo,
+            mode: name
+        };
+        localStorage.setItem('todoApp_customThemes', JSON.stringify(customs));
+    }
+
+    deleteCustomTheme(name) {
+        const customs = this.getCustomThemes();
+        delete customs[name];
+        localStorage.setItem('todoApp_customThemes', JSON.stringify(customs));
+    }
+
+    renderCustomThemes() {
+        const container = document.getElementById('themePresets');
+        if (!container) return;
+        // 移除旧的自定义主题
+        container.querySelectorAll('.theme-preset.custom').forEach(el => el.remove());
+
+        const customs = this.getCustomThemes();
+        Object.entries(customs).forEach(([name, theme]) => {
+            const div = document.createElement('div');
+            div.className = 'theme-preset custom';
+            div.dataset.theme = name;
+            div.style.background = `linear-gradient(135deg, ${theme.headerFrom}, ${theme.headerTo})`;
+            div.innerHTML = `
+                <span>${name}</span>
+                <span class="delete-theme-btn" data-theme="${name}">✕</span>
+            `;
+            container.appendChild(div);
+        });
     }
 }
 
@@ -522,8 +581,21 @@ class TodoManager {
             }
         });
 
-        // 预设主题
+        // 预设主题点击
         document.getElementById('themePresets')?.addEventListener('click', (e) => {
+            // 删除自定义主题
+            const delBtn = e.target.closest('.delete-theme-btn');
+            if (delBtn) {
+                e.stopPropagation();
+                const themeName = delBtn.dataset.theme;
+                if (confirm(`确定要删除主题"${themeName}"吗？`)) {
+                    this.theme.deleteCustomTheme(themeName);
+                    this.theme.renderCustomThemes();
+                    this.showNotification('主题已删除', 'info');
+                }
+                return;
+            }
+
             const preset = e.target.closest('.theme-preset');
             if (preset) {
                 document.querySelectorAll('.theme-preset').forEach(p => p.classList.remove('active'));
@@ -532,6 +604,44 @@ class TodoManager {
                 this.syncSettingsUI();
                 this.showNotification('主题已切换', 'success');
             }
+        });
+
+        // 添加自定义主题
+        document.getElementById('addCustomThemeBtn')?.addEventListener('click', () => {
+            document.getElementById('customThemeModal').classList.remove('hidden');
+            this.updateCustomPreview();
+        });
+
+        // 关闭自定义主题模态框
+        document.getElementById('closeCustomThemeBtn')?.addEventListener('click', () => {
+            document.getElementById('customThemeModal').classList.add('hidden');
+        });
+        document.getElementById('cancelCustomThemeBtn')?.addEventListener('click', () => {
+            document.getElementById('customThemeModal').classList.add('hidden');
+        });
+        document.getElementById('customThemeModal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'customThemeModal') {
+                document.getElementById('customThemeModal').classList.add('hidden');
+            }
+        });
+
+        // 自定义主题颜色变化时更新预览
+        document.getElementById('customColorFrom')?.addEventListener('input', () => this.updateCustomPreview());
+        document.getElementById('customColorTo')?.addEventListener('input', () => this.updateCustomPreview());
+
+        // 保存自定义主题
+        document.getElementById('saveCustomThemeBtn')?.addEventListener('click', () => {
+            const name = document.getElementById('customThemeName').value.trim();
+            const from = document.getElementById('customColorFrom').value;
+            const to = document.getElementById('customColorTo').value;
+
+            if (!name) return this.showAuthError('请输入主题名称');
+
+            this.theme.saveCustomTheme(name, from, to);
+            this.theme.renderCustomThemes();
+            document.getElementById('customThemeModal').classList.add('hidden');
+            document.getElementById('customThemeName').value = '';
+            this.showNotification(`主题"${name}"已创建`, 'success');
         });
 
         // 主色调选择
@@ -636,8 +746,18 @@ class TodoManager {
     }
 
     openSettings() {
+        this.theme.renderCustomThemes();
         this.syncSettingsUI();
         document.getElementById('settingsModal').classList.remove('hidden');
+    }
+
+    updateCustomPreview() {
+        const from = document.getElementById('customColorFrom')?.value || '#667eea';
+        const to = document.getElementById('customColorTo')?.value || '#764ba2';
+        const preview = document.getElementById('customThemePreview');
+        if (preview) {
+            preview.style.background = `linear-gradient(135deg, ${from}, ${to})`;
+        }
     }
 
     syncSettingsUI() {

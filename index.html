@@ -198,7 +198,10 @@
             <div class="modal-body settings-body">
                 <!-- 预设主题 -->
                 <div class="setting-section">
-                    <h4>🌈 预设主题</h4>
+                    <div class="theme-header">
+                        <h4>🌈 我的主题</h4>
+                        <button class="add-theme-btn" id="addCustomThemeBtn">+ 添加主题</button>
+                    </div>
                     <div class="theme-presets" id="themePresets">
                         <div class="theme-preset active" data-theme="default" style="background:linear-gradient(135deg,#667eea,#764ba2)">
                             <span>默认</span>
@@ -301,6 +304,35 @@
             <div class="modal-footer">
                 <button class="modal-cancel-btn" id="resetSettingsBtn">🔄 恢复默认</button>
                 <button class="modal-save-btn" id="saveSettingsBtn">💾 保存设置</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== 添加自定义主题模态框 ========== -->
+    <div class="modal hidden" id="customThemeModal">
+        <div class="modal-content" style="max-width:400px;">
+            <div class="modal-header">
+                <h3>🎨 创建自定义主题</h3>
+                <button class="modal-close-btn" id="closeCustomThemeBtn">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>主题名称</label>
+                    <input type="text" id="customThemeName" placeholder="如：我的主题" required>
+                </div>
+                <div class="color-picker-row">
+                    <label>起始颜色</label>
+                    <input type="color" id="customColorFrom" value="#667eea">
+                </div>
+                <div class="color-picker-row">
+                    <label>结束颜色</label>
+                    <input type="color" id="customColorTo" value="#764ba2">
+                </div>
+                <div class="theme-preview" id="customThemePreview"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-cancel-btn" id="cancelCustomThemeBtn">取消</button>
+                <button class="modal-save-btn" id="saveCustomThemeBtn">保存主题</button>
             </div>
         </div>
     </div>
