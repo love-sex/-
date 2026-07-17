@@ -142,23 +142,67 @@ class ThemeManager {
             header.style.display = '';
         }
 
-        // 背景图片 - 添加半透明遮罩保证文字可读
+        // 背景图片/视频 - 添加半透明遮罩保证文字可读
         const existingBg = document.getElementById('custom-bg-image');
+        const existingVideo = document.getElementById('custom-bg-video');
         if (s.bgImage) {
-            if (!existingBg) {
-                const bgDiv = document.createElement('div');
-                bgDiv.id = 'custom-bg-image';
-                bgDiv.style.cssText = `
-                    position: fixed; inset: 0; z-index: -1;
-                    background-image: url('${s.bgImage}');
-                    background-size: cover; background-position: center;
-                    opacity: ${s.bgOpacity / 100};
-                    filter: blur(${s.bgBlur}px);
-                    pointer-events: none;
-                `;
-                document.body.insertBefore(bgDiv, document.body.firstChild);
-                // 添加半透明遮罩层保证文字可读
-                const overlay = document.createElement('div');
+            const isVideo = s.bgImage.startsWith('data:video');
+            if (isVideo) {
+                // 视频背景
+                if (!existingVideo) {
+                    const video = document.createElement('video');
+                    video.id = 'custom-bg-video';
+                    video.autoplay = true;
+                    video.loop = true;
+                    video.muted = false;
+                    video.playsInline = true;
+                    video.style.cssText = `
+                        position: fixed; inset: 0; z-index: -2;
+                        width: 100%; height: 100%;
+                        object-fit: cover;
+                        opacity: ${s.bgOpacity / 100};
+                        filter: blur(${s.bgBlur}px);
+                        pointer-events: none;
+                    `;
+                    const source = document.createElement('source');
+                    source.src = s.bgImage;
+                    video.appendChild(source);
+                    document.body.insertBefore(video, document.body.firstChild);
+                    // 尝试播放（处理浏览器自动播放策略）
+                    video.play().catch(() => {
+                        video.muted = true;
+                        video.play();
+                    });
+                } else {
+                    existingVideo.style.opacity = s.bgOpacity / 100;
+                    existingVideo.style.filter = `blur(${s.bgBlur}px)`;
+                }
+                if (existingBg) existingBg.remove();
+            } else {
+                // 图片背景
+                if (!existingBg) {
+                    const bgDiv = document.createElement('div');
+                    bgDiv.id = 'custom-bg-image';
+                    bgDiv.style.cssText = `
+                        position: fixed; inset: 0; z-index: -1;
+                        background-image: url('${s.bgImage}');
+                        background-size: cover; background-position: center;
+                        opacity: ${s.bgOpacity / 100};
+                        filter: blur(${s.bgBlur}px);
+                        pointer-events: none;
+                    `;
+                    document.body.insertBefore(bgDiv, document.body.firstChild);
+                } else {
+                    existingBg.style.backgroundImage = `url('${s.bgImage}')`;
+                    existingBg.style.opacity = s.bgOpacity / 100;
+                    existingBg.style.filter = `blur(${s.bgBlur}px)`;
+                }
+                if (existingVideo) existingVideo.remove();
+            }
+            // 添加半透明遮罩层保证文字可读
+            let overlay = document.getElementById('custom-bg-overlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
                 overlay.id = 'custom-bg-overlay';
                 overlay.style.cssText = `
                     position: fixed; inset: 0; z-index: -1;
@@ -166,13 +210,10 @@ class ThemeManager {
                     pointer-events: none;
                 `;
                 document.body.insertBefore(overlay, document.body.firstChild);
-            } else {
-                existingBg.style.backgroundImage = `url('${s.bgImage}')`;
-                existingBg.style.opacity = s.bgOpacity / 100;
-                existingBg.style.filter = `blur(${s.bgBlur}px)`;
             }
         } else {
             if (existingBg) existingBg.remove();
+            if (existingVideo) existingVideo.remove();
             const overlay = document.getElementById('custom-bg-overlay');
             if (overlay) overlay.remove();
         }
@@ -668,27 +709,35 @@ class TodoManager {
         document.getElementById('bgImageInput')?.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            if (file.size > 5 * 1024 * 1024) {
-                return this.showNotification('图片大小不能超过5MB', 'error');
-            }
+
+            const isVideo = file.type.startsWith('video/');
             const reader = new FileReader();
             reader.onload = (ev) => {
                 this.theme.setBgImage(ev.target.result);
-                this.updateBgPreview(ev.target.result);
+                if (isVideo) {
+                    document.getElementById('bgVideoPreview').classList.remove('hidden');
+                    document.getElementById('bgVideoPreview').src = ev.target.result;
+                    document.getElementById('bgImagePreview').style.display = 'none';
+                } else {
+                    this.updateBgPreview(ev.target.result);
+                    document.getElementById('bgVideoPreview').classList.add('hidden');
+                }
                 document.getElementById('removeBgBtn').classList.remove('hidden');
-                this.showNotification('背景图片已设置', 'success');
+                this.showNotification(isVideo ? '背景视频已设置' : '背景图片已设置', 'success');
             };
             reader.readAsDataURL(file);
             e.target.value = '';
         });
 
-        // 移除背景图片
+        // 移除背景图片/视频
         document.getElementById('removeBgBtn')?.addEventListener('click', () => {
             this.theme.removeBgImage();
             document.getElementById('bgImagePreview').style.backgroundImage = '';
             document.getElementById('bgImagePreview').style.display = 'none';
+            document.getElementById('bgVideoPreview').classList.add('hidden');
+            document.getElementById('bgVideoPreview').src = '';
             document.getElementById('removeBgBtn').classList.add('hidden');
-            this.showNotification('背景图片已移除', 'info');
+            this.showNotification('背景已移除', 'info');
         });
 
         // 背景透明度
@@ -780,7 +829,15 @@ class TodoManager {
 
         // 同步背景预览
         if (s.bgImage) {
-            this.updateBgPreview(s.bgImage);
+            const isVideo = s.bgImage.startsWith('data:video');
+            if (isVideo) {
+                document.getElementById('bgVideoPreview').classList.remove('hidden');
+                document.getElementById('bgVideoPreview').src = s.bgImage;
+                document.getElementById('bgImagePreview').style.display = 'none';
+            } else {
+                this.updateBgPreview(s.bgImage);
+                document.getElementById('bgVideoPreview').classList.add('hidden');
+            }
             document.getElementById('removeBgBtn').classList.remove('hidden');
         }
 
@@ -1084,11 +1141,6 @@ class TodoManager {
                     <select id="editCategory" class="modal-input">
                         ${this.categories.map(cat => `<option value="${escapeHtml(cat)}" ${task.category === cat ? 'selected' : ''}>${escapeHtml(cat)}</option>`).join('')}
                     </select>
-                    <div style="display:flex;align-items:center;gap:12px;margin-top:8px;">
-                        <label style="font-size:0.9rem;color:#374151;">进度:</label>
-                        <input type="range" id="editProgress" min="0" max="100" value="${task.progress}" style="flex:1;">
-                        <span id="progressValue" style="min-width:40px;font-weight:600;">${task.progress}%</span>
-                    </div>
                 </div>
                 <div class="modal-footer">
                     <button class="modal-cancel-btn" id="cancelEdit">取消</button>
@@ -1098,12 +1150,6 @@ class TodoManager {
         `;
 
         document.body.appendChild(modal);
-
-        const progressInput = modal.querySelector('#editProgress');
-        const progressValue = modal.querySelector('#progressValue');
-        progressInput?.addEventListener('input', () => {
-            progressValue.textContent = progressInput.value + '%';
-        });
 
         modal.addEventListener('click', (e) => {
             if (e.target === modal) modal.remove();
@@ -1122,7 +1168,6 @@ class TodoManager {
             task.priority = modal.querySelector('#editPriority').value;
             task.dueDate = modal.querySelector('#editDueDate').value;
             task.category = modal.querySelector('#editCategory').value;
-            task.progress = parseInt(modal.querySelector('#editProgress').value) || 0;
 
             if (!this.categories.includes(task.category)) {
                 this.categories.push(task.category);
@@ -1212,9 +1257,6 @@ class TodoManager {
                     <span class="task-priority ${priorityClass}">${priorityLabels[priorityClass]}优先级</span>
                     <span class="task-category">📁 ${escapeHtml(task.category)}</span>
                     <span class="task-due-date ${isOverdue ? 'overdue' : ''}">📅 ${dueDateStr}</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: ${task.progress || 0}%"></div>
                 </div>
             </div>
             <div class="task-actions">

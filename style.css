@@ -1276,6 +1276,14 @@ button {
     margin-bottom: 8px;
     border: 2px dashed var(--gray-300);
 }
+.bg-video-preview {
+    width: 100%;
+    height: 80px;
+    border-radius: var(--radius-md);
+    margin-bottom: 8px;
+    object-fit: cover;
+    background: #000;
+}
 .bg-controls {
     display: flex;
     align-items: center;

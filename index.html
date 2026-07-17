@@ -255,11 +255,12 @@
                 <div class="setting-section">
                     <h4>🖼️ 背景图片</h4>
                     <div class="bg-image-upload">
-                        <input type="file" id="bgImageInput" accept="image/*" style="display:none">
-                        <button class="upload-btn" id="uploadBgBtn">📁 选择图片</button>
-                        <button class="remove-btn hidden" id="removeBgBtn">🗑️ 移除图片</button>
+                        <input type="file" id="bgImageInput" accept="image/*,video/*" style="display:none">
+                        <button class="upload-btn" id="uploadBgBtn">📁 选择图片/视频</button>
+                        <button class="remove-btn hidden" id="removeBgBtn">🗑️ 移除</button>
                     </div>
                     <div class="bg-image-preview" id="bgImagePreview"></div>
+                    <div class="bg-video-preview hidden" id="bgVideoPreview"></div>
                     <div class="bg-controls">
                         <label>透明度</label>
                         <input type="range" id="bgOpacity" min="0" max="100" value="15">
