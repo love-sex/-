@@ -70,7 +70,8 @@ migrateData();
 // ==================== 主题设置管理器 ====================
 const DEFAULT_THEME = {
     primaryColor: '#6366f1',
-    bgColor: '#f8fafc',
+    headerFrom: '#667eea',
+    headerTo: '#764ba2',
     bgImage: '',
     bgOpacity: 15,
     bgBlur: 5,
@@ -82,12 +83,16 @@ const DEFAULT_THEME = {
 };
 
 const PRESET_THEMES = {
-    default: { primaryColor: '#6366f1', bgColor: '#f8fafc', mode: 'default' },
-    ocean:   { primaryColor: '#0891b2', bgColor: '#ecfeff', mode: 'ocean' },
-    forest:  { primaryColor: '#059669', bgColor: '#f0fdf4', mode: 'forest' },
-    sunset:  { primaryColor: '#ea580c', bgColor: '#fff7ed', mode: 'sunset' },
-    dark:    { primaryColor: '#818cf8', bgColor: '#1e293b', mode: 'dark' },
-    sakura:  { primaryColor: '#db2777', bgColor: '#fdf2f8', mode: 'sakura' }
+    default: { primaryColor: '#6366f1', headerFrom: '#667eea', headerTo: '#764ba2', mode: 'default' },
+    ocean:   { primaryColor: '#0891b2', headerFrom: '#2193b0', headerTo: '#6dd5ed', mode: 'ocean' },
+    forest:  { primaryColor: '#059669', headerFrom: '#11998e', headerTo: '#38ef7d', mode: 'forest' },
+    sunset:  { primaryColor: '#ea580c', headerFrom: '#f12711', headerTo: '#f5af19', mode: 'sunset' },
+    sakura:  { primaryColor: '#db2777', headerFrom: '#fbc2eb', headerTo: '#a18cd1', mode: 'sakura' },
+    night:   { primaryColor: '#818cf8', headerFrom: '#0f172a', headerTo: '#334155', mode: 'night' },
+    purple:  { primaryColor: '#7c3aed', headerFrom: '#7c3aed', headerTo: '#c084fc', mode: 'purple' },
+    mint:    { primaryColor: '#0d9488', headerFrom: '#0d9488', headerTo: '#5eead4', mode: 'mint' },
+    rose:    { primaryColor: '#e11d48', headerFrom: '#e11d48', headerTo: '#fb7185', mode: 'rose' },
+    sky:     { primaryColor: '#0284c7', headerFrom: '#0284c7', headerTo: '#7dd3fc', mode: 'sky' }
 };
 
 class ThemeManager {
@@ -117,25 +122,21 @@ class ThemeManager {
         const s = this.settings;
         const root = document.documentElement;
 
-        // 应用颜色变量
+        // 应用主色调到CSS变量
         root.style.setProperty('--primary-500', s.primaryColor);
         root.style.setProperty('--primary-600', this.darkenColor(s.primaryColor, 10));
         root.style.setProperty('--primary-700', this.darkenColor(s.primaryColor, 20));
         root.style.setProperty('--primary-400', this.lightenColor(s.primaryColor, 15));
         root.style.setProperty('--primary-300', this.lightenColor(s.primaryColor, 30));
+        root.style.setProperty('--primary-100', this.lightenColor(s.primaryColor, 40) + '22');
 
-        // 深色模式
-        if (s.mode === 'dark') {
-            root.style.setProperty('--gray-50', '#0f172a');
-            root.style.setProperty('--gray-100', '#1e293b');
-            root.style.setProperty('--gray-800', '#f1f5f9');
-            root.style.setProperty('--gray-900', '#f8fafc');
-            document.body.classList.add('dark-mode');
-        } else {
-            document.body.classList.remove('dark-mode');
+        // 预设主题只影响头部 header 渐变
+        const header = document.querySelector('header');
+        if (header && s.headerFrom && s.headerTo) {
+            header.style.background = `linear-gradient(135deg, ${s.headerFrom} 0%, ${s.headerTo} 100%)`;
         }
 
-        // 背景图片
+        // 背景图片 - 添加半透明遮罩保证文字可读
         const existingBg = document.getElementById('custom-bg-image');
         if (s.bgImage) {
             if (!existingBg) {
@@ -150,13 +151,24 @@ class ThemeManager {
                     pointer-events: none;
                 `;
                 document.body.insertBefore(bgDiv, document.body.firstChild);
+                // 添加半透明遮罩层保证文字可读
+                const overlay = document.createElement('div');
+                overlay.id = 'custom-bg-overlay';
+                overlay.style.cssText = `
+                    position: fixed; inset: 0; z-index: -1;
+                    background: rgba(255,255,255,0.85);
+                    pointer-events: none;
+                `;
+                document.body.insertBefore(overlay, document.body.firstChild);
             } else {
                 existingBg.style.backgroundImage = `url('${s.bgImage}')`;
                 existingBg.style.opacity = s.bgOpacity / 100;
                 existingBg.style.filter = `blur(${s.bgBlur}px)`;
             }
-        } else if (existingBg) {
-            existingBg.remove();
+        } else {
+            if (existingBg) existingBg.remove();
+            const overlay = document.getElementById('custom-bg-overlay');
+            if (overlay) overlay.remove();
         }
 
         // 效果
@@ -528,11 +540,13 @@ class TodoManager {
             document.getElementById('primaryColorValue').textContent = e.target.value;
         });
 
-        // 背景色选择
+        // 背景色选择 - 只影响背景遮罩色调
         document.getElementById('bgColorPicker')?.addEventListener('input', (e) => {
-            this.theme.settings.bgColor = e.target.value;
+            const overlay = document.getElementById('custom-bg-overlay');
+            if (overlay) {
+                overlay.style.background = e.target.value + 'd9';
+            }
             document.getElementById('bgColorValue').textContent = e.target.value;
-            this.theme.applySettings();
             this.theme.saveSettings();
         });
 
@@ -635,9 +649,9 @@ class TodoManager {
         if (primaryValue) primaryValue.textContent = s.primaryColor;
 
         const bgPicker = document.getElementById('bgColorPicker');
-        if (bgPicker) bgPicker.value = s.bgColor;
+        if (bgPicker) bgPicker.value = '#f8fafc';
         const bgValue = document.getElementById('bgColorValue');
-        if (bgValue) bgValue.textContent = s.bgColor;
+        if (bgValue) bgValue.textContent = '#f8fafc';
 
         // 同步预设主题选中
         document.querySelectorAll('.theme-preset').forEach(p => {
