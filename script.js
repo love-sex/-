@@ -67,6 +67,151 @@ function saveUsers(users) {
 // ==================== 启动时数据迁移 ====================
 migrateData();
 
+// ==================== 主题设置管理器 ====================
+const DEFAULT_THEME = {
+    primaryColor: '#6366f1',
+    bgColor: '#f8fafc',
+    bgImage: '',
+    bgOpacity: 15,
+    bgBlur: 5,
+    glassEffect: false,
+    shadowEffect: true,
+    animationEffect: true,
+    fontSize: 100,
+    mode: 'default'
+};
+
+const PRESET_THEMES = {
+    default: { primaryColor: '#6366f1', bgColor: '#f8fafc', mode: 'default' },
+    ocean:   { primaryColor: '#0891b2', bgColor: '#ecfeff', mode: 'ocean' },
+    forest:  { primaryColor: '#059669', bgColor: '#f0fdf4', mode: 'forest' },
+    sunset:  { primaryColor: '#ea580c', bgColor: '#fff7ed', mode: 'sunset' },
+    dark:    { primaryColor: '#818cf8', bgColor: '#1e293b', mode: 'dark' },
+    sakura:  { primaryColor: '#db2777', bgColor: '#fdf2f8', mode: 'sakura' }
+};
+
+class ThemeManager {
+    constructor() {
+        this.settings = this.loadSettings();
+        this.applySettings();
+    }
+
+    loadSettings() {
+        try {
+            const saved = localStorage.getItem('todoApp_theme');
+            return saved ? { ...DEFAULT_THEME, ...JSON.parse(saved) } : { ...DEFAULT_THEME };
+        } catch { return { ...DEFAULT_THEME }; }
+    }
+
+    saveSettings() {
+        localStorage.setItem('todoApp_theme', JSON.stringify(this.settings));
+    }
+
+    resetSettings() {
+        this.settings = { ...DEFAULT_THEME };
+        this.saveSettings();
+        this.applySettings();
+    }
+
+    applySettings() {
+        const s = this.settings;
+        const root = document.documentElement;
+
+        // 应用颜色变量
+        root.style.setProperty('--primary-500', s.primaryColor);
+        root.style.setProperty('--primary-600', this.darkenColor(s.primaryColor, 10));
+        root.style.setProperty('--primary-700', this.darkenColor(s.primaryColor, 20));
+        root.style.setProperty('--primary-400', this.lightenColor(s.primaryColor, 15));
+        root.style.setProperty('--primary-300', this.lightenColor(s.primaryColor, 30));
+
+        // 深色模式
+        if (s.mode === 'dark') {
+            root.style.setProperty('--gray-50', '#0f172a');
+            root.style.setProperty('--gray-100', '#1e293b');
+            root.style.setProperty('--gray-800', '#f1f5f9');
+            root.style.setProperty('--gray-900', '#f8fafc');
+            document.body.classList.add('dark-mode');
+        } else {
+            document.body.classList.remove('dark-mode');
+        }
+
+        // 背景图片
+        const existingBg = document.getElementById('custom-bg-image');
+        if (s.bgImage) {
+            if (!existingBg) {
+                const bgDiv = document.createElement('div');
+                bgDiv.id = 'custom-bg-image';
+                bgDiv.style.cssText = `
+                    position: fixed; inset: 0; z-index: -1;
+                    background-image: url('${s.bgImage}');
+                    background-size: cover; background-position: center;
+                    opacity: ${s.bgOpacity / 100};
+                    filter: blur(${s.bgBlur}px);
+                    pointer-events: none;
+                `;
+                document.body.insertBefore(bgDiv, document.body.firstChild);
+            } else {
+                existingBg.style.backgroundImage = `url('${s.bgImage}')`;
+                existingBg.style.opacity = s.bgOpacity / 100;
+                existingBg.style.filter = `blur(${s.bgBlur}px)`;
+            }
+        } else if (existingBg) {
+            existingBg.remove();
+        }
+
+        // 效果
+        document.body.classList.toggle('glass-effect', s.glassEffect);
+        document.body.classList.toggle('no-shadow', !s.shadowEffect);
+        document.body.classList.toggle('no-animation', !s.animationEffect);
+
+        // 字体大小
+        root.style.fontSize = s.fontSize + '%';
+    }
+
+    darkenColor(hex, percent) {
+        const num = parseInt(hex.replace('#', ''), 16);
+        const r = Math.max(0, (num >> 16) - Math.round(255 * percent / 100));
+        const g = Math.max(0, ((num >> 8) & 0x00FF) - Math.round(255 * percent / 100));
+        const b = Math.max(0, (num & 0x0000FF) - Math.round(255 * percent / 100));
+        return '#' + (0x1000000 + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    }
+
+    lightenColor(hex, percent) {
+        const num = parseInt(hex.replace('#', ''), 16);
+        const r = Math.min(255, (num >> 16) + Math.round(255 * percent / 100));
+        const g = Math.min(255, ((num >> 8) & 0x00FF) + Math.round(255 * percent / 100));
+        const b = Math.min(255, (num & 0x0000FF) + Math.round(255 * percent / 100));
+        return '#' + (0x1000000 + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    }
+
+    setPrimaryColor(color) {
+        this.settings.primaryColor = color;
+        this.applySettings();
+        this.saveSettings();
+    }
+
+    setBgImage(base64) {
+        this.settings.bgImage = base64;
+        this.applySettings();
+        this.saveSettings();
+    }
+
+    removeBgImage() {
+        this.settings.bgImage = '';
+        this.applySettings();
+        this.saveSettings();
+    }
+
+    setPreset(themeName) {
+        const preset = PRESET_THEMES[themeName];
+        if (preset) {
+            this.settings = { ...this.settings, ...preset };
+            this.applySettings();
+            this.saveSettings();
+        }
+    }
+}
+
 // ==================== 认证管理器 ====================
 class AuthManager {
     constructor() {
@@ -339,11 +484,195 @@ class TodoManager {
         document.getElementById('mainApp')?.classList.remove('hidden');
         const el = document.getElementById('currentUsername');
         if (el) el.textContent = this.auth.username;
+        this.theme = new ThemeManager();
         this.setupEventListeners();
         this.renderCategories();
         this.updateUI();
         this.setupDragAndDrop();
+        this.setupSettingsUI();
         this.showNotification(`欢迎回来，${this.auth.username}！`, 'success');
+    }
+
+    // ==================== 设置面板 ====================
+    setupSettingsUI() {
+        // 打开/关闭设置面板
+        document.getElementById('openSettingsBtn')?.addEventListener('click', () => {
+            this.openSettings();
+        });
+        document.getElementById('closeSettingsBtn')?.addEventListener('click', () => {
+            document.getElementById('settingsModal').classList.add('hidden');
+        });
+
+        // 点击模态框背景关闭
+        document.getElementById('settingsModal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'settingsModal') {
+                document.getElementById('settingsModal').classList.add('hidden');
+            }
+        });
+
+        // 预设主题
+        document.getElementById('themePresets')?.addEventListener('click', (e) => {
+            const preset = e.target.closest('.theme-preset');
+            if (preset) {
+                document.querySelectorAll('.theme-preset').forEach(p => p.classList.remove('active'));
+                preset.classList.add('active');
+                this.theme.setPreset(preset.dataset.theme);
+                this.syncSettingsUI();
+                this.showNotification('主题已切换', 'success');
+            }
+        });
+
+        // 主色调选择
+        document.getElementById('primaryColorPicker')?.addEventListener('input', (e) => {
+            this.theme.setPrimaryColor(e.target.value);
+            document.getElementById('primaryColorValue').textContent = e.target.value;
+        });
+
+        // 背景色选择
+        document.getElementById('bgColorPicker')?.addEventListener('input', (e) => {
+            this.theme.settings.bgColor = e.target.value;
+            document.getElementById('bgColorValue').textContent = e.target.value;
+            this.theme.applySettings();
+            this.theme.saveSettings();
+        });
+
+        // 背景图片上传
+        document.getElementById('uploadBgBtn')?.addEventListener('click', () => {
+            document.getElementById('bgImageInput')?.click();
+        });
+
+        document.getElementById('bgImageInput')?.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (file.size > 5 * 1024 * 1024) {
+                return this.showNotification('图片大小不能超过5MB', 'error');
+            }
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                this.theme.setBgImage(ev.target.result);
+                this.updateBgPreview(ev.target.result);
+                document.getElementById('removeBgBtn').classList.remove('hidden');
+                this.showNotification('背景图片已设置', 'success');
+            };
+            reader.readAsDataURL(file);
+            e.target.value = '';
+        });
+
+        // 移除背景图片
+        document.getElementById('removeBgBtn')?.addEventListener('click', () => {
+            this.theme.removeBgImage();
+            document.getElementById('bgImagePreview').style.backgroundImage = '';
+            document.getElementById('bgImagePreview').style.display = 'none';
+            document.getElementById('removeBgBtn').classList.add('hidden');
+            this.showNotification('背景图片已移除', 'info');
+        });
+
+        // 背景透明度
+        document.getElementById('bgOpacity')?.addEventListener('input', (e) => {
+            this.theme.settings.bgOpacity = parseInt(e.target.value);
+            document.getElementById('bgOpacityValue').textContent = e.target.value + '%';
+            this.theme.applySettings();
+            this.theme.saveSettings();
+        });
+
+        // 背景模糊度
+        document.getElementById('bgBlur')?.addEventListener('input', (e) => {
+            this.theme.settings.bgBlur = parseInt(e.target.value);
+            document.getElementById('bgBlurValue').textContent = e.target.value + 'px';
+            this.theme.applySettings();
+            this.theme.saveSettings();
+        });
+
+        // 效果选项
+        document.getElementById('glassEffect')?.addEventListener('change', (e) => {
+            this.theme.settings.glassEffect = e.target.checked;
+            this.theme.applySettings();
+            this.theme.saveSettings();
+        });
+        document.getElementById('shadowEffect')?.addEventListener('change', (e) => {
+            this.theme.settings.shadowEffect = e.target.checked;
+            this.theme.applySettings();
+            this.theme.saveSettings();
+        });
+        document.getElementById('animationEffect')?.addEventListener('change', (e) => {
+            this.theme.settings.animationEffect = e.target.checked;
+            this.theme.applySettings();
+            this.theme.saveSettings();
+        });
+
+        // 字体大小
+        document.getElementById('fontSize')?.addEventListener('input', (e) => {
+            this.theme.settings.fontSize = parseInt(e.target.value);
+            document.getElementById('fontSizeValue').textContent = e.target.value + '%';
+            this.theme.applySettings();
+            this.theme.saveSettings();
+        });
+
+        // 保存/重置
+        document.getElementById('saveSettingsBtn')?.addEventListener('click', () => {
+            this.theme.saveSettings();
+            document.getElementById('settingsModal').classList.add('hidden');
+            this.showNotification('设置已保存', 'success');
+        });
+        document.getElementById('resetSettingsBtn')?.addEventListener('click', () => {
+            this.theme.resetSettings();
+            this.syncSettingsUI();
+            this.showNotification('已恢复默认设置', 'info');
+        });
+    }
+
+    openSettings() {
+        this.syncSettingsUI();
+        document.getElementById('settingsModal').classList.remove('hidden');
+    }
+
+    syncSettingsUI() {
+        const s = this.theme.settings;
+        // 同步颜色选择器
+        const primaryPicker = document.getElementById('primaryColorPicker');
+        if (primaryPicker) primaryPicker.value = s.primaryColor;
+        const primaryValue = document.getElementById('primaryColorValue');
+        if (primaryValue) primaryValue.textContent = s.primaryColor;
+
+        const bgPicker = document.getElementById('bgColorPicker');
+        if (bgPicker) bgPicker.value = s.bgColor;
+        const bgValue = document.getElementById('bgColorValue');
+        if (bgValue) bgValue.textContent = s.bgColor;
+
+        // 同步预设主题选中
+        document.querySelectorAll('.theme-preset').forEach(p => {
+            p.classList.toggle('active', p.dataset.theme === s.mode);
+        });
+
+        // 同步背景预览
+        if (s.bgImage) {
+            this.updateBgPreview(s.bgImage);
+            document.getElementById('removeBgBtn').classList.remove('hidden');
+        }
+
+        // 同步滑块
+        const bgOpacity = document.getElementById('bgOpacity');
+        if (bgOpacity) { bgOpacity.value = s.bgOpacity; document.getElementById('bgOpacityValue').textContent = s.bgOpacity + '%'; }
+        const bgBlur = document.getElementById('bgBlur');
+        if (bgBlur) { bgBlur.value = s.bgBlur; document.getElementById('bgBlurValue').textContent = s.bgBlur + 'px'; }
+        const fontSize = document.getElementById('fontSize');
+        if (fontSize) { fontSize.value = s.fontSize; document.getElementById('fontSizeValue').textContent = s.fontSize + '%'; }
+
+        // 同步复选框
+        const glass = document.getElementById('glassEffect');
+        if (glass) glass.checked = s.glassEffect;
+        const shadow = document.getElementById('shadowEffect');
+        if (shadow) shadow.checked = s.shadowEffect;
+        const anim = document.getElementById('animationEffect');
+        if (anim) anim.checked = s.animationEffect;
+    }
+
+    updateBgPreview(imageData) {
+        const preview = document.getElementById('bgImagePreview');
+        if (preview) {
+            preview.style.display = 'block';
+            preview.style.backgroundImage = `url('${imageData}')`;
+        }
     }
 
     showAuthError(msg) {
