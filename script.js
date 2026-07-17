@@ -637,225 +637,76 @@ class TodoManager {
     initDynamicBackground() {
         const canvas = document.getElementById('dynamicBgCanvas');
         if (!canvas) return;
-
         if (this.theme.settings.bgImage || this.theme.settings.bgVideoId) {
             canvas.style.display = 'none';
             return;
         }
-
         canvas.style.display = 'block';
         const ctx = canvas.getContext('2d');
-        let particles = [];
-        let orbs = [];
-        let ripples = [];
-        let mouseX = -1000, mouseY = -1000;
-        let prevMouseX = 0, prevMouseY = 0;
-        let mouseSpeed = 0;
         let animationId = null;
-
-        const resize = () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        };
+        let particles = [];
+        let mouseX = -1000, mouseY = -1000;
+        let seasonIndex = 0;
+        let transitionProgress = 0;
+        const SEASON_DURATION = 3 * 60 * 1000;
+        const TRANSITION_DURATION = 2000;
+        let seasonStartTime = Date.now();
+        let nextParticles = SEASONS = [
+            { name:'Spring', emoji:'S', colors:['#fce4ec','#f8bbd0','#f48fb1','#e1bee7'], bgTop:'#2d1b4e', bgBottom:'#1a1a2e', count:60 },
+            { name:'Summer', emoji:'Su', colors:['#bbdefb','#90caf9','#64b5f6','#4fc3f7'], bgTop:'#0d2b4e', bgBottom:'#0a1929', count:50 },
+            { name:'Autumn', emoji:'A', colors:['#ffcc80','#ffb74d','#ffa726','#ff8a65'], bgTop:'#3e2723', bgBottom:'#1a1a1a', count:70 },
+            { name:'Winter', emoji:'W', colors:['#e3f2fd','#bbdefb','#90caf9','#f8fdff'], bgTop:'#1a237e', bgBottom:'#0d1b2a', count:80 }
+        ];
+        const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
         resize();
         window.addEventListener('resize', resize);
-
-        // 鼠标交互
-        const onMouseMove = (e) => {
-            prevMouseX = mouseX;
-            prevMouseY = mouseY;
-            mouseX = e.clientX;
-            mouseY = e.clientY;
-            mouseSpeed = Math.sqrt((mouseX - prevMouseX) ** 2 + (mouseY - prevMouseY) ** 2);
-
-            // 快速移动时产生涟漪
-            if (mouseSpeed > 8 && ripples.length < 6) {
-                ripples.push({ x: mouseX, y: mouseY, radius: 0, opacity: 0.5 });
+        document.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
+        function createParticles(count, season) {
+            const arr = [];
+            for (let i = 0; i < count; i++) {
+                arr.push({ x:Math.random()*canvas.width, y:Math.random()*canvas.height, size:Math.random()*3+1.5, speedX:(Math.random()-0.5)*0.8, speedY:Math.random()*0.4+0.2, opacity:Math.random()*0.5+0.3, color:season.colors[Math.floor(Math.random()*season.colors.length)], rotation:Math.random()*6.28, rotSpeed:(Math.random()-0.5)*0.03, sway:Math.random()*6.28, swaySpeed:Math.random()*0.015+0.008 });
             }
-        };
-        document.addEventListener('mousemove', onMouseMove);
-
-        // 点击产生大涟漪
-        const onClick = (e) => {
-            ripples.push({ x: e.clientX, y: e.clientY, radius: 0, opacity: 0.8, big: true });
-        };
-        document.addEventListener('click', onClick);
-
-        // 漂浮光球
-        class Orb {
-            constructor() { this.reset(); }
-            reset() {
-                this.x = Math.random() * canvas.width;
-                this.y = Math.random() * canvas.height;
-                this.radius = Math.random() * 60 + 30;
-                this.speedX = (Math.random() - 0.5) * 0.4;
-                this.speedY = (Math.random() - 0.5) * 0.4;
-                this.hue = Math.random() * 40 + 210;
-                this.pulse = Math.random() * Math.PI * 2;
-            }
-            update() {
-                this.x += this.speedX;
-                this.y += this.speedY;
-                this.pulse += 0.01;
-                if (this.x < -this.radius) this.x = canvas.width + this.radius;
-                if (this.x > canvas.width + this.radius) this.x = -this.radius;
-                if (this.y < -this.radius) this.y = canvas.height + this.radius;
-                if (this.y > canvas.height + this.radius) this.y = -this.radius;
-            }
-            draw() {
-                const r = this.radius + Math.sin(this.pulse) * 8;
-                const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, r);
-                gradient.addColorStop(0, `hsla(${this.hue}, 80%, 60%, 0.08)`);
-                gradient.addColorStop(0.5, `hsla(${this.hue}, 70%, 50%, 0.04)`);
-                gradient.addColorStop(1, `hsla(${this.hue}, 60%, 40%, 0)`);
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
-                ctx.fillStyle = gradient;
-                ctx.fill();
+            return arr;
+        }
+        function updateParticles(ps) {
+            for (const p of ps) {
+                if (seasonIndex === 0) { p.x += Math.sin(p.sway)*0.4+p.speedX*0.4; p.y += p.speedY+Math.cos(p.sway)*0.2; p.sway += p.swaySpeed; p.rotation += p.rotSpeed; }
+                else if (seasonIndex === 1) { p.x += Math.sin(p.sway)*0.2; p.y -= p.speedY*0.6; p.sway += p.swaySpeed*2; p.opacity = 0.3+Math.sin(p.sway)*0.3; if(p.y<-10){p.y=canvas.height+10;p.x=Math.random()*canvas.width;} }
+                else if (seasonIndex === 2) { p.x += p.speedX+Math.sin(p.sway)*0.6; p.y += p.speedY+Math.cos(p.sway)*0.3; p.sway += p.swaySpeed*2.5; p.rotation += p.rotSpeed*1.5; }
+                else { p.x += Math.sin(p.sway)*0.4; p.y += p.speedY*0.5; p.sway += p.swaySpeed*1.5; p.rotation += p.rotSpeed*0.4; }
+                if(seasonIndex!==1){if(p.y>canvas.height+10){p.y=-10;p.x=Math.random()*canvas.width;}if(p.x<-10)p.x=canvas.width+10;if(p.x>canvas.width+10)p.x=-10;}
+                const dx=p.x-mouseX,dy=p.y-mouseY,dist=Math.sqrt(dx*dx+dy*dy);
+                if(dist<100&&dist>0){const f=(100-dist)/100;p.x+=(dx/dist)*f;p.opacity=Math.min(p.opacity+f*0.2,0.9);}
             }
         }
-
-        // 粒子
-        class Particle {
-            constructor() { this.reset(); }
-            reset() {
-                this.x = Math.random() * canvas.width;
-                this.y = Math.random() * canvas.height;
-                this.baseSize = Math.random() * 2 + 0.5;
-                this.size = this.baseSize;
-                this.speedX = (Math.random() - 0.5) * 0.5;
-                this.speedY = (Math.random() - 0.5) * 0.5;
-                this.baseOpacity = Math.random() * 0.4 + 0.15;
-                this.opacity = this.baseOpacity;
-                this.hue = Math.random() * 50 + 210;
-                this.angle = Math.random() * Math.PI * 2;
+        function drawPsects(ps, alpha) {
+            ctx.globalAlpha = alpha;
+            for (const p of ps) {
+                ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rotation);
+                if (seasonIndex === 3) { ctx.beginPath(); for(let i=0;i<6;i++){ctx.moveTo(0,0);ctx.lineTo(0,-p.size*2);ctx.rotate(Math.PI/3);} ctx.strokeStyle=p.color; ctx.lineWidth=0.7; ctx.globalAlpha=alpha*p.opacity; ctx.stroke(); }
+                else if (seasonIndex === 0) { ctx.fillStyle=p.color; ctx.globalAlpha=alpha*p.opacity; ctx.beginPath(); ctx.ellipse(0,0,p.size*1.5,p.size,0,0,Math.PI*2); ctx.fill(); }
+                else if (seasonIndex === 2) { ctx.fillStyle=p.color; ctx.globalAlpha=alpha*p.opacity; ctx.beginPath(); for(let i=0;i<5;i++){const a=(i*2*Math.PI/5)-Math.PI/2;const r=p.size*1.2;if(i===0)ctx.moveTo(Math.cos(a)*r,Math.sin(a)*r);else ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r);} ctx.closePath(); ctx.fill(); }
+                else { const g=ctx.createRadialGradient(0,0,0,0,0,p.size*3); g.addColorStop(0,p.color); g.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=g; ctx.globalAlpha=alpha*p.opacity; ctx.beginPath(); ctx.arc(0,0,p.size*3,0,Math.PI*2); ctx.fill(); }
+                ctx.restore();
             }
-            update() {
-                // 围绕自转
-                this.angle += 0.005;
-                this.x += this.speedX + Math.cos(this.angle) * 0.2;
-                this.y += this.speedY + Math.sin(this.angle) * 0.2;
-
-                // 边界回弹
-                if (this.x < 0) { this.x = 0; this.speedX *= -1; }
-                if (this.x > canvas.width) { this.x = canvas.width; this.speedX *= -1; }
-                if (this.y < 0) { this.y = 0; this.speedY *= -1; }
-                if (this.y > canvas.height) { this.y = canvas.height; this.speedY *= -1; }
-
-                // 鼠标引力/排斥
-                const dx = this.x - mouseX;
-                const dy = this.y - mouseY;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < 150 && dist > 0) {
-                    const force = (150 - dist) / 150;
-                    // 近处排斥，远处吸引
-                    if (dist < 60) {
-                        this.x += (dx / dist) * force * 2;
-                        this.y += (dy / dist) * force * 2;
-                    } else {
-                        this.x -= (dx / dist) * force * 0.5;
-                        this.y -= (dy / dist) * force * 0.5;
-                    }
-                    this.size = this.baseSize + force * 4;
-                    this.opacity = Math.min(this.baseOpacity + force * 0.6, 0.9);
-                } else {
-                    this.size += (this.baseSize - this.size) * 0.05;
-                    this.opacity += (this.baseOpacity - this.opacity) * 0.05;
-                }
-            }
-            draw() {
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fillStyle = `hsla(${this.hue}, 70%, 65%, ${this.opacity})`;
-                ctx.fill();
-            }
+            ctx.globalAlpha = 1;
         }
-
-        // 初始化
-        const orbCount = Math.min(5, Math.floor((canvas.width * canvas.height) / 200000));
-        for (let i = 0; i < orbCount; i++) orbs.push(new Orb());
-
-        const particleCount = Math.min(80, Math.floor((canvas.width * canvas.height) / 8000));
-        for (let i = 0; i < particleCount; i++) particles.push(new Particle());
-
-        const animate = () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // 深色渐变背景
-            const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-            grad.addColorStop(0, '#0a0f1e');
-            grad.addColorStop(0.5, '#15203a');
-            grad.addColorStop(1, '#0a0f1e');
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // 绘制光球
-            orbs.forEach(orb => { orb.update(); orb.draw(); });
-
-            // 绘制涟漪
-            for (let i = ripples.length - 1; i >= 0; i--) {
-                const r = ripples[i];
-                r.radius += r.big ? 3 : 2;
-                r.opacity -= 0.008;
-                if (r.opacity <= 0) { ripples.splice(i, 1); continue; }
-                ctx.beginPath();
-                ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(100, 180, 255, ${r.opacity})`;
-                ctx.lineWidth = r.big ? 2 : 1;
-                ctx.stroke();
-
-                // 涟漪内部光晕
-                const rGrad = ctx.createRadialGradient(r.x, r.y, 0, r.x, r.y, r.radius);
-                rGrad.addColorStop(0, `rgba(100, 180, 255, ${r.opacity * 0.1})`);
-                rGrad.addColorStop(1, 'rgba(100, 180, 255, 0)');
-                ctx.fillStyle = rGrad;
-                ctx.fill();
-            }
-
-            // 绘制粒子连线
-            for (let i = 0; i < particles.length; i++) {
-                for (let j = i + 1; j < particles.length; j++) {
-                    const dx = particles[i].x - particles[j].x;
-                    const dy = particles[i].y - particles[j].y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < 80) {
-                        ctx.beginPath();
-                        ctx.moveTo(particles[i].x, particles[i].y);
-                        ctx.lineTo(particles[j].x, particles[j].y);
-                        ctx.strokeStyle = `rgba(120, 170, 240, ${0.15 * (1 - dist / 80)})`;
-                        ctx.lineWidth = 0.6;
-                        ctx.stroke();
-                    }
-                }
-            }
-
-            // 绘制粒子
-            particles.forEach(p => { p.update(); p.draw(); });
-
-            // 鼠标光晕
-            if (mouseX > 0 && mouseY > 0) {
-                const mouseGlow = ctx.createRadialGradient(mouseX, mouseY, 0, mouseX, mouseY, 80);
-                mouseGlow.addColorStop(0, 'rgba(100, 160, 255, 0.08)');
-                mouseGlow.addColorStop(0.5, 'rgba(80, 140, 220, 0.03)');
-                mouseGlow.addColorStop(1, 'rgba(60, 120, 200, 0)');
-                ctx.fillStyle = mouseGlow;
-                ctx.beginPath();
-                ctx.arc(mouseX, mouseY, 80, 0, Math.PI * 2);
-                ctx.fill();
-            }
-
-            animationId = requestAnimationFrame(animate);
-        };
-
-        animate();
-
-        // 保存引用
-        this._bgCleanup = () => {
-            if (animationId) cancelAnimationFrame(animationId);
-            document.removeEventListener('mousemove', onMouseMove);
-            document.removeEventListener('click', onClick);
-        };
+        function drawScene() {
+            const elapsed = Date.now() - seasonStartTime;
+            if (elapsed >= SEASON_DURATION) { if (transitionProgress < 1) { transitionProgress += 16.67 / TRANSITION_DURATION; if (transitionProgress >= 1) { seasonIndex = (seasonIndex+1)%4; seasonStartTime = Date.now(); transitionProgress = 0; particles = nextParticles.length ? nextParticles : createParticles(SEASONS[seasonIndex].count, SEASONS[seasonIndex]); nextParticles = []; } } }
+            if (elapsed > SEASON_DURATION - TRANSITION_DURATION && nextParticles.length === 0) { nextParticles = createParticles(SEASONS[(seasonIndex+1)%4].count, SEASONS[(seasonIndex+1)%4]); }
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            const grad = ctx.createLinearGradient(0,0,canvas.width,canvas.height); grad.addColorStop(0,SEASONS[seasonIndex].bgTop); grad.addColorStop(1,SEASONS[seasonIndex].bgBottom); ctx.fillStyle=grad; ctx.fillRect(0,0,canvas.width,canvas.height);
+            drawPsects(particles, transitionProgress>0?1-transitionProgress:1);
+            if(transitionProgress>0&&nextParticles.length>0) drawPsects(nextParticles, transitionProgress);
+            ctx.fillStyle='rgba(255,255,255,0.1)'; ctx.font='bold 70px sans-serif'; ctx.textAlign='center'; ctx.fillText(SEASONS[seasonIndex].emoji+' '+SEASONS[seasonIndex].name, canvas.width/2, canvas.height/2);
+            updateParticles(particles); if(nextParticles.length>0) updateParticles(nextParticles);
+            animationId = requestAnimationFrame(drawScene);
+        }
+        particles = createParticles(SEASONS[0].count, SEASONS[0]); drawScene();
+        this._bgCleanup = () => { if (animationId) cancelAnimationFrame(animationId); window.removeEventListener('resize', resize); };
     }
+
 
     // ==================== 内容隐藏/显示 ====================
     setupToggleContent() {
