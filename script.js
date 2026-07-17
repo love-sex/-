@@ -662,7 +662,153 @@ class TodoManager {
         this.updateUI();
         this.setupDragAndDrop();
         this.setupSettingsUI();
+        this.initDynamicBackground();
+        this.setupToggleContent();
         this.showNotification(`欢迎回来，${this.auth.username}！`, 'success');
+    }
+
+    // ==================== 动态背景 ====================
+    initDynamicBackground() {
+        const canvas = document.getElementById('dynamicBgCanvas');
+        if (!canvas) return;
+
+        // 如果有自定义背景图片/视频，不显示动态背景
+        if (this.theme.settings.bgImage || this.theme.settings.bgVideoId) {
+            canvas.classList.add('hidden');
+            return;
+        }
+
+        canvas.classList.remove('hidden');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        let animationId;
+
+        const resize = () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        };
+        resize();
+        window.addEventListener('resize', resize);
+
+        // 创建粒子
+        class Particle {
+            constructor() {
+                this.reset();
+            }
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 3 + 1;
+                this.speedX = (Math.random() - 0.5) * 0.8;
+                this.speedY = (Math.random() - 0.5) * 0.8;
+                this.opacity = Math.random() * 0.5 + 0.2;
+                this.hue = Math.random() * 60 + 220; // 蓝紫色系
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                if (this.x < 0 || this.x > canvas.width) this.speedX *= -1;
+                if (this.y < 0 || this.y > canvas.height) this.speedY *= -1;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(${this.hue}, 70%, 60%, ${this.opacity})`;
+                ctx.fill();
+            }
+        }
+
+        // 初始化粒子
+        const particleCount = Math.min(80, Math.floor(canvas.width * canvas.height / 10000));
+        for (let i = 0; i < particleCount; i++) {
+            particles.push(new Particle());
+        }
+
+        // 鼠标交互
+        let mouseX = 0, mouseY = 0;
+        canvas.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+
+        const animate = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 绘制渐变背景
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            gradient.addColorStop(0, '#0f172a');
+            gradient.addColorStop(0.5, '#1e293b');
+            gradient.addColorStop(1, '#0f172a');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 绘制粒子连线
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+
+                // 粒子间连线
+                for (let j = i + 1; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 120) {
+                        ctx.beginPath();
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.strokeStyle = `rgba(148, 163, 184, ${0.15 * (1 - dist / 120)})`;
+                        ctx.lineWidth = 0.5;
+                        ctx.stroke();
+                    }
+                }
+
+                // 鼠标交互
+                const dx = particles[i].x - mouseX;
+                const dy = particles[i].y - mouseY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 150) {
+                    particles[i].size = Math.min(particles[i].size + 0.1, 5);
+                    particles[i].opacity = Math.min(particles[i].opacity + 0.02, 0.8);
+                }
+            }
+
+            animationId = requestAnimationFrame(animate);
+        };
+        animate();
+
+        // 保存引用以便清理
+        this._bgAnimationId = animationId;
+    }
+
+    // ==================== 内容隐藏/显示 ====================
+    setupToggleContent() {
+        const container = document.getElementById('mainApp');
+        const toggleBtn = document.getElementById('toggleContentBtn');
+
+        // 创建恢复按钮
+        let restoreBtn = document.getElementById('contentRestoreBtn');
+        if (!restoreBtn) {
+            restoreBtn = document.createElement('button');
+            restoreBtn.id = 'contentRestoreBtn';
+            restoreBtn.className = 'content-restore-hint';
+            restoreBtn.innerHTML = '👁️';
+            restoreBtn.title = '显示内容';
+            document.body.appendChild(restoreBtn);
+        }
+
+        const toggleContent = () => {
+            const isHidden = container.classList.contains('content-hidden');
+            if (isHidden) {
+                container.classList.remove('content-hidden');
+                toggleBtn.innerHTML = '👁️';
+            } else {
+                container.classList.add('content-hidden');
+                toggleBtn.innerHTML = '👁️‍🗨️';
+            }
+        };
+
+        toggleBtn?.addEventListener('click', toggleContent);
+        restoreBtn?.addEventListener('click', toggleContent);
     }
 
     // ==================== 设置面板 ====================

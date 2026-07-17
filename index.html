@@ -88,6 +88,9 @@
         </div>
     </div>
 
+    <!-- 动态背景画布 -->
+    <canvas id="dynamicBgCanvas" class="hidden"></canvas>
+
     <!-- ========== 主应用页面 ========== -->
     <div class="container hidden" id="mainApp">
         <header>
@@ -98,6 +101,7 @@
                 </div>
                 <div class="user-info">
                     <span class="user-greeting">👋 你好，<strong id="currentUsername">用户</strong></span>
+                    <button class="toggle-content-btn" id="toggleContentBtn" title="隐藏/显示内容">👁️</button>
                     <button class="settings-btn" id="openSettingsBtn" title="自定义主题">🎨</button>
                     <button class="logout-btn" id="logoutBtn">退出登录</button>
                 </div>
