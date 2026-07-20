@@ -614,14 +614,20 @@ class TodoManager {
 
     showAuth() {
         document.getElementById('authContainer')?.classList.remove('hidden');
-        document.getElementById('mainApp')?.classList.add('hidden');
+        const ws = document.getElementById('workspace');
+        if (ws) ws.classList.add('hidden');
+        const panel = document.getElementById('todoPanel');
+        if (panel) panel.classList.add('hidden');
     }
 
     showMainApp() {
         document.getElementById('authContainer')?.classList.add('hidden');
-        document.getElementById('mainApp')?.classList.remove('hidden');
+        const ws = document.getElementById('workspace');
+        if (ws) ws.classList.remove('hidden');
         const el = document.getElementById('currentUsername');
-        if (el) el.textContent = this.auth.username;
+        if (el) el.textContent = this.auth.username.charAt(0).toUpperCase();
+        const heroEl = document.getElementById('heroUsername');
+        if (heroEl) heroEl.textContent = this.auth.username;
         this.theme = new ThemeManager();
         this.setupEventListeners();
         this.renderCategories();
@@ -629,8 +635,43 @@ class TodoManager {
         this.setupDragAndDrop();
         this.setupSettingsUI();
         this.initDynamicBackground();
-        this.setupToggleContent();
-        this.showNotification(`欢迎回来，${this.auth.username}！`, 'success');
+        this.updateTodoBadge();
+    }
+
+    // ==================== 工具面板 ====================
+    openTool(name) {
+        const panel = document.getElementById('todoPanel');
+        const workspace = document.getElementById('workspace');
+        if (panel && workspace) {
+            workspace.style.display = 'none';
+            panel.classList.remove('hidden');
+            this.renderTasks();
+            this.renderCategories();
+            this.updateUI();
+        }
+    }
+
+    closeTool() {
+        const panel = document.getElementById('todoPanel');
+        const workspace = document.getElementById('workspace');
+        if (panel && workspace) {
+            panel.classList.add('hidden');
+            workspace.style.display = 'block';
+            this.updateTodoBadge();
+        }
+    }
+
+    showComingSoon() {
+        this.showNotification('该功能即将推出，敬请期待！', 'info');
+    }
+
+    updateTodoBadge() {
+        const badge = document.getElementById('todoBadge');
+        if (badge) {
+            const count = this.tasks.filter(t => !t.completed).length;
+            badge.textContent = count;
+            badge.style.display = count > 0 ? 'flex' : 'none';
+        }
     }
 
     // ==================== 动态背景 ====================
@@ -1468,8 +1509,8 @@ class TodoManager {
         const contentPreview = task.content ? (task.content.substring(0, 50) + (task.content.length > 50 ? '...' : '')) : '';
 
         taskItem.innerHTML = `
-            <input type="checkbox" class="task-checkbox" ${isSelected ? 'checked' : ''} onchange="window.todoManager.toggleTaskSelection(${task.id}, event)" title="选择任务" />
-            <div class="task-content" onclick="window.todoManager.openTaskDetail(${task.id})" style="cursor:pointer" title="点击查看详情">
+            <input type="checkbox" class="task-checkbox" ${isSelected ? 'checked' : ''} onchange="window.app.toggleTaskSelection(${task.id}, event)" title="选择任务" />
+            <div class="task-content" onclick="window.app.openTaskDetail(${task.id})" style="cursor:pointer" title="点击查看详情">
                 <div class="task-title">${escapeHtml(task.title)}</div>
                 ${contentPreview ? `<div class="task-content-preview">${escapeHtml(contentPreview)}</div>` : ''}
                 <div class="task-meta">
@@ -1479,11 +1520,11 @@ class TodoManager {
                 </div>
             </div>
             <div class="task-actions">
-                <button class="task-action-btn complete-btn" onclick="event.stopPropagation();window.todoManager.toggleTask(${task.id})" title="${task.completed ? '取消完成' : '标记完成'}">
+                <button class="task-action-btn complete-btn" onclick="event.stopPropagation();window.app.toggleTask(${task.id})" title="${task.completed ? '取消完成' : '标记完成'}">
                     ${task.completed ? '↶' : '✓'}
                 </button>
-                <button class="task-action-btn edit-btn" onclick="event.stopPropagation();window.todoManager.editTask(${task.id})" title="编辑">✏️</button>
-                <button class="task-action-btn delete-btn" onclick="event.stopPropagation();window.todoManager.deleteTask(${task.id})" title="删除">🗑️</button>
+                <button class="task-action-btn edit-btn" onclick="event.stopPropagation();window.app.editTask(${task.id})" title="编辑">✏️</button>
+                <button class="task-action-btn delete-btn" onclick="event.stopPropagation();window.app.deleteTask(${task.id})" title="删除">🗑️</button>
             </div>
         `;
 
@@ -1823,5 +1864,5 @@ class TodoManager {
 let todoManager;
 document.addEventListener('DOMContentLoaded', () => {
     todoManager = new TodoManager();
-    window.todoManager = todoManager;
+    window.app = todoManager;
 });

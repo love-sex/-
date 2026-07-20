@@ -3,192 +3,208 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>待办事项管理</title>
+    <title>个人工作台 | My Workspace</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style-portfolio.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
+    <!-- 动态背景 -->
+    <canvas id="dynamicBgCanvas"></canvas>
+
     <!-- ========== 登录/注册页面 ========== -->
-    <div class="auth-container" id="authContainer">
+    <div class="auth-container hidden" id="authContainer">
         <div class="auth-box">
             <div class="auth-header">
-                <div class="auth-logo">📋</div>
-                <h1>待办事项</h1>
-                <p>高效管理您的任务</p>
+                <div class="auth-logo">🚀</div>
+                <h1>个人工作台</h1>
+                <p>高效管理你的工作和生活</p>
             </div>
-
-            <!-- 登录表单 -->
             <form class="auth-form" id="loginForm">
                 <div class="form-group">
-                    <label for="loginUsername">👤 用户名</label>
+                    <label>👤 用户名</label>
                     <input type="text" id="loginUsername" placeholder="请输入用户名" required minlength="2" maxlength="20">
                 </div>
                 <div class="form-group">
-                    <label for="loginPassword">🔒 密码</label>
+                    <label>🔒 密码</label>
                     <input type="password" id="loginPassword" placeholder="请输入密码" required minlength="6">
                 </div>
                 <button type="submit" class="auth-btn login-btn">登 录</button>
-                <div class="forgot-link">
-                    <a href="#" id="showForgot">忘记密码？</a>
-                </div>
-                <div class="auth-switch">
-                    还没有账号？<a href="#" id="showRegister">立即注册</a>
-                </div>
+                <div class="forgot-link"><a href="#" id="showForgot">忘记密码？</a></div>
+                <div class="auth-switch">还没有账号？<a href="#" id="showRegister">立即注册</a></div>
             </form>
-
-            <!-- 注册表单 -->
             <form class="auth-form hidden" id="registerForm">
                 <div class="form-group">
-                    <label for="regUsername">👤 用户名</label>
+                    <label>👤 用户名</label>
                     <input type="text" id="regUsername" placeholder="2-20个字符" required minlength="2" maxlength="20">
                 </div>
                 <div class="form-group">
-                    <label for="regPassword">🔒 密码</label>
+                    <label>🔒 密码</label>
                     <input type="password" id="regPassword" placeholder="至少6位密码" required minlength="6">
                 </div>
                 <div class="form-group">
-                    <label for="regPasswordConfirm">🔒 确认密码</label>
+                    <label>🔒 确认密码</label>
                     <input type="password" id="regPasswordConfirm" placeholder="再次输入密码" required minlength="6">
                 </div>
                 <div class="form-group">
-                    <label for="regEmail">📧 邮箱（可选，用于找回密码）</label>
+                    <label>📧 邮箱（可选）</label>
                     <input type="email" id="regEmail" placeholder="example@email.com">
                 </div>
                 <button type="submit" class="auth-btn register-btn">注 册</button>
-                <div class="auth-switch">
-                    已有账号？<a href="#" id="showLogin">立即登录</a>
-                </div>
+                <div class="auth-switch">已有账号？<a href="#" id="showLogin">立即登录</a></div>
             </form>
-
-            <!-- 忘记密码表单 -->
             <form class="auth-form hidden" id="forgotForm">
                 <div class="forgot-info">
                     <h3>🔑 找回密码</h3>
-                    <p>请输入您的用户名和绑定的邮箱，我们将帮您重置密码。</p>
+                    <p>请输入用户名和绑定邮箱重置密码</p>
                 </div>
-                <div class="form-group">
-                    <label for="forgotUsername">👤 用户名</label>
-                    <input type="text" id="forgotUsername" placeholder="请输入用户名" required>
-                </div>
-                <div class="form-group">
-                    <label for="forgotEmail">📧 绑定邮箱</label>
-                    <input type="email" id="forgotEmail" placeholder="请输入绑定的邮箱" required>
-                </div>
-                <div class="form-group">
-                    <label for="forgotNewPassword">🔒 新密码</label>
-                    <input type="password" id="forgotNewPassword" placeholder="至少6位新密码" required minlength="6">
-                </div>
+                <div class="form-group"><label>👤 用户名</label><input type="text" id="forgotUsername" required></div>
+                <div class="form-group"><label>📧 邮箱</label><input type="email" id="forgotEmail" required></div>
+                <div class="form-group"><label>🔒 新密码</label><input type="password" id="forgotNewPassword" required minlength="6"></div>
                 <button type="submit" class="auth-btn reset-btn">重置密码</button>
-                <div class="auth-switch">
-                    想起密码了？<a href="#" id="showLoginFromForgot">返回登录</a>
-                </div>
+                <div class="auth-switch"><a href="#" id="showLoginFromForgot">返回登录</a></div>
             </form>
-
             <div class="auth-error" id="authError"></div>
         </div>
     </div>
 
-    <!-- 动态背景画布 -->
-    <canvas id="dynamicBgCanvas"></canvas>
-
-    <!-- ========== 主应用页面 ========== -->
-    <div class="container hidden" id="mainApp">
-        <header>
-            <div class="header-content">
-                <div>
-                    <h1>📋 待办事项</h1>
-                    <p class="subtitle">高效管理您的任务</p>
-                </div>
-                <div class="user-info">
-                    <span class="user-greeting">👋 你好，<strong id="currentUsername">用户</strong></span>
-                    <button class="toggle-content-btn" id="toggleContentBtn" title="隐藏/显示内容">👁️</button>
-                    <button class="settings-btn" id="openSettingsBtn" title="自定义主题">🎨</button>
-                    <button class="logout-btn" id="logoutBtn">退出登录</button>
+    <!-- ========== 主工作台 ========== -->
+    <div class="workspace hidden" id="workspace">
+        <!-- 顶部导航 -->
+        <nav class="top-nav">
+            <div class="nav-brand">
+                <span class="brand-icon">🚀</span>
+                <span class="brand-text">工作台</span>
+            </div>
+            <div class="nav-actions">
+                <button class="nav-btn" id="openSettingsBtn" title="主题设置">🎨</button>
+                <div class="user-menu">
+                    <span class="user-avatar" id="currentUsername">U</span>
+                    <button class="logout-btn" id="logoutBtn">退出</button>
                 </div>
             </div>
-        </header>
+        </nav>
 
-        <div class="input-section">
-            <div class="input-group">
-                <input type="text" id="taskInput" placeholder="输入新的待办事项...">
-                <select id="prioritySelect">
-                    <option value="low">🔽 低优先级</option>
-                    <option value="medium" selected>⚪ 中优先级</option>
-                    <option value="high">🔺 高优先级</option>
-                </select>
-                <select id="categorySelect">
-                    <option value="默认">📁 默认分类</option>
-                </select>
-                <input type="date" id="dueDateInput">
-                <button id="addTaskBtn">添加任务</button>
+        <!-- 欢迎区域 -->
+        <section class="hero-section">
+            <h1 class="hero-title">你好，<span id="heroUsername">创作者</span> 👋</h1>
+            <p class="hero-subtitle">今天也是高效创作的一天</p>
+        </section>
+
+        <!-- 功能卡片网格 -->
+        <section class="tools-grid">
+            <!-- 待办事项卡片 -->
+            <div class="tool-card" data-tool="todo" onclick="window.app.openTool('todo')">
+                <div class="tool-card-icon">📋</div>
+                <h3 class="tool-card-title">待办事项</h3>
+                <p class="tool-card-desc">管理日常任务，提升工作效率</p>
+                <div class="tool-card-badge" id="todoBadge">0</div>
+            </div>
+
+            <!-- 未来功能占位卡片 -->
+            <div class="tool-card coming-soon" data-tool="notes" onclick="window.app.showComingSoon()">
+                <div class="tool-card-icon">📝</div>
+                <h3 class="tool-card-title">笔记</h3>
+                <p class="tool-card-desc">记录灵感和想法</p>
+                <div class="tool-card-tag">即将推出</div>
+            </div>
+
+            <div class="tool-card coming-soon" data-tool="calendar" onclick="window.app.showComingSoon()">
+                <div class="tool-card-icon">📅</div>
+                <h3 class="tool-card-title">日历</h3>
+                <p class="tool-card-desc">规划你的时间</p>
+                <div class="tool-card-tag">即将推出</div>
+            </div>
+
+            <div class="tool-card coming-soon" data-tool="pomodoro" onclick="window.app.showComingSoon()">
+                <div class="tool-card-icon">⏱️</div>
+                <h3 class="tool-card-title">番茄钟</h3>
+                <p class="tool-card-desc">专注工作计时器</p>
+                <div class="tool-card-tag">即将推出</div>
+            </div>
+
+            <div class="tool-card coming-soon" data-tool="habits" onclick="window.app.showComingSoon()">
+                <div class="tool-card-icon">🎯</div>
+                <h3 class="tool-card-title">习惯追踪</h3>
+                <p class="tool-card-desc">养成好习惯</p>
+                <div class="tool-card-tag">即将推出</div>
+            </div>
+
+            <div class="tool-card add-new" onclick="window.app.showComingSoon()">
+                <div class="tool-card-icon">➕</div>
+                <h3 class="tool-card-title">添加功能</h3>
+                <p class="tool-card-desc">更多工具正在开发中</p>
+            </div>
+        </section>
+    </div>
+
+    <!-- ========== 待办事项面板 ========== -->
+    <div class="tool-panel hidden" id="todoPanel">
+        <div class="tool-panel-header">
+            <button class="panel-back-btn" onclick="window.app.closeTool()">← 返回</button>
+            <h2>📋 待办事项</h2>
+            <div class="panel-actions">
+                <button class="panel-action-btn" id="exportBtn" title="导出">📋</button>
+                <button class="panel-action-btn" id="exportImageBtn" title="图片">🖼️</button>
+                <button class="panel-action-btn" id="importBtn" title="导入">📥</button>
+                <input type="file" id="fileInput" accept=".json" style="display:none">
             </div>
         </div>
-
-        <div class="filter-section">
-            <div class="filter-group">
+        <div class="tool-panel-body">
+            <!-- 输入区 -->
+            <div class="todo-input-area">
+                <div class="todo-input-row">
+                    <input type="text" id="taskInput" placeholder="添加新任务...">
+                    <select id="prioritySelect">
+                        <option value="low">🔽 低</option>
+                        <option value="medium" selected>⚪ 中</option>
+                        <option value="high">🔺 高</option>
+                    </select>
+                    <select id="categorySelect"><option value="默认">📁 默认</option></select>
+                    <input type="date" id="dueDateInput">
+                    <button id="addTaskBtn" class="add-btn">+</button>
+                </div>
+            </div>
+            <!-- 筛选 -->
+            <div class="todo-filters">
                 <button class="filter-btn active" data-filter="all">全部</button>
                 <button class="filter-btn" data-filter="pending">待完成</button>
                 <button class="filter-btn" data-filter="completed">已完成</button>
-                <select id="filterCategory">
-                    <option value="all">所有分类</option>
-                </select>
+                <select id="filterCategory"><option value="all">所有分类</option></select>
                 <select id="sortSelect">
-                    <option value="date">按日期排序</option>
-                    <option value="priority">按优先级排序</option>
-                    <option value="name">按名称排序</option>
+                    <option value="date">按日期</option>
+                    <option value="priority">按优先级</option>
+                    <option value="name">按名称</option>
                 </select>
             </div>
-        </div>
-
-        <div class="stats-section">
-            <div class="stat-item">
-                <div class="stat-number" id="totalTasks">0</div>
-                <div class="stat-label">📊 总任务</div>
+            <!-- 统计 -->
+            <div class="stats-bar">
+                <div class="stat-chip"><span class="stat-num" id="totalTasks">0</span>总任务</div>
+                <div class="stat-chip"><span class="stat-num" id="pendingTasks">0</span>待完成</div>
+                <div class="stat-chip"><span class="stat-num" id="completedTasks">0</span>已完成</div>
+                <div class="stat-chip"><span class="stat-num" id="completionRate">0%</span>完成率</div>
             </div>
-            <div class="stat-item">
-                <div class="stat-number" id="pendingTasks">0</div>
-                <div class="stat-label">⏳ 待完成</div>
+            <!-- 分类 -->
+            <div class="category-bar">
+                <div class="category-list" id="categoryList"></div>
+                <div class="category-add">
+                    <input type="text" id="categoryInput" placeholder="新分类">
+                    <button id="addCategoryBtn">+</button>
+                </div>
             </div>
-            <div class="stat-item">
-                <div class="stat-number" id="completedTasks">0</div>
-                <div class="stat-label">✅ 已完成</div>
+            <!-- 任务列表 -->
+            <div class="task-list" id="taskList"></div>
+            <div class="empty-state" id="emptyState">
+                <div class="empty-icon">📝</div>
+                <p>暂无任务</p>
+                <p class="empty-hint">添加第一个任务开始吧！</p>
             </div>
-            <div class="stat-item">
-                <div class="stat-number" id="completionRate">0%</div>
-                <div class="stat-label">🎯 完成率</div>
+            <!-- 操作栏 -->
+            <div class="todo-actions">
+                <button id="selectAllBtn" class="action-btn">全选</button>
+                <button id="deleteSelectedBtn" class="action-btn danger">删除选中</button>
+                <button id="clearCompletedBtn" class="action-btn">清空已完成</button>
             </div>
-        </div>
-
-        <div class="category-section">
-            <h3>任务分类</h3>
-            <div class="category-list" id="categoryList">
-                <span class="category-tag active" data-category="all">全部</span>
-            </div>
-            <div class="category-input-group">
-                <input type="text" id="categoryInput" placeholder="添加新分类...">
-                <button id="addCategoryBtn">添加</button>
-            </div>
-        </div>
-
-        <div class="task-list" id="taskList">
-            <!-- 任务动态添加到这里 -->
-        </div>
-        <div class="empty-state" id="emptyState">
-            <div class="empty-icon">📝</div>
-            <p>暂无待办事项</p>
-            <p class="empty-hint">添加您的第一个任务吧！</p>
-        </div>
-
-        <div class="action-buttons">
-            <button id="selectAllBtn" class="secondary-btn">全选</button>
-            <button id="deleteSelectedBtn" class="secondary-btn danger-btn">删除选中</button>
-            <button id="clearCompletedBtn" class="secondary-btn">清空已完成</button>
-            <button id="exportBtn" class="secondary-btn">📋 导出JSON</button>
-            <button id="exportImageBtn" class="secondary-btn">🖼️ 导出图片</button>
-            <button id="importBtn" class="secondary-btn">
-                <input type="file" id="fileInput" accept=".json" style="display: none;">
-                📥 导入数据
-            </button>
         </div>
     </div>
 
@@ -196,154 +212,70 @@
     <div class="modal hidden" id="settingsModal">
         <div class="modal-content settings-content">
             <div class="modal-header">
-                <h3>🎨 自定义主题</h3>
+                <h3>🎨 主题设置</h3>
                 <button class="modal-close-btn" id="closeSettingsBtn">✕</button>
             </div>
             <div class="modal-body settings-body">
-                <!-- 预设主题 -->
                 <div class="setting-section">
-                    <div class="theme-header">
-                        <h4>🌈 我的主题</h4>
-                        <button class="add-theme-btn" id="addCustomThemeBtn">+ 添加主题</button>
-                    </div>
-                    <div class="theme-presets" id="themePresets">
-                        <div class="theme-preset active" data-theme="default" style="background:linear-gradient(135deg,#667eea,#764ba2)">
-                            <span>默认</span>
-                        </div>
-                        <div class="theme-preset" data-theme="ocean" style="background:linear-gradient(135deg,#2193b0,#6dd5ed)">
-                            <span>海洋</span>
-                        </div>
-                        <div class="theme-preset" data-theme="forest" style="background:linear-gradient(135deg,#11998e,#38ef7d)">
-                            <span>森林</span>
-                        </div>
-                        <div class="theme-preset" data-theme="sunset" style="background:linear-gradient(135deg,#f12711,#f5af19)">
-                            <span>日落</span>
-                        </div>
-                        <div class="theme-preset" data-theme="sakura" style="background:linear-gradient(135deg,#fbc2eb,#a18cd1)">
-                            <span>樱花</span>
-                        </div>
-                        <div class="theme-preset" data-theme="night" style="background:linear-gradient(135deg,#0f172a,#334155)">
-                            <span>夜空</span>
-                        </div>
-                        <div class="theme-preset" data-theme="purple" style="background:linear-gradient(135deg,#7c3aed,#c084fc)">
-                            <span>梦幻</span>
-                        </div>
-                        <div class="theme-preset" data-theme="mint" style="background:linear-gradient(135deg,#0d9488,#5eead4)">
-                            <span>薄荷</span>
-                        </div>
-                        <div class="theme-preset" data-theme="rose" style="background:linear-gradient(135deg,#e11d48,#fb7185)">
-                            <span>玫瑰</span>
-                        </div>
-                        <div class="theme-preset" data-theme="sky" style="background:linear-gradient(135deg,#0284c7,#7dd3fc)">
-                            <span>天空</span>
-                        </div>
-                    </div>
+                    <div class="theme-header"><h4>🌈 主题</h4><button class="add-theme-btn" id="addCustomThemeBtn">+ 添加</button></div>
+                    <div class="theme-presets" id="themePresets"></div>
                 </div>
-
-                <!-- 自定义颜色 -->
                 <div class="setting-section">
-                    <h4>🎨 自定义颜色</h4>
-                    <div class="color-picker-row">
-                        <label>主色调</label>
-                        <input type="color" id="primaryColorPicker" value="#6366f1">
-                        <span class="color-value" id="primaryColorValue">#6366f1</span>
-                    </div>
-                    <div class="color-picker-row">
-                        <label>背景色</label>
-                        <input type="color" id="bgColorPicker" value="#f8fafc">
-                        <span class="color-value" id="bgColorValue">#f8fafc</span>
-                    </div>
+                    <h4>🎨 颜色</h4>
+                    <div class="color-picker-row"><label>主色调</label><input type="color" id="primaryColorPicker" value="#6366f1"><span id="primaryColorValue">#6366f1</span></div>
+                    <div class="color-picker-row"><label>背景色</label><input type="color" id="bgColorPicker" value="#f8fafc"><span id="bgColorValue">#f8fafc</span></div>
                 </div>
-
-                <!-- 背景图片 -->
                 <div class="setting-section">
-                    <h4>🖼️ 背景图片</h4>
+                    <h4>🖼️ 背景图片/视频</h4>
                     <div class="bg-image-upload">
                         <input type="file" id="bgImageInput" accept="image/*,video/*" style="display:none">
-                        <button class="upload-btn" id="uploadBgBtn">📁 选择图片/视频</button>
+                        <button class="upload-btn" id="uploadBgBtn">📁 选择文件</button>
                         <button class="remove-btn hidden" id="removeBgBtn">🗑️ 移除</button>
                     </div>
                     <div class="bg-image-preview" id="bgImagePreview"></div>
                     <div class="bg-video-preview hidden" id="bgVideoPreview"></div>
-                    <div class="bg-controls">
-                        <label>透明度</label>
-                        <input type="range" id="bgOpacity" min="0" max="100" value="15">
-                        <span id="bgOpacityValue">15%</span>
-                    </div>
-                    <div class="bg-controls">
-                        <label>模糊度</label>
-                        <input type="range" id="bgBlur" min="0" max="20" value="5">
-                        <span id="bgBlurValue">5px</span>
-                    </div>
+                    <div class="bg-controls"><label>透明度</label><input type="range" id="bgOpacity" min="0" max="100" value="15"><span id="bgOpacityValue">15%</span></div>
+                    <div class="bg-controls"><label>模糊度</label><input type="range" id="bgBlur" min="0" max="20" value="5"><span id="bgBlurValue">5px</span></div>
                 </div>
-
-                <!-- 卡片效果 -->
                 <div class="setting-section">
-                    <h4>✨ 卡片效果</h4>
+                    <h4>✨ 效果</h4>
                     <div class="effect-options">
-                        <label class="effect-option">
-                            <input type="checkbox" id="glassEffect">
-                            <span>🪟 毛玻璃效果</span>
-                        </label>
-                        <label class="effect-option">
-                            <input type="checkbox" id="shadowEffect" checked>
-                            <span>📐 阴影效果</span>
-                        </label>
-                        <label class="effect-option">
-                            <input type="checkbox" id="animationEffect" checked>
-                            <span>🎬 动画效果</span>
-                        </label>
+                        <label class="effect-option"><input type="checkbox" id="glassEffect"><span>🪟 毛玻璃</span></label>
+                        <label class="effect-option"><input type="checkbox" id="shadowEffect" checked><span>📐 阴影</span></label>
+                        <label class="effect-option"><input type="checkbox" id="animationEffect" checked><span>🎬 动画</span></label>
                     </div>
                 </div>
-
-                <!-- 字体大小 -->
                 <div class="setting-section">
                     <h4>📝 字体大小</h4>
-                    <div class="bg-controls">
-                        <label>字体缩放</label>
-                        <input type="range" id="fontSize" min="80" max="150" value="100">
-                        <span id="fontSizeValue">100%</span>
-                    </div>
+                    <div class="bg-controls"><label>缩放</label><input type="range" id="fontSize" min="80" max="150" value="100"><span id="fontSizeValue">100%</span></div>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="modal-cancel-btn" id="resetSettingsBtn">🔄 恢复默认</button>
-                <button class="modal-save-btn" id="saveSettingsBtn">💾 保存设置</button>
+                <button class="modal-save-btn" id="saveSettingsBtn">💾 保存</button>
             </div>
         </div>
     </div>
 
-    <!-- ========== 添加自定义主题模态框 ========== -->
+    <!-- 自定义主题弹窗 -->
     <div class="modal hidden" id="customThemeModal">
-        <div class="modal-content" style="max-width:400px;">
-            <div class="modal-header">
-                <h3>🎨 创建自定义主题</h3>
-                <button class="modal-close-btn" id="closeCustomThemeBtn">✕</button>
-            </div>
+        <div class="modal-content" style="max-width:380px">
+            <div class="modal-header"><h3>🎨 创建主题</h3><button class="modal-close-btn" id="closeCustomThemeBtn">✕</button></div>
             <div class="modal-body">
-                <div class="form-group">
-                    <label>主题名称</label>
-                    <input type="text" id="customThemeName" placeholder="如：我的主题" required>
-                </div>
-                <div class="color-picker-row">
-                    <label>起始颜色</label>
-                    <input type="color" id="customColorFrom" value="#667eea">
-                </div>
-                <div class="color-picker-row">
-                    <label>结束颜色</label>
-                    <input type="color" id="customColorTo" value="#764ba2">
-                </div>
+                <div class="form-group"><label>主题名称</label><input type="text" id="customThemeName" placeholder="我的主题"></div>
+                <div class="color-picker-row"><label>起始色</label><input type="color" id="customColorFrom" value="#667eea"></div>
+                <div class="color-picker-row"><label>结束色</label><input type="color" id="customColorTo" value="#764ba2"></div>
                 <div class="theme-preview" id="customThemePreview"></div>
             </div>
             <div class="modal-footer">
                 <button class="modal-cancel-btn" id="cancelCustomThemeBtn">取消</button>
-                <button class="modal-save-btn" id="saveCustomThemeBtn">保存主题</button>
+                <button class="modal-save-btn" id="saveCustomThemeBtn">保存</button>
             </div>
         </div>
     </div>
 
+    <!-- 通知 -->
     <div class="notification" id="notification"></div>
-
     <script src="script.js"></script>
 </body>
 </html>
