@@ -700,7 +700,6 @@ class TodoManager {
             const grad = ctx.createLinearGradient(0,0,canvas.width,canvas.height); grad.addColorStop(0,SEASONS[seasonIndex].bgTop); grad.addColorStop(1,SEASONS[seasonIndex].bgBottom); ctx.fillStyle=grad; ctx.fillRect(0,0,canvas.width,canvas.height);
             drawPsects(particles, transitionProgress>0?1-transitionProgress:1);
             if(transitionProgress>0&&nextParticles.length>0) drawPsects(nextParticles, transitionProgress);
-            ctx.fillStyle='rgba(255,255,255,0.1)'; ctx.font='bold 70px sans-serif'; ctx.textAlign='center'; ctx.fillText(SEASONS[seasonIndex].emoji+' '+SEASONS[seasonIndex].name, canvas.width/2, canvas.height/2);
             updateParticles(particles); if(nextParticles.length>0) updateParticles(nextParticles);
             animationId = requestAnimationFrame(drawScene);
         }
@@ -1201,12 +1200,12 @@ class TodoManager {
         const task = {
             id: this.nextId++,
             title,
+            content: '',
             priority: prioritySelect.value,
             dueDate: dueDateInput.value,
             category: categorySelect.value || '默认',
             completed: false,
-            createdAt: new Date().toISOString(),
-            progress: 0
+            createdAt: new Date().toISOString()
         };
 
         this.tasks.push(task);
@@ -1310,7 +1309,8 @@ class TodoManager {
                     <h3>✏️ 编辑任务</h3>
                 </div>
                 <div class="modal-body">
-                    <input type="text" id="editTitle" class="modal-input" value="${escapeHtml(task.title)}" placeholder="任务标题">
+                    <input type="text" id="editTitle" class="modal-input" value="${escapeHtml(task.title)}" placeholder="任务标题 *">
+                    <textarea id="editContent" class="modal-textarea" placeholder="任务详细内容（支持多行）..." rows="4">${escapeHtml(task.content || '')}</textarea>
                     <select id="editPriority" class="modal-input">
                         <option value="low" ${task.priority === 'low' ? 'selected' : ''}>🔽 低优先级</option>
                         <option value="medium" ${task.priority === 'medium' ? 'selected' : ''}>⚪ 中优先级</option>
@@ -1344,6 +1344,7 @@ class TodoManager {
             }
 
             task.title = title;
+            task.content = modal.querySelector('#editContent').value;
             task.priority = modal.querySelector('#editPriority').value;
             task.dueDate = modal.querySelector('#editDueDate').value;
             task.category = modal.querySelector('#editCategory').value;
@@ -1358,6 +1359,42 @@ class TodoManager {
             this.showNotification('任务已更新', 'success');
             modal.remove();
         });
+    }
+
+    // ==================== 任务详情 ====================
+    openTaskDetail(id) {
+        const task = this.tasks.find(t => t.id === id);
+        if (!task) return;
+
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content task-detail-modal">
+                <div class="modal-header">
+                    <h3>📋 任务详情</h3>
+                    <button class="modal-close-btn" onclick="this.closest('.modal').remove()">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="detail-row"><label>标题</label><h2 class="detail-title">${escapeHtml(task.title)}</h2></div>
+                    ${task.content ? `<div class="detail-row"><label class="content-label">详细内容</label><div class="detail-content">${escapeHtml(task.content).replace(/\n/g, '<br>')}</div></div>` : '<div class="detail-row no-content">📝 暂无详细内容</div>'}
+                    <div class="detail-meta-bar">
+                        <span class="detail-priority ${task.priority}">${{high:'🔺高', medium:'⚪中', low:'🔽低'}[task.priority||'medium']}优先级</span>
+                        <span class="detail-category">📁 ${escapeHtml(task.category)}</span>
+                        <span class="detail-date">📅 ${task.dueDate || '无截止日期'}</span>
+                        <span class="detail-status ${task.completed?'completed':'pending'}">${task.completed?'✅已完成':'⏳进行中'}</span>
+                    </div>
+                    <div class="detail-time">创建于: ${new Date(task.createdAt).toLocaleString('zh-CN')}</div>
+                </div>
+                <div class="modal-footer">
+                    <button class="modal-cancel-btn" id="editFromDetail">✏️ 编辑</button>
+                    <button class="modal-save-btn" id="closeDetail">关闭</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+        modal.querySelector('#closeDetail')?.addEventListener('click', () => modal.remove());
+        modal.querySelector('#editFromDetail')?.addEventListener('click', () => { modal.remove(); this.editTask(id); });
     }
 
     // ==================== 分类操作 ====================
@@ -1428,10 +1465,13 @@ class TodoManager {
         const priorityLabels = { high: '高', medium: '中', low: '低' };
         const priorityClass = task.priority || 'medium';
 
+        const contentPreview = task.content ? (task.content.substring(0, 50) + (task.content.length > 50 ? '...' : '')) : '';
+
         taskItem.innerHTML = `
             <input type="checkbox" class="task-checkbox" ${isSelected ? 'checked' : ''} onchange="window.todoManager.toggleTaskSelection(${task.id}, event)" title="选择任务" />
-            <div class="task-content">
+            <div class="task-content" onclick="window.todoManager.openTaskDetail(${task.id})" style="cursor:pointer" title="点击查看详情">
                 <div class="task-title">${escapeHtml(task.title)}</div>
+                ${contentPreview ? `<div class="task-content-preview">${escapeHtml(contentPreview)}</div>` : ''}
                 <div class="task-meta">
                     <span class="task-priority ${priorityClass}">${priorityLabels[priorityClass]}优先级</span>
                     <span class="task-category">📁 ${escapeHtml(task.category)}</span>
@@ -1439,11 +1479,11 @@ class TodoManager {
                 </div>
             </div>
             <div class="task-actions">
-                <button class="task-action-btn complete-btn" onclick="window.todoManager.toggleTask(${task.id})" title="${task.completed ? '取消完成' : '标记完成'}">
+                <button class="task-action-btn complete-btn" onclick="event.stopPropagation();window.todoManager.toggleTask(${task.id})" title="${task.completed ? '取消完成' : '标记完成'}">
                     ${task.completed ? '↶' : '✓'}
                 </button>
-                <button class="task-action-btn edit-btn" onclick="window.todoManager.editTask(${task.id})" title="编辑">✏️</button>
-                <button class="task-action-btn delete-btn" onclick="window.todoManager.deleteTask(${task.id})" title="删除">🗑️</button>
+                <button class="task-action-btn edit-btn" onclick="event.stopPropagation();window.todoManager.editTask(${task.id})" title="编辑">✏️</button>
+                <button class="task-action-btn delete-btn" onclick="event.stopPropagation();window.todoManager.deleteTask(${task.id})" title="删除">🗑️</button>
             </div>
         `;
 

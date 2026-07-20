@@ -1142,6 +1142,37 @@ button {
 
 .hidden { display: none !important; }
 
+/* ===== 任务内容预览 ===== */
+.task-content-preview {
+    font-size: 0.82rem;
+    color: var(--gray-500);
+    margin-top: 4px;
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ===== 任务详情弹窗 ===== */
+.task-detail-modal { max-width: 500px; }
+.task-detail-modal .modal-body { display: flex; flex-direction: column; gap: 12px; }
+.detail-row { display: flex; flex-direction: column; gap: 4px; }
+.detail-row label { font-size: 0.8rem; font-weight: 600; color: var(--gray-500); text-transform: uppercase; }
+.detail-title { font-size: 1.3rem; font-weight: 700; color: var(--gray-800); margin: 0; }
+.detail-content { font-size: 0.95rem; color: var(--gray-700); line-height: 1.6; background: var(--gray-50); padding: 12px; border-radius: var(--radius-md); white-space: pre-wrap; max-height: 200px; overflow-y: auto; }
+.detail-row.no-content { color: var(--gray-400); font-style: italic; padding: 8px; }
+.detail-meta-bar { display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.8rem; }
+.detail-meta-bar span { padding: 4px 10px; border-radius: var(--radius-full); background: var(--gray-100); color: var(--gray-600); }
+.detail-priority.high { background: var(--danger-light); color: var(--danger); }
+.detail-priority.medium { background: var(--warning-light); color: var(--priority-medium); }
+.detail-priority.low { background: var(--success-light); color: var(--priority-low); }
+.detail-status.completed { background: var(--success-light); color: var(--success); }
+.detail-status.pending { background: var(--warning-light); color: var(--priority-medium); }
+.detail-time { font-size: 0.75rem; color: var(--gray-400); }
+
+.modal-textarea { width: 100%; padding: 12px; margin-bottom: 8px; border: 2px solid var(--gray-200); border-radius: var(--radius-lg); font-size: 0.95rem; font-family: var(--font-sans); background: white; resize: vertical; transition: all var(--transition-base); }
+.modal-textarea:focus { outline: none; border-color: var(--primary-400); box-shadow: 0 0 0 3px var(--primary-100); }
+
 /* ===== 动态背景画布 ===== */
 #dynamicBgCanvas {
     position: fixed;
