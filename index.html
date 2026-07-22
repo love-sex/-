@@ -274,6 +274,42 @@
         </div>
     </div>
 
+    <!-- ========== 设置面板 ========== -->
+    <div class="modal hidden" id="settingsModal">
+        <div class="modal-content settings-content">
+            <div class="modal-header">
+                <h3>🎨 主题设置</h3>
+                <button class="modal-close-btn" id="closeSettingsBtn">✕</button>
+            </div>
+            <div class="modal-body settings-body">
+                <div class="setting-section">
+                    <div class="theme-header"><h4>🌈 主题</h4><button class="add-theme-btn" id="addCustomThemeBtn">+ 添加</button></div>
+                    <div class="theme-presets" id="themePresets">
+                        <div class="theme-preset active" data-theme="default" style="background:linear-gradient(135deg,#667eea,#764ba2)"><span>默认</span></div>
+                        <div class="theme-preset" data-theme="ocean" style="background:linear-gradient(135deg,#2193b0,#6dd5ed)"><span>海洋</span></div>
+                        <div class="theme-preset" data-theme="forest" style="background:linear-gradient(135deg,#11998e,#38ef7d)"><span>森林</span></div>
+                        <div class="theme-preset" data-theme="sunset" style="background:linear-gradient(135deg,#f12711,#f5af19)"><span>日落</span></div>
+                        <div class="theme-preset" data-theme="sakura" style="background:linear-gradient(135deg,#fbc2eb,#a18cd1)"><span>樱花</span></div>
+                        <div class="theme-preset" data-theme="dark" style="background:linear-gradient(135deg,#0f172a,#334155)"><span>深色</span></div>
+                    </div>
+                </div>
+                <div class="setting-section">
+                    <h4>🎨 自定义颜色</h4>
+                    <div class="color-picker-row"><label>主色调</label><input type="color" id="primaryColorPicker" value="#6366f1"><span id="primaryColorValue">#6366f1</span></div>
+                    <div class="color-picker-row"><label>背景色</label><input type="color" id="bgColorPicker" value="#0f172a"><span id="bgColorValue">#0f172a</span></div>
+                </div>
+                <div class="setting-section">
+                    <h4>✨ 效果</h4>
+                    <div class="effect-options">
+                        <label class="effect-option"><input type="checkbox" id="glassEffect"><span>🪟 毛玻璃</span></label>
+                        <label class="effect-option"><input type="checkbox" id="shadowEffect" checked><span>📐 阴影</span></label>
+                        <label class="effect-option"><input type="checkbox" id="animationEffect" checked><span>🎬 动画</span></label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 通知 -->
     <div class="notification" id="notification"></div>
     <script src="script.js"></script>
