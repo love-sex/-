@@ -340,6 +340,11 @@ header .subtitle { color: rgba(255,255,255,0.7); font-size: 0.9rem; }
 
 .hidden { display: none !important; }
 
+@keyframes floatUp {
+    0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -100%) scale(1.5); }
+}
+
 /* ===== AI建议区域 ===== */
 .ai-section {
     background: rgba(30, 41, 59, 0.6);

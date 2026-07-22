@@ -1645,9 +1645,46 @@ class TodoManager {
         const task = this.tasks.find(t => t.id === id);
         if (task) {
             task.completed = !task.completed;
+            if (task.completed) {
+                task.completedAt = new Date().toISOString();
+                if (gameManager) {
+                    const result = gameManager.completeTask(task);
+                    if (result.leveledUp) this.showLevelUpEffect();
+                    this.showExpGainEffect(result.amount, task.title);
+                    this.updateGameUI();
+                }
+            }
             this.saveUserData();
             this.updateUI();
         }
+    }
+
+    showExpGainEffect(amount, taskTitle) {
+        const el = document.createElement('div');
+        el.className = 'completion-effect';
+        el.innerHTML = '<span style="color:#10b981;font-weight:700;">+' + amount + ' EXP</span>';
+        el.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;animation:floatUp 1.5s ease-out forwards;pointer-events:none;';
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 1500);
+    }
+
+    showLevelUpEffect() {
+        const el = document.createElement('div');
+        el.className = 'combo-display show';
+        el.textContent = 'LEVEL UP!';
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 2000);
+    }
+
+    updateGameUI() {
+        if (!gameManager) return;
+        const levelInfo = gameManager.getLevelInfo(gameManager.data.level);
+        const levelBadge = document.getElementById('levelBadge');
+        const expFill = document.getElementById('expFill');
+        const expText = document.getElementById('expText');
+        if (levelBadge) levelBadge.textContent = 'Lv.' + gameManager.data.level + ' ' + levelInfo.name;
+        if (expFill) expFill.style.width = gameManager.getLevelProgress() + '%';
+        if (expText) expText.textContent = gameManager.data.exp + ' / ' + gameManager.getExpForNextLevel() + ' EXP';
     }
 
     clearCompleted() {

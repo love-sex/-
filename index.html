@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>个人工作台 | My Workspace</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style-game.css">
     <link rel="stylesheet" href="style-portfolio.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
@@ -330,8 +331,33 @@
         </div>
     </div>
 
+    <!-- 游戏化系统 -->
+    <div class="game-container">
+        <div class="exp-bar-container">
+            <div class="exp-header">
+                <span class="level-badge" id="levelBadge">Lv.1 新手</span>
+                <span class="exp-text" id="expText">0 / 100 EXP</span>
+            </div>
+            <div class="exp-bar">
+                <div class="exp-fill" id="expFill" style="width: 0%"></div>
+            </div>
+        </div>
+        <div class="assistant-character" id="assistantChar">
+            <div class="character-sprite">
+                <div class="character-face">
+                    <div class="character-eyes">
+                        <div class="eye"></div>
+                        <div class="eye"></div>
+                    </div>
+                    <div class="character-mouth"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 通知 -->
     <div class="notification" id="notification"></div>
+    <script src="script-game.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
