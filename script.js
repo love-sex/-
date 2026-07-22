@@ -618,6 +618,7 @@ class TodoManager {
         if (ws) ws.classList.add('hidden');
         const panel = document.getElementById('todoPanel');
         if (panel) panel.classList.add('hidden');
+        this.initDynamicBackground();
     }
 
     showMainApp() {
@@ -634,8 +635,10 @@ class TodoManager {
         this.updateUI();
         this.setupDragAndDrop();
         this.setupSettingsUI();
-        this.initDynamicBackground();
         this.updateTodoBadge();
+        // 隐藏动态背景
+        const canvas = document.getElementById('dynamicBgCanvas');
+        if (canvas) canvas.style.display = 'none';
     }
 
     // ==================== 工具面板 ====================
