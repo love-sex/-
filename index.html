@@ -238,6 +238,14 @@
                     <div class="bg-controls"><label>模糊度</label><input type="range" id="bgBlur" min="0" max="20" value="5"><span id="bgBlurValue">5px</span></div>
                 </div>
                 <div class="setting-section">
+                    <h4>🤖 AI智能分析</h4>
+                    <div class="form-group">
+                        <label>DeepSeek API Key（可选）</label>
+                        <input type="password" id="aiApiKey" placeholder="sk-..." onchange="localStorage.setItem('ai_api_key', this.value)">
+                        <p style="font-size:0.75rem;color:#64748b;margin-top:4px;">获取: deepseek.com</p>
+                    </div>
+                </div>
+                <div class="setting-section">
                     <h4>✨ 效果</h4>
                     <div class="effect-options">
                         <label class="effect-option"><input type="checkbox" id="glassEffect"><span>🪟 毛玻璃</span></label>

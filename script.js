@@ -1229,7 +1229,7 @@ class TodoManager {
     }
 
     // ==================== 任务操作 ====================
-    addTask() {
+    async addTask() {
         const taskInput = document.getElementById('taskInput');
         const prioritySelect = document.getElementById('prioritySelect');
         const dueDateInput = document.getElementById('dueDateInput');
@@ -1239,6 +1239,25 @@ class TodoManager {
         if (!title) {
             this.showNotification('请输入任务标题', 'error');
             return;
+        }
+
+        this.showNotification('🤖 AI正在分析任务...', 'info');
+        const addBtn = document.getElementById('addTaskBtn');
+        const originalText = addBtn.textContent;
+        addBtn.textContent = '⏳ 分析中...';
+        addBtn.disabled = true;
+
+        let aiResult = null;
+        try {
+            aiResult = await this.analyzeTaskWithAI(title);
+        } catch (err) {
+            console.log('AI分析失败，使用规则分析:', err.message);
+            aiResult = this.analyzeTaskWithRules(title);
+        }
+
+        if (aiResult) {
+            if (aiResult.category) categorySelect.value = aiResult.category;
+            if (aiResult.priority) prioritySelect.value = aiResult.priority;
         }
 
         const task = {
@@ -1262,7 +1281,87 @@ class TodoManager {
 
         taskInput.value = '';
         dueDateInput.value = '';
-        this.showNotification('任务添加成功！', 'success');
+        addBtn.textContent = originalText;
+        addBtn.disabled = false;
+
+        if (aiResult) {
+            this.showNotification('✅ AI建议: ' + aiResult.category + ' - ' + this.getPriorityText(aiResult.priority), 'success');
+        } else {
+            this.showNotification('任务添加成功！', 'success');
+        }
+    }
+
+    async analyzeTaskWithAI(title) {
+        const API_KEY = localStorage.getItem('ai_api_key');
+        if (!API_KEY || API_KEY === '') {
+            return this.analyzeTaskWithRules(title);
+        }
+
+        try {
+            const response = await fetch('https://api.deepseek.com/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + API_KEY
+                },
+                body: JSON.stringify({
+                    model: 'deepseek-chat',
+                    messages: [
+                        { role: 'system', content: '你是一个任务管理助手。分析用户输入的任务标题，返回JSON格式的分类和优先级。分类选项：工作、学习、生活、购物、健康、娱乐、社交、其他。优先级选项：high、medium、low。只返回JSON，不要其他文字。格式：{"category":"xxx","priority":"xxx"}' },
+                        { role: 'user', content: title }
+                    ],
+                    temperature: 0.3,
+                    max_tokens: 100
+                })
+            });
+
+            if (!response.ok) throw new Error('API请求失败');
+            const data = await response.json();
+            const content = data.choices[0]?.message?.content?.trim();
+            if (content) {
+                const jsonMatch = content.match(/\{[^}]+\}/);
+                if (jsonMatch) return JSON.parse(jsonMatch[0]);
+            }
+        } catch (err) {
+            throw new Error(err.message);
+        }
+        return null;
+    }
+
+    analyzeTaskWithRules(title) {
+        const t = title.toLowerCase();
+        const categoryRules = {
+            '工作': ['会议', '报告', '项目', '客户', '邮件', '办公', '加班', 'deadline', '截止日期', 'ppt', 'excel', '文档'],
+            '学习': ['学习', '课程', '考试', '读书', '笔记', '作业', '论文', '研究', '培训', '上课', '背单词', '复习'],
+            '生活': ['买菜', '做饭', '打扫', '洗衣', '整理', '缴费', '水电', '物业', '维修', '搬家'],
+            '购物': ['买', '购物', '下单', '快递', '淘宝', '京东', '拼多多', '外卖', '商品'],
+            '健康': ['运动', '跑步', '健身', '锻炼', '吃药', '医院', '体检', '睡觉', '早起', '减肥'],
+            '娱乐': ['电影', '游戏', '音乐', '视频', '旅行', '聚会', '逛街', '唱歌', '打球'],
+            '社交': ['聚会', '约会', '朋友', '亲戚', '拜访', '聚餐', '婚礼', '生日', '节日']
+        };
+
+        let category = '其他';
+        let priority = 'medium';
+
+        for (const [cat, keywords] of Object.entries(categoryRules)) {
+            if (keywords.some(kw => t.includes(kw))) {
+                category = cat;
+                break;
+            }
+        }
+
+        if (['紧急', '重要', '必须', '立即', '马上', 'deadline', '截止', '明天', '今天'].some(kw => t.includes(kw))) {
+            priority = 'high';
+        } else if (['有空', '随便', '不急', '以后', '有空时', '休闲', '娱乐'].some(kw => t.includes(kw))) {
+            priority = 'low';
+        }
+
+        return { category, priority };
+    }
+
+    getPriorityText(priority) {
+        const map = { high: '高优先级', medium: '中优先级', low: '低优先级' };
+        return map[priority] || '中优先级';
     }
 
     deleteTask(id) {

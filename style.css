@@ -382,6 +382,11 @@ header .subtitle { color: rgba(255,255,255,0.7); font-size: 0.9rem; }
 .modal-body { padding: 24px; }
 .setting-section { margin-bottom: 24px; }
 .setting-section h4 { font-size: 0.9rem; color: #e2e8f0; margin-bottom: 12px; font-weight: 600; }
+.setting-section .form-group { margin-bottom: 12px; }
+.setting-section .form-group label { display: block; font-size: 0.8rem; color: #94a3b8; margin-bottom: 4px; }
+.setting-section .form-group input[type="password"],
+.setting-section .form-group input[type="text"] { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.06); color: #f1f5f9; font-size: 0.85rem; outline: none; }
+.setting-section .form-group input:focus { border-color: #6366f1; }
 
 .theme-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .theme-header h4 { margin-bottom: 0; }
