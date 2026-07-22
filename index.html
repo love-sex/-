@@ -91,6 +91,17 @@
             <p class="hero-subtitle">今天也是高效创作的一天</p>
         </section>
 
+        <!-- AI建议区域 -->
+        <section class="ai-section">
+            <div class="ai-section-header">
+                <h3>🤖 AI智能建议</h3>
+                <button class="ai-report-btn" id="generateReportBtn">📋 生成日报</button>
+            </div>
+            <div class="ai-suggestions" id="aiSuggestions">
+                <div class="ai-suggestion-item">💡 添加任务开始使用AI建议功能</div>
+            </div>
+        </section>
+
         <!-- 功能卡片网格 -->
         <section class="tools-grid">
             <!-- 待办事项卡片 -->
@@ -163,6 +174,7 @@
                     <select id="categorySelect"><option value="默认">📁 默认</option></select>
                     <input type="date" id="dueDateInput">
                     <button id="addTaskBtn" class="add-btn">+</button>
+                    <button id="breakDownBtn" class="breakdown-btn" title="AI分解任务">🔨</button>
                 </div>
             </div>
             <!-- 筛选 -->

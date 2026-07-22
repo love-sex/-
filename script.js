@@ -1169,6 +1169,76 @@ class TodoManager {
                 if (cat && cat !== '全部') this.deleteCategory(cat);
             }
         });
+
+        // AI功能事件监听
+        document.getElementById('breakDownBtn')?.addEventListener('click', () => this.showBreakdownModal());
+        document.getElementById('generateReportBtn')?.addEventListener('click', () => this.showDailyReport());
+
+        // 初始化AI建议
+        this.updateAISuggestions();
+    }
+
+    // 显示任务分解模态框
+    async showBreakdownModal() {
+        const title = document.getElementById('taskInput')?.value.trim();
+        if (!title) {
+            this.showNotification('请先输入任务标题', 'warning');
+            return;
+        }
+
+        let modal = document.getElementById('breakdownModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'breakdownModal';
+            modal.className = 'modal';
+            modal.innerHTML = '<div class="modal-content"><div class="modal-header"><h3>🔨 AI任务分解</h3><button class="modal-close-btn" onclick="document.getElementById(\'breakdownModal\').classList.add(\'hidden\')">✕</button></div><div class="modal-body"><div class="breakdown-steps" id="breakdownSteps"></div></div><div class="modal-footer"><button class="modal-cancel-btn" onclick="document.getElementById(\'breakdownModal\').classList.add(\'hidden\')">关闭</button><button class="modal-save-btn" id="addBreakdownTasks">添加为子任务</button></div></div>';
+            document.body.appendChild(modal);
+        }
+
+        modal.classList.remove('hidden');
+        const stepsContainer = document.getElementById('breakdownSteps');
+        stepsContainer.innerHTML = '<p style="color:#94a3b8;">🤖 AI正在分析...</p>';
+
+        const steps = await this.breakTaskDown(title);
+        const times = await Promise.all(steps.map(() => this.estimateTaskTime(title, 'medium')));
+
+        stepsContainer.innerHTML = steps.map((step, i) => '<div class="breakdown-step"><div class="step-number">' + (i + 1) + '</div><div class="step-text">' + step + '</div><div class="step-time">' + (times[i] || '30分钟') + '</div></div>').join('');
+
+        document.getElementById('addBreakdownTasks').onclick = () => {
+            steps.forEach((step) => {
+                this.tasks.push({ id: this.nextId++, title: step, content: '', priority: 'medium', category: '默认', completed: false, createdAt: new Date().toISOString() });
+            });
+            this.saveUserData();
+            this.updateUI();
+            modal.classList.add('hidden');
+            this.showNotification('已添加 ' + steps.length + ' 个子任务', 'success');
+        };
+    }
+
+    // 显示日报模态框
+    showDailyReport() {
+        let modal = document.getElementById('reportModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'reportModal';
+            modal.className = 'modal';
+            modal.innerHTML = '<div class="modal-content"><div class="modal-header"><h3>📋 AI日报</h3><button class="modal-close-btn" onclick="document.getElementById(\'reportModal\').classList.add(\'hidden\')">✕</button></div><div class="modal-body"><div class="report-content" id="reportContent"></div><div class="report-actions"><button class="copy-report-btn" id="copyReportBtn">📋 复制日报</button><button class="close-report-btn" onclick="document.getElementById(\'reportModal\').classList.add(\'hidden\')">关闭</button></div></div></div>';
+            document.body.appendChild(modal);
+            document.getElementById('copyReportBtn').onclick = () => {
+                const content = document.getElementById('reportContent').textContent;
+                navigator.clipboard.writeText(content).then(() => this.showNotification('日报已复制', 'success'));
+            };
+        }
+        modal.classList.remove('hidden');
+        document.getElementById('reportContent').textContent = this.generateDailyReport();
+    }
+
+    // 更新AI建议
+    updateAISuggestions() {
+        const container = document.getElementById('aiSuggestions');
+        if (!container) return;
+        const suggestions = this.getAISuggestions();
+        container.innerHTML = suggestions.map(s => '<div class="ai-suggestion-item">' + s + '</div>').join('');
     }
 
     // ==================== 拖拽功能 ====================
@@ -1362,6 +1432,161 @@ class TodoManager {
     getPriorityText(priority) {
         const map = { high: '高优先级', medium: '中优先级', low: '低优先级' };
         return map[priority] || '中优先级';
+    }
+
+    // ==================== AI扩展功能 ====================
+
+    // 1. AI任务分解 - 将大任务拆分为小步骤
+    async breakTaskDown(title) {
+        const API_KEY = localStorage.getItem('ai_api_key');
+        if (!API_KEY || API_KEY === '') {
+            return this.breakTaskDownWithRules(title);
+        }
+
+        try {
+            const response = await fetch('https://api.deepseek.com/chat/completions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + API_KEY },
+                body: JSON.stringify({
+                    model: 'deepseek-chat',
+                    messages: [
+                        { role: 'system', content: '你是一个任务管理助手。用户输入一个大任务，你将其拆分为3-5个具体可执行的小步骤。返回JSON数组格式：["步骤1","步骤2","步骤3"]。只返回JSON，不要其他文字。' },
+                        { role: 'user', content: title }
+                    ],
+                    temperature: 0.5,
+                    max_tokens: 500
+                })
+            });
+
+            if (!response.ok) throw new Error('API请求失败');
+            const data = await response.json();
+            const content = data.choices[0]?.message?.content?.trim();
+            if (content) {
+                const jsonMatch = content.match(/\[[\s\S]*\]/);
+                if (jsonMatch) return JSON.parse(jsonMatch[0]);
+            }
+        } catch (err) {
+            console.log('AI分解失败:', err.message);
+        }
+        return this.breakTaskDownWithRules(title);
+    }
+
+    breakTaskDownWithRules(title) {
+        return ['准备：收集必要资料和资源', '规划：制定详细计划和时间表', '执行：按计划逐步完成任务', '检查：验证完成情况和质量', '总结：记录经验教训'].slice(0, 3 + Math.floor(Math.random() * 3));
+    }
+
+    // 2. AI时间估算 - 估算任务所需时间
+    async estimateTaskTime(title, priority) {
+        const API_KEY = localStorage.getItem('ai_api_key');
+        if (!API_KEY || API_KEY === '') {
+            return this.estimateTimeWithRules(title, priority);
+        }
+
+        try {
+            const response = await fetch('https://api.deepseek.com/chat/completions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + API_KEY },
+                body: JSON.stringify({
+                    model: 'deepseek-chat',
+                    messages: [
+                        { role: 'system', content: '你是一个时间管理助手。根据任务标题和优先级，估算完成时间。返回JSON格式：{"hours":数字,"minutes":数字}。只返回JSON，不要其他文字。' },
+                        { role: 'user', content: '任务：' + title + '，优先级：' + priority }
+                    ],
+                    temperature: 0.3,
+                    max_tokens: 100
+                })
+            });
+
+            if (!response.ok) throw new Error('API请求失败');
+            const data = await response.json();
+            const content = data.choices[0]?.message?.content?.trim();
+            if (content) {
+                const jsonMatch = content.match(/\{[^}]+\}/);
+                if (jsonMatch) {
+                    const result = JSON.parse(jsonMatch[0]);
+                    return result.hours + '小时' + (result.minutes ? result.minutes + '分钟' : '');
+                }
+            }
+        } catch (err) {
+            console.log('AI估算失败:', err.message);
+        }
+        return this.estimateTimeWithRules(title, priority);
+    }
+
+    estimateTimeWithRules(title, priority) {
+        const timeMap = { high: '2-4小时', medium: '1-2小时', low: '30分钟-1小时' };
+        return timeMap[priority] || '1小时';
+    }
+
+    // 3. AI日报生成 - 根据完成任务生成日报
+    generateDailyReport() {
+        const today = new Date().toLocaleDateString('zh-CN');
+        const completedToday = this.tasks.filter(t => {
+            if (!t.completed || !t.completedAt) return false;
+            return new Date(t.completedAt).toLocaleDateString('zh-CN') === today;
+        });
+        const pendingCount = this.tasks.filter(t => !t.completed).length;
+        const totalCount = this.tasks.length;
+        const completionRate = totalCount > 0 ? Math.round((completedToday.length / totalCount) * 100) : 0;
+
+        let report = '📋 ' + today + ' 日报\n\n';
+        report += '✅ 今日完成: ' + completedToday.length + ' 个任务\n';
+        report += '⏳ 待完成: ' + pendingCount + ' 个任务\n';
+        report += '📊 完成率: ' + completionRate + '%\n\n';
+
+        if (completedToday.length > 0) {
+            report += '🎉 今日成就:\n';
+            completedToday.forEach((t, i) => {
+                report += '  ' + (i + 1) + '. ' + t.title + '\n';
+            });
+            report += '\n';
+        }
+
+        report += '💡 明日建议:\n';
+        if (completionRate >= 80) {
+            report += '  太棒了！保持这个节奏，继续保持高效！\n';
+        } else if (completionRate >= 50) {
+            report += '  不错！明天可以尝试完成更多任务。\n';
+        } else {
+            report += '  明天加油！建议先完成高优先级任务。\n';
+        }
+
+        return report;
+    }
+
+    // 4. AI建议 - 根据历史数据建议最佳工作时间
+    getAISuggestions() {
+        const completedTasks = this.tasks.filter(t => t.completed && t.completedAt);
+        const highPriorityCompleted = completedTasks.filter(t => t.priority === 'high');
+        const totalCompleted = completedTasks.length;
+        const totalPending = this.tasks.filter(t => !t.completed).length;
+        const highPriorityPending = this.tasks.filter(t => !t.completed && t.priority === 'high').length;
+
+        let suggestions = [];
+
+        if (highPriorityPending > 0) {
+            suggestions.push('🔴 有 ' + highPriorityPending + ' 个高优先级任务待完成，建议优先处理');
+        }
+
+        if (totalPending > 10) {
+            suggestions.push('📋 待办任务较多（' + totalPending + '个），建议分解大任务逐步完成');
+        } else if (totalPending === 0) {
+            suggestions.push('🎉 所有任务都已完成！休息一下或添加新任务吧');
+        }
+
+        if (totalCompleted > 0) {
+            suggestions.push('📈 已完成 ' + totalCompleted + ' 个任务，继续保持！');
+        }
+
+        const total = this.tasks.length;
+        const rate = total > 0 ? Math.round((totalCompleted / total) * 100) : 0;
+        if (rate >= 80) {
+            suggestions.push('🌟 完成率 ' + rate + '%，效率很高！');
+        } else if (rate < 50) {
+            suggestions.push('💪 完成率 ' + rate + '%，建议专注完成高优先级任务');
+        }
+
+        return suggestions.length > 0 ? suggestions : ['💡 添加任务开始使用AI建议功能'];
     }
 
     deleteTask(id) {
