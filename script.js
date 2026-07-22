@@ -681,10 +681,8 @@ class TodoManager {
     initDynamicBackground() {
         const canvas = document.getElementById('dynamicBgCanvas');
         if (!canvas) return;
-        if (this.theme.settings.bgImage || this.theme.settings.bgVideoId) {
-            canvas.style.display = 'none';
-            return;
-        }
+        if (this._bgAnimationId) cancelAnimationFrame(this._bgAnimationId);
+        if (this._bgCleanup) this._bgCleanup();
         canvas.style.display = 'block';
         const ctx = canvas.getContext('2d');
         let animationId = null;
@@ -697,15 +695,17 @@ class TodoManager {
         let seasonStartTime = Date.now();
         let nextParticles = [];
         const SEASONS = [
-            { name:'Spring', emoji:'S', colors:['#fce4ec','#f8bbd0','#f48fb1','#e1bee7'], bgTop:'#2d1b4e', bgBottom:'#1a1a2e', count:60 },
-            { name:'Summer', emoji:'Su', colors:['#bbdefb','#90caf9','#64b5f6','#4fc3f7'], bgTop:'#0d2b4e', bgBottom:'#0a1929', count:50 },
-            { name:'Autumn', emoji:'A', colors:['#ffcc80','#ffb74d','#ffa726','#ff8a65'], bgTop:'#3e2723', bgBottom:'#1a1a1a', count:70 },
-            { name:'Winter', emoji:'W', colors:['#e3f2fd','#bbdefb','#90caf9','#f8fdff'], bgTop:'#1a237e', bgBottom:'#0d1b2a', count:80 }
+            { name:'Spring', colors:['#fce4ec','#f8bbd0','#f48fb1','#e1bee7'], bgTop:'#2d1b4e', bgBottom:'#1a1a2e', count:50 },
+            { name:'Summer', colors:['#bbdefb','#90caf9','#64b5f6','#4fc3f7'], bgTop:'#0d2b4e', bgBottom:'#0a1929', count:40 },
+            { name:'Autumn', colors:['#ffcc80','#ffb74d','#ffa726','#ff8a65'], bgTop:'#3e2723', bgBottom:'#1a1a1a', count:60 },
+            { name:'Winter', colors:['#e3f2fd','#bbdefb','#90caf9','#f8fdff'], bgTop:'#1a237e', bgBottom:'#0d1b2a', count:70 }
         ];
         const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
         resize();
-        window.addEventListener('resize', resize);
-        document.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
+        const onResize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+        const onMouseMove = (e) => { mouseX = e.clientX; mouseY = e.clientY; };
+        window.addEventListener('resize', onResize);
+        document.addEventListener('mousemove', onMouseMove);
         function createParticles(count, season) {
             const arr = [];
             for (let i = 0; i < count; i++) {
@@ -748,7 +748,7 @@ class TodoManager {
             animationId = requestAnimationFrame(drawScene);
         }
         particles = createParticles(SEASONS[0].count, SEASONS[0]); drawScene();
-        this._bgCleanup = () => { if (animationId) cancelAnimationFrame(animationId); window.removeEventListener('resize', resize); };
+        this._bgCleanup = () => { if (animationId) cancelAnimationFrame(animationId); window.removeEventListener('resize', onResize); document.removeEventListener('mousemove', onMouseMove); };
     }
 
 
