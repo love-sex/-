@@ -128,9 +128,10 @@ migrateData();
 
 // ==================== 主题设置管理器 ====================
 const DEFAULT_THEME = {
-    primaryColor: '#6366f1',
-    headerFrom: '#667eea',
-    headerTo: '#764ba2',
+    primaryColor: '#8b5cf6',
+    bgColor: '#0f172a',
+    headerFrom: '#6366f1',
+    headerTo: '#a855f7',
     bgImage: '',
     bgVideoId: '',
     bgOpacity: 15,
@@ -143,16 +144,16 @@ const DEFAULT_THEME = {
 };
 
 const PRESET_THEMES = {
-    default: { primaryColor: '#6366f1', headerFrom: '#667eea', headerTo: '#764ba2', mode: 'default' },
-    ocean:   { primaryColor: '#0891b2', headerFrom: '#2193b0', headerTo: '#6dd5ed', mode: 'ocean' },
-    forest:  { primaryColor: '#059669', headerFrom: '#11998e', headerTo: '#38ef7d', mode: 'forest' },
-    sunset:  { primaryColor: '#ea580c', headerFrom: '#f12711', headerTo: '#f5af19', mode: 'sunset' },
-    sakura:  { primaryColor: '#db2777', headerFrom: '#fbc2eb', headerTo: '#a18cd1', mode: 'sakura' },
-    night:   { primaryColor: '#818cf8', headerFrom: '#0f172a', headerTo: '#334155', mode: 'night' },
-    purple:  { primaryColor: '#7c3aed', headerFrom: '#7c3aed', headerTo: '#c084fc', mode: 'purple' },
-    mint:    { primaryColor: '#0d9488', headerFrom: '#0d9488', headerTo: '#5eead4', mode: 'mint' },
-    rose:    { primaryColor: '#e11d48', headerFrom: '#e11d48', headerTo: '#fb7185', mode: 'rose' },
-    sky:     { primaryColor: '#0284c7', headerFrom: '#0284c7', headerTo: '#7dd3fc', mode: 'sky' }
+    default: { primaryColor: '#8b5cf6', bgColor: '#0f172a', headerFrom: '#6366f1', headerTo: '#8b5cf6', mode: 'default' },
+    ocean:   { primaryColor: '#a855f7', bgColor: '#0f172a', headerFrom: '#8b5cf6', headerTo: '#a855f7', mode: 'ocean' },
+    forest:  { primaryColor: '#c084fc', bgColor: '#0f172a', headerFrom: '#a855f7', headerTo: '#c084fc', mode: 'forest' },
+    sunset:  { primaryColor: '#7c3aed', bgColor: '#1e1b4b', headerFrom: '#6366f1', headerTo: '#a855f7', mode: 'sunset' },
+    sakura:  { primaryColor: '#ec4899', bgColor: '#0f172a', headerFrom: '#8b5cf6', headerTo: '#ec4899', mode: 'sakura' },
+    night:   { primaryColor: '#7c3aed', bgColor: '#020617', headerFrom: '#4c1d95', headerTo: '#7c3aed', mode: 'night' },
+    purple:  { primaryColor: '#6366f1', bgColor: '#0f172a', headerFrom: '#6366f1', headerTo: '#c084fc', mode: 'purple' },
+    mint:    { primaryColor: '#a78bfa', bgColor: '#0f172a', headerFrom: '#a78bfa', headerTo: '#e879f9', mode: 'mint' },
+    rose:    { primaryColor: '#d946ef', bgColor: '#0f172a', headerFrom: '#d946ef', headerTo: '#f0abfc', mode: 'rose' },
+    sky:     { primaryColor: '#818cf8', bgColor: '#0f172a', headerFrom: '#818cf8', headerTo: '#a5b4fc', mode: 'sky' }
 };
 
 class ThemeManager {
@@ -276,6 +277,12 @@ class ThemeManager {
 
     setBgImage(base64) {
         this.settings.bgImage = base64;
+        this.applySettings();
+        this.saveSettings();
+    }
+
+    setBgColor(color) {
+        this.settings.bgColor = color;
         this.applySettings();
         this.saveSettings();
     }
@@ -869,14 +876,14 @@ class TodoManager {
             document.getElementById('primaryColorValue').textContent = e.target.value;
         });
 
-        // 背景色选择 - 只影响背景遮罩色调
+        // 背景色选择
         document.getElementById('bgColorPicker')?.addEventListener('input', (e) => {
+            this.theme.setBgColor(e.target.value);
             const overlay = document.getElementById('custom-bg-overlay');
             if (overlay) {
                 overlay.style.background = e.target.value + 'd9';
             }
             document.getElementById('bgColorValue').textContent = e.target.value;
-            this.theme.saveSettings();
         });
 
         // 背景图片上传
@@ -1038,9 +1045,9 @@ class TodoManager {
         if (primaryValue) primaryValue.textContent = s.primaryColor;
 
         const bgPicker = document.getElementById('bgColorPicker');
-        if (bgPicker) bgPicker.value = '#f8fafc';
+        if (bgPicker) bgPicker.value = s.bgColor || '#0f172a';
         const bgValue = document.getElementById('bgColorValue');
-        if (bgValue) bgValue.textContent = '#f8fafc';
+        if (bgValue) bgValue.textContent = s.bgColor || '#0f172a';
 
         // 同步预设主题选中
         document.querySelectorAll('.theme-preset').forEach(p => {

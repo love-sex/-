@@ -198,9 +198,110 @@ class GamificationManager {
     }
 }
 
+// ==================== AI机器人拖拽功能 ====================
+function initDraggableAI() {
+    const container = document.querySelector('.game-container');
+    if (!container) return;
+
+    let isDragging = false;
+    let startX, startY;
+    let startRight, startBottom;
+
+    // 鼠标按下开始拖拽
+    container.addEventListener('mousedown', (e) => {
+        // 如果点击的是角色本身或经验条，才允许拖拽
+        if (!e.target.closest('.assistant-character') && !e.target.closest('.exp-bar-container')) return;
+        e.preventDefault();
+        isDragging = true;
+        container.classList.add('dragging');
+
+        startX = e.clientX;
+        startY = e.clientY;
+
+        // 获取当前位置（从 computed style 获取 bottom/right）
+        const style = window.getComputedStyle(container);
+        startRight = parseInt(style.right) || 20;
+        startBottom = parseInt(style.bottom) || 20;
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    });
+
+    // 触摸事件支持（移动端）
+    container.addEventListener('touchstart', (e) => {
+        if (!e.target.closest('.assistant-character') && !e.target.closest('.exp-bar-container')) return;
+        isDragging = true;
+        container.classList.add('dragging');
+
+        const touch = e.touches[0];
+        startX = touch.clientX;
+        startY = touch.clientY;
+
+        const style = window.getComputedStyle(container);
+        startRight = parseInt(style.right) || 20;
+        startBottom = parseInt(style.bottom) || 20;
+
+        document.addEventListener('touchmove', onTouchMove, { passive: false });
+        document.addEventListener('touchend', onTouchEnd);
+    }, { passive: true });
+
+    function onMouseMove(e) {
+        if (!isDragging) return;
+        e.preventDefault();
+        moveTo(e.clientX, e.clientY);
+    }
+
+    function onTouchMove(e) {
+        if (!isDragging) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        moveTo(touch.clientX, touch.clientY);
+    }
+
+    function moveTo(clientX, clientY) {
+        const deltaX = startX - clientX;
+        const deltaY = startY - clientY;
+
+        let newRight = startRight + deltaX;
+        let newBottom = startBottom + deltaY;
+
+        // 限制在窗口范围内
+        const containerWidth = container.offsetWidth;
+        const containerHeight = container.offsetHeight;
+        const maxRight = window.innerWidth - containerWidth;
+        const maxBottom = window.innerHeight - containerHeight;
+
+        newRight = Math.max(0, Math.min(newRight, maxRight));
+        newBottom = Math.max(0, Math.min(newBottom, maxBottom));
+
+        container.style.right = newRight + 'px';
+        container.style.bottom = newBottom + 'px';
+        container.style.left = 'auto';
+        container.style.top = 'auto';
+    }
+
+    function onMouseUp() {
+        endDrag();
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+    }
+
+    function onTouchEnd() {
+        endDrag();
+        document.removeEventListener('touchmove', onTouchMove);
+        document.removeEventListener('touchend', onTouchEnd);
+    }
+
+    function endDrag() {
+        isDragging = false;
+        container.classList.remove('dragging');
+    }
+}
+
 // ==================== 全局实例 ====================
 let gameManager;
 
 document.addEventListener('DOMContentLoaded', () => {
     gameManager = new GamificationManager();
+    initDraggableAI();
 });
