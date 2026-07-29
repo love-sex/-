@@ -924,7 +924,6 @@ const App = (() => {
     load();
     document.body.setAttribute('data-theme', data.settings.theme);
     renderCalendar();
-    renderHome();
     bindTodo();
     bindSport();
     bindFinance();
@@ -942,6 +941,9 @@ const App = (() => {
     $('#backBtn').onclick = () => showView('home');
     $('#settingsBtn').onclick = () => showView('settings');
     $('#appMenuBtn').onclick = () => showView('home');
+
+    // 切换到首页（确保view状态正确初始化）
+    showView('home');
 
     // 日期条
     $('#dateBarToggle').onclick = () => {

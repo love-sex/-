@@ -24,24 +24,29 @@
     <!-- 兜底：确保登录容器可见（即使主脚本出错也能看到登录框） -->
     <script>
         (function(){
-            // DOM准备好后强制保证登录表单可见
+            var runs = 0; // 仅在页面加载初期执行，避免干扰登录后状态
             function ensureAuthVisible(){
+                runs++;
                 var ac = document.getElementById('authContainer');
-                if (ac) {
-                    ac.classList.remove('hidden');
-                    ac.style.display = 'flex';
-                    ac.style.minHeight = '100vh';
-                    ac.style.opacity = '1';
-                }
                 var wb = document.getElementById('wbContainer');
-                if (wb) wb.style.display = 'none';
+                // 只在前 2 次执行（DOMContentLoaded + 1.5s）才强制状态
+                // 之后让主脚本自由控制
+                if (runs <= 2) {
+                    if (ac) {
+                        ac.classList.remove('hidden');
+                        ac.style.display = 'flex';
+                        ac.style.minHeight = '100vh';
+                        ac.style.opacity = '1';
+                    }
+                    if (wb) wb.style.display = 'none';
+                }
             }
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', ensureAuthVisible);
             } else {
                 ensureAuthVisible();
             }
-            // 双重保险：1.5秒后再次确保可见
+            // 1.5秒后兜底一次（仅在登录页加载时生效，不影响登录后）
             setTimeout(ensureAuthVisible, 1500);
         })();
     </script>
