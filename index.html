@@ -2,23 +2,31 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>个人工作台 | My Workspace</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="想想工作台">
+    <meta name="theme-color" content="#3d2817">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%BE%3C/text%3E%3C/svg%3E">
+    <title>想想工作台 · 个人AI工作台</title>
+    <!-- Auth 页样式 -->
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="style-game.css">
     <link rel="stylesheet" href="style-portfolio.css">
+    <!-- 想想工作台样式（后加载，覆盖 body/:root） -->
+    <link rel="stylesheet" href="workbench.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
-    <!-- 动态背景 -->
+    <!-- 动态背景（登录页使用） -->
     <canvas id="dynamicBgCanvas"></canvas>
 
     <!-- ========== 登录/注册页面 ========== -->
     <div class="auth-container hidden" id="authContainer">
         <div class="auth-box">
             <div class="auth-header">
-                <div class="auth-logo">🚀</div>
-                <h1>个人工作台</h1>
+                <div class="auth-logo">🌾</div>
+                <h1>想想工作台</h1>
                 <p>高效管理你的工作和生活</p>
             </div>
             <form class="auth-form" id="loginForm">
@@ -69,269 +77,516 @@
         </div>
     </div>
 
-    <!-- ========== 主工作台 ========== -->
-    <div class="workspace hidden" id="workspace">
-        <!-- 顶部导航 -->
-        <nav class="top-nav">
-            <div class="nav-brand">
-                <span class="brand-icon">🚀</span>
-                <span class="brand-text">工作台</span>
+    <!-- ========== 想想工作台（登录后显示）========== -->
+    <div id="wbContainer" style="display:none;">
+        <!-- 顶部导航条 -->
+        <header class="app-header" id="appHeader">
+            <div class="app-header-left">
+                <button class="icon-btn" id="backBtn" title="返回" style="display:none;">
+                    <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+                </button>
+                <button class="icon-btn" id="appMenuBtn" title="菜单">
+                    <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M3 13h2v-2H3zm0 4h2v-2H3zm0-8h2V7H3zm4 4h14v-2H7zm0 4h14v-2H7zM7 7v2h14V7z"/></svg>
+                </button>
+                <h1 class="app-title">想想工作台</h1>
             </div>
-            <div class="nav-actions">
-                <button class="nav-btn" id="openSettingsBtn" title="主题设置">🎨</button>
-                <div class="user-menu">
-                    <span class="user-avatar" id="currentUsername">U</span>
-                    <button class="logout-btn" id="logoutBtn">退出</button>
+            <div class="app-header-right">
+                <span class="user-display" id="wbUsername" style="margin-right:8px;font-size:0.85rem;color:var(--gold);"></span>
+                <span class="status-dot" id="syncStatus" title="同步状态"></span>
+                <button class="icon-btn" id="settingsBtn" title="设置">
+                    <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+                </button>
+                <button class="icon-btn" id="wbLogoutBtn" title="退出登录" style="color:#b94e4e;">
+                    <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- 日期选择条 -->
+        <div class="date-bar" id="dateBar">
+            <button class="date-bar-collapse" id="dateBarToggle" title="展开/折叠日历">
+                <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
+            </button>
+            <button class="date-arrow" id="prevMonth">‹</button>
+            <span class="date-bar-title" id="dateBarTitle">2026年7月</span>
+            <button class="date-arrow" id="nextMonth">›</button>
+            <span class="date-pill" id="datePill">7月29日 周三</span>
+            <button class="date-jump" id="dateJumpBtn">展开日历</button>
+        </div>
+
+        <!-- 折叠的日历面板 -->
+        <div class="calendar-panel" id="calendarPanel" style="display:none;">
+            <div class="calendar-weekdays">
+                <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+            </div>
+            <div class="calendar-days" id="calendarDays"></div>
+        </div>
+
+        <!-- 主内容区 -->
+        <main class="app-main" id="appMain">
+
+            <!-- ============ 首页 ============ -->
+            <section class="view view-home" data-view="home">
+                <div class="home-content">
+                    <div class="section-block">
+                        <div class="module-grid">
+                            <button class="module-card" data-target="todo">
+                                <div class="module-icon">📝</div>
+                                <div class="module-name">待办清单</div>
+                                <div class="module-stat">待办 <b id="homeTodoCount">0</b> 项</div>
+                            </button>
+                            <button class="module-card" data-target="sport">
+                                <div class="module-icon">💪</div>
+                                <div class="module-name">运动记录</div>
+                                <div class="module-stat">本月 <b id="homeSportDays">0</b> 次训练</div>
+                            </button>
+                            <button class="module-card" data-target="finance">
+                                <div class="module-icon">💰</div>
+                                <div class="module-name">收支记账</div>
+                                <div class="module-stat">收入 <b id="homeIncome">¥0</b></div>
+                                <div class="module-stat">支出 <b id="homeExpense">¥0</b></div>
+                            </button>
+                            <button class="module-card" data-target="account">
+                                <div class="module-icon">🐼</div>
+                                <div class="module-name">宠物号</div>
+                                <div class="module-stat">账号运营</div>
+                            </button>
+                            <button class="module-card" data-target="account">
+                                <div class="module-icon">⭐</div>
+                                <div class="module-name">好物号</div>
+                                <div class="module-stat">账号运营</div>
+                            </button>
+                            <button class="module-card" data-target="account">
+                                <div class="module-icon">📱</div>
+                                <div class="module-name">带货号</div>
+                                <div class="module-stat">账号运营</div>
+                            </button>
+                            <button class="module-card" data-target="excerpt">
+                                <div class="module-icon">✍️</div>
+                                <div class="module-name">摘录本</div>
+                                <div class="module-stat">文案 · 笔记 · 播客</div>
+                            </button>
+                            <button class="module-card" data-target="study">
+                                <div class="module-icon">📚</div>
+                                <div class="module-name">学习工作</div>
+                                <div class="module-stat">课程 · 项目</div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="block-title">今日概览</h3>
+                        <div class="overview-row">
+                            <div class="overview-circle">
+                                <div class="circle-num"><span id="ovTodo">0</span><small>/<span id="ovTodoTotal">0</span></small></div>
+                                <div class="circle-label">📝 今日待办</div>
+                            </div>
+                            <div class="overview-circle">
+                                <div class="circle-num">¥<span id="ovCash">0</span></div>
+                                <div class="circle-label">💰 今日支出</div>
+                            </div>
+                            <div class="overview-circle">
+                                <div class="circle-num"><span id="ovSport">0</span><small>/90 min</small></div>
+                                <div class="circle-label">💪 今日运动</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-block">
+                        <div class="quick-todo-head">
+                            <h3 class="block-title">今日 To-do</h3>
+                            <a class="link-more" data-target="todo">全部 ›</a>
+                        </div>
+                        <div class="quick-todo-list" id="homeQuickTodo"></div>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 class="block-title">最近内容</h3>
+                        <div class="recent-list" id="homeRecent"></div>
+                    </div>
                 </div>
-            </div>
+            </section>
+
+            <!-- ============ To-do List ============ -->
+            <section class="view" data-view="todo" style="display:none;">
+                <div class="view-content">
+                    <div class="page-head">
+                        <button class="back-btn" data-back>← 返回首页</button>
+                        <h2 class="page-title">📝 To-do List</h2>
+                    </div>
+                    <div class="stat-row">
+                        <div class="stat-card"><div class="stat-num" id="todoStatPending">0</div><div class="stat-label">待办</div></div>
+                        <div class="stat-card"><div class="stat-num" id="todoStatDone">0</div><div class="stat-label">已完成</div></div>
+                        <div class="stat-card"><div class="stat-num" id="todoStatTotal">0</div><div class="stat-label">待完成</div></div>
+                    </div>
+                    <div class="input-row">
+                        <input type="text" id="todoInput" placeholder="添加待办事项...">
+                        <button class="btn btn-primary" id="todoAddBtn">+</button>
+                    </div>
+                    <div class="todo-list" id="todoList"></div>
+                </div>
+            </section>
+
+            <!-- ============ 运动 ============ -->
+            <section class="view" data-view="sport" style="display:none;">
+                <div class="view-content">
+                    <div class="page-head">
+                        <button class="back-btn" data-back>← 返回首页</button>
+                        <h2 class="page-title">💪 运动</h2>
+                    </div>
+                    <div class="tabs">
+                        <button class="tab tab-active" data-tab="sport-plan">本周计划</button>
+                        <button class="tab" data-tab="sport-data">数据统计</button>
+                    </div>
+                    <div class="tab-panel" data-panel="sport-plan">
+                        <div class="week-strip" id="weekStrip"></div>
+                        <div class="card">
+                            <div class="card-title">📋 今日训练 · <span id="todayPlanName">休息日</span></div>
+                            <div class="plan-select">
+                                <label>选择训练日：</label>
+                                <select id="dayTypeSelect">
+                                    <option value="chest">胸肩日</option>
+                                    <option value="back">练背日</option>
+                                    <option value="leg">臀腿日</option>
+                                    <option value="pratice">普拉提</option>
+                                    <option value="rest">休息日</option>
+                                </select>
+                            </div>
+                            <div class="exercise-list" id="exerciseList"></div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title">⏱ 今日打卡</div>
+                            <div class="timer-box">
+                                <div class="timer-display" id="timerDisplay">00:00</div>
+                                <div class="timer-actions">
+                                    <input type="text" id="todayExerciseName" placeholder="自定义动作">
+                                    <input type="number" id="todayExerciseSets" placeholder="组数" min="1" max="99">
+                                    <input type="number" id="todayExerciseDuration" placeholder="时长(分钟)" min="1">
+                                    <button class="btn btn-primary" id="addCustomExercise">添加</button>
+                                </div>
+                                <div class="timer-controls">
+                                    <button class="btn btn-gold" id="timerStart">▶ 开始</button>
+                                    <button class="btn btn-ghost" id="timerPause">⏸ 暂停</button>
+                                    <button class="btn btn-ghost" id="timerReset">⟲ 重置</button>
+                                    <button class="btn btn-outline" id="photoUpload">📷 拍照/上传</button>
+                                    <input type="file" id="photoFile" accept="image/*" capture="environment" style="display:none;">
+                                </div>
+                                <div class="photo-preview" id="photoPreview"></div>
+                                <button class="btn btn-gold btn-block" id="punchBtn">🎉 打卡</button>
+                                <div class="punch-feedback" id="punchFeedback" style="display:none;">🎊 打卡成功！继续加油～</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tab-panel" data-panel="sport-data" style="display:none;">
+                        <div class="seg">
+                            <button class="seg-btn seg-active" data-seg="week">周</button>
+                            <button class="seg-btn" data-seg="month">月</button>
+                        </div>
+                        <div class="stat-row">
+                            <div class="stat-card"><div class="stat-num" id="sportDays">0</div><div class="stat-label">本周运动天数</div></div>
+                            <div class="stat-card"><div class="stat-num" id="sportMinutes">0</div><div class="stat-label">本周运动总时长(分)</div></div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title">📈 体重趋势</div>
+                            <canvas id="weightChart" width="600" height="240"></canvas>
+                            <div class="weight-form">
+                                <div class="wf-row"><label>体重 (kg)</label><input type="number" step="0.1" id="weightInput" placeholder="0.0"></div>
+                                <div class="wf-row"><label>最新体重 (kg)</label><input type="number" step="0.1" id="latestWeight" placeholder="0.0"></div>
+                                <button class="btn btn-primary" id="weightSave">记录</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ 记账 ============ -->
+            <section class="view" data-view="finance" style="display:none;">
+                <div class="view-content">
+                    <div class="page-head">
+                        <button class="back-btn" data-back>← 返回首页</button>
+                        <h2 class="page-title">💰 收支记账</h2>
+                    </div>
+                    <div class="stat-grid">
+                        <div class="stat-pill"><div class="sp-label">本月收入</div><div class="sp-num green" id="monthIncome">¥0</div></div>
+                        <div class="stat-pill"><div class="sp-label">本月支出</div><div class="sp-num red" id="monthExpense">¥0</div></div>
+                        <div class="stat-pill"><div class="sp-label">结余</div><div class="sp-num" id="monthBalance">¥0</div></div>
+                        <div class="stat-pill"><div class="sp-label">存款</div><div class="sp-num" id="totalSaving">¥0</div></div>
+                    </div>
+                    <div class="record-form">
+                        <div class="rf-row">
+                            <button class="seg-btn seg-active rf-type" data-type="expense">支出</button>
+                            <button class="seg-btn rf-type" data-type="income">收入</button>
+                            <input type="number" id="recordAmount" placeholder="金额">
+                            <input type="text" id="recordPurpose" placeholder="用途">
+                            <button class="btn btn-primary" id="recordAdd">记一笔</button>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">本月流水</div>
+                        <div class="record-list" id="recordList"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ 账号 ============ -->
+            <section class="view" data-view="account" style="display:none;">
+                <div class="view-content">
+                    <div class="page-head">
+                        <button class="back-btn" data-back>← 返回首页</button>
+                        <h2 class="page-title">📱 账号</h2>
+                    </div>
+                    <div class="account-tabs">
+                        <button class="atab atab-active" data-account="pet">🐼 宠物号</button>
+                        <button class="atab" data-account="good">⭐ 好物号</button>
+                        <button class="atab" data-account="ecom">🛍 带货号</button>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">AI 知识库 <button class="link-more" id="addKbBtn">+ 添加</button></div>
+                        <div class="kb-list" id="kbList"></div>
+                    </div>
+                    <div class="card" id="kbCard" style="display:none;">
+                        <div class="card-title">📚 知识库详情</div>
+                        <div class="kb-edit">
+                            <input type="text" id="kbName" placeholder="知识库名称">
+                            <input type="text" id="kbLink" placeholder="账号/内容链接（可选）">
+                            <textarea id="kbContent" placeholder="粘贴链接或输入内容，AI会分析为你的专属助手..."></textarea>
+                            <div class="kb-actions">
+                                <button class="btn btn-primary" id="kbAnalyze">🔮 链接分析完成</button>
+                                <button class="btn btn-ghost" id="kbChat">💬 发送</button>
+                                <button class="btn btn-outline" id="kbUpload">📎 上传</button>
+                            </div>
+                            <div class="kb-input-row">
+                                <input type="text" id="kbAsk" placeholder="粘贴链接或输入问题...">
+                            </div>
+                            <div class="kb-result" id="kbResult"></div>
+                            <div class="btn-row">
+                                <button class="btn btn-ghost" id="kbSave">保存</button>
+                                <button class="btn btn-ghost" id="kbDelete">删除</button>
+                                <button class="btn btn-ghost" id="kbClose">关闭</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="tabs">
+                            <button class="tab tab-active" data-tab="acc-topic">选题</button>
+                            <button class="tab" data-tab="acc-publish">发布</button>
+                            <button class="tab" data-tab="acc-data">数据</button>
+                        </div>
+                        <div class="tab-panel" data-panel="acc-topic">
+                            <div class="topic-list" id="topicList"></div>
+                            <div class="topic-form">
+                                <input type="text" id="topicInput" placeholder="新建选题...">
+                                <select id="topicStatus">
+                                    <option value="待发布">待发布</option>
+                                    <option value="制作中">制作中</option>
+                                    <option value="编辑中">编辑中</option>
+                                    <option value="已发布">已发布</option>
+                                </select>
+                                <button class="btn btn-primary" id="topicAdd">+ 新建选题</button>
+                                <button class="btn btn-gold" id="topicAi">💡 AI建议</button>
+                            </div>
+                        </div>
+                        <div class="tab-panel" data-panel="acc-publish" style="display:none;">
+                            <div class="pub-calendar">
+                                <div class="card-title">📅 发布日历 · <span id="pubMonth"></span></div>
+                                <div class="calendar-weekdays">
+                                    <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+                                </div>
+                                <div class="calendar-days" id="pubCalendarDays"></div>
+                            </div>
+                            <div class="card">
+                                <div class="card-title">📌 当日发布</div>
+                                <div class="pub-day" id="pubDayList"></div>
+                                <div class="pub-form">
+                                    <input type="text" id="pubContent" placeholder="发布内容...">
+                                    <select id="pubType">
+                                        <option value="日常">日常</option>
+                                        <option value="广告">广告</option>
+                                    </select>
+                                    <button class="btn btn-primary" id="pubAdd">添加</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tab-panel" data-panel="acc-data" style="display:none;">
+                            <div class="card">
+                                <div class="card-title">📈 粉丝情况</div>
+                                <input type="number" id="fansInput" placeholder="待更新粉丝数">
+                                <button class="btn btn-primary" id="fansRecord">记录</button>
+                                <canvas id="fansChart" width="600" height="220"></canvas>
+                            </div>
+                            <div class="card">
+                                <div class="card-title">💵 变现情况</div>
+                                <div class="money-row"><label>当月广告收入</label><input type="number" id="moneyAd" placeholder="0"></div>
+                                <div class="money-row"><label>其他变现</label><input type="number" id="moneyOther" placeholder="0"></div>
+                                <button class="btn btn-primary" id="moneySave">保存</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ 摘录本 ============ -->
+            <section class="view" data-view="excerpt" style="display:none;">
+                <div class="view-content">
+                    <div class="page-head">
+                        <button class="back-btn" data-back>← 返回首页</button>
+                        <h2 class="page-title">✍️ 摘录本</h2>
+                    </div>
+                    <div class="tabs">
+                        <button class="tab tab-active" data-tab="ex-copy">文案库</button>
+                        <button class="tab" data-tab="ex-read">阅读笔记</button>
+                        <button class="tab" data-tab="ex-pod">播客记录</button>
+                    </div>
+                    <div class="tab-panel" data-panel="ex-copy">
+                        <div class="ex-form">
+                            <textarea id="exCopyContent" placeholder="记录内容..."></textarea>
+                            <input type="text" id="exCopySource" placeholder="来源（书名/播客名等）">
+                            <button class="btn btn-primary btn-block" id="exCopySave">保存</button>
+                        </div>
+                        <div class="ex-list" id="exCopyList"></div>
+                    </div>
+                    <div class="tab-panel" data-panel="ex-read" style="display:none;">
+                        <div class="ex-form">
+                            <textarea id="exReadContent" placeholder="记录内容..."></textarea>
+                            <input type="text" id="exReadSource" placeholder="来源（书名/作者）">
+                            <button class="btn btn-primary btn-block" id="exReadSave">保存</button>
+                        </div>
+                        <div class="ex-list" id="exReadList"></div>
+                    </div>
+                    <div class="tab-panel" data-panel="ex-pod" style="display:none;">
+                        <div class="ex-form">
+                            <textarea id="exPodContent" placeholder="记录内容..."></textarea>
+                            <input type="text" id="exPodSource" placeholder="来源（播客名/集数）">
+                            <button class="btn btn-primary btn-block" id="exPodSave">保存</button>
+                        </div>
+                        <div class="ex-list" id="exPodList"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ 学习工作 ============ -->
+            <section class="view" data-view="study" style="display:none;">
+                <div class="view-content">
+                    <div class="page-head">
+                        <button class="back-btn" data-back>← 返回首页</button>
+                        <h2 class="page-title">📚 学习工作</h2>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">课程 / 项目 进度</div>
+                        <div class="study-form">
+                            <input type="text" id="studyName" placeholder="学习/项目名称">
+                            <input type="text" id="studyGoal" placeholder="目标（例：看完5章）">
+                            <input type="range" id="studyProgress" min="0" max="100" value="0">
+                            <span id="studyProgressText">0%</span>
+                            <button class="btn btn-primary" id="studyAdd">+ 添加</button>
+                        </div>
+                        <div class="study-list" id="studyList"></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">📝 学习笔记</div>
+                        <div class="ex-form">
+                            <textarea id="studyNote" placeholder="记录学习心得..."></textarea>
+                            <input type="text" id="studyNoteTag" placeholder="标签（例：AI/设计）">
+                            <button class="btn btn-primary btn-block" id="studyNoteSave">保存笔记</button>
+                        </div>
+                        <div class="ex-list" id="studyNoteList"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ 设置 ============ -->
+            <section class="view" data-view="settings" style="display:none;">
+                <div class="view-content">
+                    <div class="page-head">
+                        <button class="back-btn" data-back>← 返回首页</button>
+                        <h2 class="page-title">⚙️ 设置</h2>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">👤 账号</div>
+                        <div class="user-info-row">
+                            <span>当前用户：<b id="settingsUsername">--</b></span>
+                            <button class="btn btn-outline" id="settingsLogoutBtn" style="color:#b94e4e;">退出登录</button>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">☁️ 云端同步</div>
+                        <p class="muted">本工作台数据默认保存在本地（localStorage）。如需多端同步，可使用以下任一方式：</p>
+                        <ol class="sync-list">
+                            <li>导出 JSON → 上传到网盘（iCloud/OneDrive/百度网盘） → 在另一端导入</li>
+                            <li>使用云端笔记（如Notion/飞书）作为中间存储</li>
+                            <li>部署到 Vercel/Netlify 后使用浏览器自带云同步</li>
+                        </ol>
+                        <div class="btn-row">
+                            <button class="btn btn-primary" id="exportBtn">📤 导出全部数据</button>
+                            <button class="btn btn-ghost" id="importBtn">📥 导入数据</button>
+                            <input type="file" id="importFile" accept="application/json" style="display:none;">
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">🖼 外观</div>
+                        <div class="opt-row">
+                            <label>主题</label>
+                            <select id="themeSelect">
+                                <option value="brown">深棕 (默认)</option>
+                                <option value="mocha">摩卡</option>
+                                <option value="sage">鼠尾草</option>
+                            </select>
+                        </div>
+                        <div class="opt-row">
+                            <label>布局</label>
+                            <select id="layoutSelect">
+                                <option value="auto">自动（手机竖版/电脑横版）</option>
+                                <option value="portrait">强制竖版</option>
+                                <option value="landscape">强制横版</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">📅 历史日期</div>
+                        <p class="muted">所有数据按日期归档，关闭后再打开仍可查看历史。点击下方日期可切换查看对应日期的内容。</p>
+                        <div class="history-list" id="historyList"></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">⚠️ 危险操作</div>
+                        <button class="btn btn-danger" id="clearAllBtn">清空所有数据</button>
+                    </div>
+                    <div class="card about-card">
+                        <h3>关于</h3>
+                        <p class="muted">想想工作台 · 个人AI工作台</p>
+                        <p class="muted">v1.0 · 数据自动保存到本地浏览器</p>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- 底部导航 -->
+        <nav class="bottom-nav" id="bottomNav">
+            <button class="nav-item nav-active" data-nav="home">
+                <div class="nav-icon">🏠</div><div class="nav-label">首页</div>
+            </button>
+            <button class="nav-item" data-nav="todo">
+                <div class="nav-icon">📝</div><div class="nav-label">To-do</div>
+            </button>
+            <button class="nav-item" data-nav="sport">
+                <div class="nav-icon">💪</div><div class="nav-label">运动</div>
+            </button>
+            <button class="nav-item" data-nav="finance">
+                <div class="nav-icon">💰</div><div class="nav-label">记账</div>
+            </button>
+            <button class="nav-item" data-nav="account">
+                <div class="nav-icon">📱</div><div class="nav-label">账号</div>
+            </button>
+            <button class="nav-item" data-nav="excerpt">
+                <div class="nav-icon">✍️</div><div class="nav-label">摘录</div>
+            </button>
         </nav>
 
-        <!-- 欢迎区域 -->
-        <section class="hero-section">
-            <h1 class="hero-title">你好，<span id="heroUsername">创作者</span> 👋</h1>
-            <p class="hero-subtitle">今天也是高效创作的一天</p>
-        </section>
+        <!-- Toast -->
+        <div class="toast" id="toast"></div>
+    </div><!-- end wbContainer -->
 
-        <!-- AI建议区域 -->
-        <section class="ai-section">
-            <div class="ai-section-header">
-                <h3>🤖 AI智能建议</h3>
-                <button class="ai-report-btn" id="generateReportBtn">📋 生成日报</button>
-            </div>
-            <div class="ai-suggestions" id="aiSuggestions">
-                <div class="ai-suggestion-item">💡 添加任务开始使用AI建议功能</div>
-            </div>
-        </section>
-
-        <!-- 功能卡片网格 -->
-        <section class="tools-grid">
-            <!-- 待办事项卡片 -->
-            <div class="tool-card" data-tool="todo" onclick="window.app.openTool('todo')">
-                <div class="tool-card-icon">📋</div>
-                <h3 class="tool-card-title">待办事项</h3>
-                <p class="tool-card-desc">管理日常任务，提升工作效率</p>
-                <div class="tool-card-badge" id="todoBadge">0</div>
-            </div>
-
-            <!-- 未来功能占位卡片 -->
-            <div class="tool-card coming-soon" data-tool="notes" onclick="window.app.showComingSoon()">
-                <div class="tool-card-icon">📝</div>
-                <h3 class="tool-card-title">笔记</h3>
-                <p class="tool-card-desc">记录灵感和想法</p>
-                <div class="tool-card-tag">即将推出</div>
-            </div>
-
-            <div class="tool-card coming-soon" data-tool="calendar" onclick="window.app.showComingSoon()">
-                <div class="tool-card-icon">📅</div>
-                <h3 class="tool-card-title">日历</h3>
-                <p class="tool-card-desc">规划你的时间</p>
-                <div class="tool-card-tag">即将推出</div>
-            </div>
-
-            <div class="tool-card coming-soon" data-tool="pomodoro" onclick="window.app.showComingSoon()">
-                <div class="tool-card-icon">⏱️</div>
-                <h3 class="tool-card-title">番茄钟</h3>
-                <p class="tool-card-desc">专注工作计时器</p>
-                <div class="tool-card-tag">即将推出</div>
-            </div>
-
-            <div class="tool-card coming-soon" data-tool="habits" onclick="window.app.showComingSoon()">
-                <div class="tool-card-icon">🎯</div>
-                <h3 class="tool-card-title">习惯追踪</h3>
-                <p class="tool-card-desc">养成好习惯</p>
-                <div class="tool-card-tag">即将推出</div>
-            </div>
-
-            <div class="tool-card add-new" onclick="window.app.showComingSoon()">
-                <div class="tool-card-icon">➕</div>
-                <h3 class="tool-card-title">添加功能</h3>
-                <p class="tool-card-desc">更多工具正在开发中</p>
-            </div>
-        </section>
-    </div>
-
-    <!-- ========== 待办事项面板 ========== -->
-    <div class="tool-panel hidden" id="todoPanel">
-        <div class="tool-panel-header">
-            <button class="panel-back-btn" onclick="window.app.closeTool()">← 返回</button>
-            <h2>📋 待办事项</h2>
-            <div class="panel-actions">
-                <button class="panel-action-btn" id="exportBtn" title="导出">📋</button>
-                <button class="panel-action-btn" id="exportImageBtn" title="图片">🖼️</button>
-                <button class="panel-action-btn" id="importBtn" title="导入">📥</button>
-                <input type="file" id="fileInput" accept=".json" style="display:none">
-            </div>
-        </div>
-        <div class="tool-panel-body">
-            <!-- 输入区 -->
-            <div class="todo-input-area">
-                <div class="todo-input-row">
-                    <input type="text" id="taskInput" placeholder="添加新任务...">
-                    <select id="prioritySelect">
-                        <option value="low">🔽 低</option>
-                        <option value="medium" selected>⚪ 中</option>
-                        <option value="high">🔺 高</option>
-                    </select>
-                    <select id="categorySelect"><option value="默认">📁 默认</option></select>
-                    <input type="date" id="dueDateInput">
-                    <button id="addTaskBtn" class="add-btn">+</button>
-                    <button id="breakDownBtn" class="breakdown-btn" title="AI分解任务">🔨</button>
-                </div>
-            </div>
-            <!-- 筛选 -->
-            <div class="todo-filters">
-                <button class="filter-btn active" data-filter="all">全部</button>
-                <button class="filter-btn" data-filter="pending">待完成</button>
-                <button class="filter-btn" data-filter="completed">已完成</button>
-                <select id="filterCategory"><option value="all">所有分类</option></select>
-                <select id="sortSelect">
-                    <option value="date">按日期</option>
-                    <option value="priority">按优先级</option>
-                    <option value="name">按名称</option>
-                </select>
-            </div>
-            <!-- 统计 -->
-            <div class="stats-bar">
-                <div class="stat-chip"><span class="stat-num" id="totalTasks">0</span>总任务</div>
-                <div class="stat-chip"><span class="stat-num" id="pendingTasks">0</span>待完成</div>
-                <div class="stat-chip"><span class="stat-num" id="completedTasks">0</span>已完成</div>
-                <div class="stat-chip"><span class="stat-num" id="completionRate">0%</span>完成率</div>
-            </div>
-            <!-- 分类 -->
-            <div class="category-bar">
-                <div class="category-list" id="categoryList"></div>
-                <div class="category-add">
-                    <input type="text" id="categoryInput" placeholder="新分类">
-                    <button id="addCategoryBtn">+</button>
-                </div>
-            </div>
-            <!-- 任务列表 -->
-            <div class="task-list" id="taskList"></div>
-            <div class="empty-state" id="emptyState">
-                <div class="empty-icon">📝</div>
-                <p>暂无任务</p>
-                <p class="empty-hint">添加第一个任务开始吧！</p>
-            </div>
-            <!-- 操作栏 -->
-            <div class="todo-actions">
-                <button id="selectAllBtn" class="action-btn">全选</button>
-                <button id="deleteSelectedBtn" class="action-btn danger">删除选中</button>
-                <button id="clearCompletedBtn" class="action-btn">清空已完成</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ========== 设置面板 ========== -->
-    <div class="modal hidden" id="settingsModal">
-        <div class="modal-content settings-content">
-            <div class="modal-header">
-                <h3>🎨 主题设置</h3>
-                <button class="modal-close-btn" id="closeSettingsBtn">✕</button>
-            </div>
-            <div class="modal-body settings-body">
-                <div class="setting-section">
-                    <div class="theme-header"><h4>🌈 主题</h4><button class="add-theme-btn" id="addCustomThemeBtn">+ 添加</button></div>
-                    <div class="theme-presets" id="themePresets"></div>
-                </div>
-                <div class="setting-section">
-                    <h4>🎨 颜色</h4>
-                    <div class="color-picker-row"><label>主色调</label><input type="color" id="primaryColorPicker" value="#8b5cf6"><span id="primaryColorValue">#8b5cf6</span></div>
-                    <div class="color-picker-row"><label>背景色</label><input type="color" id="bgColorPicker" value="#0f172a"><span id="bgColorValue">#0f172a</span></div>
-                </div>
-                <div class="setting-section">
-                    <h4>🖼️ 背景图片/视频</h4>
-                    <div class="bg-image-upload">
-                        <input type="file" id="bgImageInput" accept="image/*,video/*" style="display:none">
-                        <button class="upload-btn" id="uploadBgBtn">📁 选择文件</button>
-                        <button class="remove-btn hidden" id="removeBgBtn">🗑️ 移除</button>
-                    </div>
-                    <div class="bg-image-preview" id="bgImagePreview"></div>
-                    <div class="bg-video-preview hidden" id="bgVideoPreview"></div>
-                    <div class="bg-controls"><label>透明度</label><input type="range" id="bgOpacity" min="0" max="100" value="15"><span id="bgOpacityValue">15%</span></div>
-                    <div class="bg-controls"><label>模糊度</label><input type="range" id="bgBlur" min="0" max="20" value="5"><span id="bgBlurValue">5px</span></div>
-                </div>
-                <div class="setting-section">
-                    <h4>🤖 AI智能分析</h4>
-                    <div class="form-group">
-                        <label>DeepSeek API Key（可选）</label>
-                        <input type="password" id="aiApiKey" placeholder="sk-..." onchange="localStorage.setItem('ai_api_key', this.value)">
-                        <p style="font-size:0.75rem;color:#64748b;margin-top:4px;">获取: deepseek.com</p>
-                    </div>
-                </div>
-                <div class="setting-section">
-                    <h4>✨ 效果</h4>
-                    <div class="effect-options">
-                        <label class="effect-option"><input type="checkbox" id="glassEffect"><span>🪟 毛玻璃</span></label>
-                        <label class="effect-option"><input type="checkbox" id="shadowEffect" checked><span>📐 阴影</span></label>
-                        <label class="effect-option"><input type="checkbox" id="animationEffect" checked><span>🎬 动画</span></label>
-                    </div>
-                </div>
-                <div class="setting-section">
-                    <h4>📝 字体大小</h4>
-                    <div class="bg-controls"><label>缩放</label><input type="range" id="fontSize" min="80" max="150" value="100"><span id="fontSizeValue">100%</span></div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="modal-cancel-btn" id="resetSettingsBtn">🔄 恢复默认</button>
-                <button class="modal-save-btn" id="saveSettingsBtn">💾 保存</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 自定义主题弹窗 -->
-    <div class="modal hidden" id="customThemeModal">
-        <div class="modal-content" style="max-width:380px">
-            <div class="modal-header"><h3>🎨 创建主题</h3><button class="modal-close-btn" id="closeCustomThemeBtn">✕</button></div>
-            <div class="modal-body">
-                <div class="form-group"><label>主题名称</label><input type="text" id="customThemeName" placeholder="我的主题"></div>
-                <div class="color-picker-row"><label>起始色</label><input type="color" id="customColorFrom" value="#667eea"></div>
-                <div class="color-picker-row"><label>结束色</label><input type="color" id="customColorTo" value="#764ba2"></div>
-                <div class="theme-preview" id="customThemePreview"></div>
-            </div>
-            <div class="modal-footer">
-                <button class="modal-cancel-btn" id="cancelCustomThemeBtn">取消</button>
-                <button class="modal-save-btn" id="saveCustomThemeBtn">保存</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ========== 设置面板 ========== -->
-    <div class="modal hidden" id="settingsModal">
-        <div class="modal-content settings-content">
-            <div class="modal-header">
-                <h3>🎨 主题设置</h3>
-                <button class="modal-close-btn" id="closeSettingsBtn">✕</button>
-            </div>
-            <div class="modal-body settings-body">
-                <div class="setting-section">
-                    <div class="theme-header"><h4>🌈 主题</h4><button class="add-theme-btn" id="addCustomThemeBtn">+ 添加</button></div>
-                    <div class="theme-presets" id="themePresets">
-                        <div class="theme-preset active" data-theme="default" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)"><span>星空</span></div>
-                        <div class="theme-preset" data-theme="ocean" style="background:linear-gradient(135deg,#8b5cf6,#a855f7)"><span>紫罗兰</span></div>
-                        <div class="theme-preset" data-theme="forest" style="background:linear-gradient(135deg,#a855f7,#c084fc)"><span>薰衣草</span></div>
-                        <div class="theme-preset" data-theme="sunset" style="background:linear-gradient(135deg,#6366f1,#a855f7)"><span>幻影</span></div>
-                        <div class="theme-preset" data-theme="sakura" style="background:linear-gradient(135deg,#8b5cf6,#ec4899)"><span>梦幻</span></div>
-                        <div class="theme-preset" data-theme="dark" style="background:linear-gradient(135deg,#4c1d95,#7c3aed)"><span>深紫</span></div>
-                    </div>
-                </div>
-                <div class="setting-section">
-                    <h4>🎨 自定义颜色</h4>
-                    <div class="color-picker-row"><label>主色调</label><input type="color" id="primaryColorPicker" value="#8b5cf6"><span id="primaryColorValue">#8b5cf6</span></div>
-                    <div class="color-picker-row"><label>背景色</label><input type="color" id="bgColorPicker" value="#0f172a"><span id="bgColorValue">#0f172a</span></div>
-                </div>
-                <div class="setting-section">
-                    <h4>✨ 效果</h4>
-                    <div class="effect-options">
-                        <label class="effect-option"><input type="checkbox" id="glassEffect"><span>🪟 毛玻璃</span></label>
-                        <label class="effect-option"><input type="checkbox" id="shadowEffect" checked><span>📐 阴影</span></label>
-                        <label class="effect-option"><input type="checkbox" id="animationEffect" checked><span>🎬 动画</span></label>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 游戏化系统 -->
+    <!-- 游戏化系统（保留） -->
     <div class="game-container">
         <div class="exp-bar-container">
             <div class="exp-header">
@@ -357,7 +612,9 @@
 
     <!-- 通知 -->
     <div class="notification" id="notification"></div>
+
     <script src="script-game.js"></script>
     <script src="script.js"></script>
+    <script src="workbench.js"></script>
 </body>
 </html>

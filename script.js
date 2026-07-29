@@ -621,15 +621,33 @@ class TodoManager {
 
     showAuth() {
         document.getElementById('authContainer')?.classList.remove('hidden');
-        const ws = document.getElementById('workspace');
-        if (ws) ws.classList.add('hidden');
-        const panel = document.getElementById('todoPanel');
-        if (panel) panel.classList.add('hidden');
+        // 隐藏想想工作台
+        const wb = document.getElementById('wbContainer');
+        if (wb) wb.style.display = 'none';
         this.initDynamicBackground();
     }
 
     showMainApp() {
         document.getElementById('authContainer')?.classList.add('hidden');
+        // 隐藏动态背景
+        const canvas = document.getElementById('dynamicBgCanvas');
+        if (canvas) canvas.style.display = 'none';
+        // 显示想想工作台
+        const wb = document.getElementById('wbContainer');
+        if (wb) {
+            wb.style.display = 'block';
+            // 显示当前用户名
+            const wbUser = document.getElementById('wbUsername');
+            if (wbUser) wbUser.textContent = '👤 ' + this.auth.username;
+            const setsUser = document.getElementById('settingsUsername');
+            if (setsUser) setsUser.textContent = this.auth.username;
+        }
+        // 初始化想想工作台（如果尚未初始化）
+        window.__wbUser = this.auth.username;
+        if (typeof App !== 'undefined' && App.init) {
+            try { App.init(); } catch(e) { console.warn('Workbench init:', e); }
+        }
+        // 保持旧系统兼容（old workspace 已不存在时跳过）
         const ws = document.getElementById('workspace');
         if (ws) ws.classList.remove('hidden');
         const el = document.getElementById('currentUsername');
@@ -643,9 +661,15 @@ class TodoManager {
         this.setupDragAndDrop();
         this.setupSettingsUI();
         this.updateTodoBadge();
-        // 隐藏动态背景
-        const canvas = document.getElementById('dynamicBgCanvas');
-        if (canvas) canvas.style.display = 'none';
+        // 绑定退出登录按钮
+        const logoutHeader = document.getElementById('wbLogoutBtn');
+        const logoutSettings = document.getElementById('settingsLogoutBtn');
+        const handleLogout = () => {
+            this.auth.logout();
+            location.reload();
+        };
+        if (logoutHeader) logoutHeader.addEventListener('click', handleLogout);
+        if (logoutSettings) logoutSettings.addEventListener('click', handleLogout);
     }
 
     // ==================== 工具面板 ====================
