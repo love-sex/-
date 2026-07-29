@@ -624,14 +624,23 @@ class TodoManager {
         // 隐藏想想工作台
         const wb = document.getElementById('wbContainer');
         if (wb) wb.style.display = 'none';
+        // 恢复动态背景（移除兜底class）
+        const canvas = document.getElementById('dynamicBgCanvas');
+        if (canvas) {
+            canvas.classList.remove('wb-hidden-bg');
+            canvas.style.display = 'block';
+        }
         this.initDynamicBackground();
     }
 
     showMainApp() {
         document.getElementById('authContainer')?.classList.add('hidden');
-        // 隐藏动态背景
+        // 隐藏动态背景：同时设 inline style + 兜底 class
         const canvas = document.getElementById('dynamicBgCanvas');
-        if (canvas) canvas.style.display = 'none';
+        if (canvas) {
+            canvas.style.display = 'none';
+            canvas.classList.add('wb-hidden-bg');
+        }
         // 显示想想工作台
         const wb = document.getElementById('wbContainer');
         if (wb) {
