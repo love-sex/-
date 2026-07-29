@@ -21,8 +21,33 @@
     <!-- 动态背景（登录页使用） -->
     <canvas id="dynamicBgCanvas"></canvas>
 
+    <!-- 兜底：确保登录容器可见（即使主脚本出错也能看到登录框） -->
+    <script>
+        (function(){
+            // DOM准备好后强制保证登录表单可见
+            function ensureAuthVisible(){
+                var ac = document.getElementById('authContainer');
+                if (ac) {
+                    ac.classList.remove('hidden');
+                    ac.style.display = 'flex';
+                    ac.style.minHeight = '100vh';
+                    ac.style.opacity = '1';
+                }
+                var wb = document.getElementById('wbContainer');
+                if (wb) wb.style.display = 'none';
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', ensureAuthVisible);
+            } else {
+                ensureAuthVisible();
+            }
+            // 双重保险：1.5秒后再次确保可见
+            setTimeout(ensureAuthVisible, 1500);
+        })();
+    </script>
+
     <!-- ========== 登录/注册页面 ========== -->
-    <div class="auth-container hidden" id="authContainer">
+    <div class="auth-container" id="authContainer">
         <div class="auth-box">
             <div class="auth-header">
                 <div class="auth-logo">🌾</div>
