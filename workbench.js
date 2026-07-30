@@ -1176,6 +1176,17 @@ const App = (() => {
     // 日历密度切换
     const cd = document.getElementById('calendarDays');
     if (cd) cd.classList.toggle('cal-compact', density === 'compact');
+    // 任务栏隐藏：直接给 .bottom-nav 设 inline style（最稳）
+    const nav = document.getElementById('bottomNav');
+    if (nav) {
+      if (navHidden) {
+        nav.style.setProperty('display', 'none', 'important');
+        document.querySelectorAll('.app-main,.date-bar,.calendar-panel').forEach(el => el.style.marginLeft = '0');
+      } else {
+        nav.style.removeProperty('display');
+        document.querySelectorAll('.app-main,.date-bar,.calendar-panel').forEach(el => el.style.removeProperty('margin-left'));
+      }
+    }
   };
 
   // 切换任务栏（底部 nav）可见性
@@ -1186,6 +1197,28 @@ const App = (() => {
     btn.onclick = () => {
       data.settings.navHidden = !data.settings.navHidden;
       document.body.classList.toggle('nav-hidden', data.settings.navHidden);
+      // 直接给 .bottom-nav 设置 inline style（兼容 desktop landscape 模式下的 sidebar）
+      const nav = document.getElementById('bottomNav');
+      if (nav) {
+        if (data.settings.navHidden) {
+          nav.style.setProperty('display', 'none', 'important');
+          // 取消 desktop 下的 margin-left 偏移
+          const am = document.querySelector('.app-main');
+          if (am) am.style.marginLeft = '0';
+          const db = document.querySelector('.date-bar');
+          if (db) db.style.marginLeft = '0';
+          const cp = document.querySelector('.calendar-panel');
+          if (cp) cp.style.marginLeft = '0';
+        } else {
+          nav.style.removeProperty('display');
+          const am = document.querySelector('.app-main');
+          if (am) am.style.removeProperty('margin-left');
+          const db = document.querySelector('.date-bar');
+          if (db) db.style.removeProperty('margin-left');
+          const cp = document.querySelector('.calendar-panel');
+          if (cp) cp.style.removeProperty('margin-left');
+        }
+      }
       save();
       toast(data.settings.navHidden ? '已隐藏任务栏（再次点击可显示）' : '已显示任务栏');
     };
