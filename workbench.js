@@ -42,7 +42,9 @@ const App = (() => {
   });
 
   const defaultData = () => ({
-    settings: { theme: 'brown', layout: 'auto', density: 'comfortable', accent: 'gold', navHidden: false, bgMuted: true, bgOverlay: 30 },
+    settings: { theme: 'brown', layout: 'auto', density: 'comfortable', accent: 'gold', navHidden: false, bgMuted: true, bgOverlay: 30,
+      hiddenUI: { dateBar: true, calendarPanel: true, bottomNav: true, pageHead: true, statRow: true, quickTodo: true }
+    },
     dates: {},
     // 全局待办（独立于日历日期）：每条任务带优先级 / 分类 / 日期
     todos: [],
@@ -1268,6 +1270,58 @@ const App = (() => {
     };
   };
 
+  // 应用界面元素隐藏状态
+  const applyHiddenUI = () => {
+    const h = data.settings.hiddenUI || {};
+    // 日期栏
+    const dateBar = document.getElementById('dateBar');
+    if (dateBar) dateBar.classList.toggle('ui-hidden', !h.dateBar);
+    // 日历面板
+    const cal = document.getElementById('calendarPanel');
+    if (cal) cal.classList.toggle('ui-hidden', !h.calendarPanel);
+    // 底部导航
+    const bnav = document.getElementById('bottomNav');
+    if (bnav) {
+      bnav.classList.toggle('ui-hidden', !h.bottomNav);
+      // 同步 desktop 布局
+      const am = document.querySelector('.app-main');
+      if (am) am.style.marginLeft = h.bottomNav ? '' : '0';
+    }
+    // 页面标题栏（所有 .page-head）
+    document.querySelectorAll('.page-head').forEach(el => el.classList.toggle('ui-hidden', !h.pageHead));
+    // 统计卡片（所有 .stat-row）
+    document.querySelectorAll('.stat-row').forEach(el => el.classList.toggle('ui-hidden', !h.statRow));
+    // 首页快捷待办
+    const qt = document.getElementById('homeQuickTodo');
+    if (qt) {
+      const wrap = qt.closest('.card');
+      if (wrap) wrap.classList.toggle('ui-hidden', !h.quickTodo);
+    }
+  };
+
+  // 绑定界面元素隐藏开关
+  const bindHiddenUI = () => {
+    const h = data.settings.hiddenUI || {};
+    const toggles = [
+      { id: 'toggleDateBar', key: 'dateBar' },
+      { id: 'toggleCalendar', key: 'calendarPanel' },
+      { id: 'toggleBottomNav', key: 'bottomNav' },
+      { id: 'togglePageHead', key: 'pageHead' },
+      { id: 'toggleStatRow', key: 'statRow' },
+      { id: 'toggleQuickTodo', key: 'quickTodo' },
+    ];
+    toggles.forEach(({ id, key }) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.checked = !!h[key];
+      el.onchange = () => {
+        data.settings.hiddenUI[key] = el.checked;
+        applyHiddenUI();
+        save();
+      };
+    });
+  };
+
   /* ---------- 主题弹窗：实时预览 ---------- */
   const updateThemePreview = () => {
     const preview = $('#newThemePreview');
@@ -1380,6 +1434,12 @@ const App = (() => {
     $('#layoutSelect').value  = data.settings.layout  || 'auto';
     const ds = $('#densitySelect'); if (ds) ds.value = data.settings.density || 'comfortable';
     const as = $('#accentSelect');  if (as) as.value = data.settings.accent   || 'gold';
+    // 同步界面元素隐藏开关状态
+    const h = data.settings.hiddenUI || {};
+    ['toggleDateBar','toggleCalendar','toggleBottomNav','togglePageHead','toggleStatRow','toggleQuickTodo'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.checked = !!h[el.dataset.target];
+    });
     const hl = $('#historyList');
     hl.innerHTML = '';
     Object.keys(data.dates).sort().reverse().forEach(date => {
@@ -1472,6 +1532,8 @@ const App = (() => {
       renderCalendar();
       showView('home');
     };
+    // 界面元素隐藏开关
+    bindHiddenUI();
   };
 
   /* ---------- 折线图 ---------- */
@@ -1554,6 +1616,7 @@ const App = (() => {
     bindAddThemeModal();
     bindBackground();
     applyBackground(); // 恢复背景
+    applyHiddenUI(); // 应用界面元素隐藏状态
     bindTabs();
 
     // 导航
