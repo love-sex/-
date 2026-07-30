@@ -1182,12 +1182,13 @@ const App = (() => {
   const bindNavToggle = () => {
     const btn = document.getElementById('navToggleFab');
     if (!btn) return;
-    btn.addEventListener('click', () => {
+    // 用 onclick（属性赋值，多次 init 不会累加 handler）
+    btn.onclick = () => {
       data.settings.navHidden = !data.settings.navHidden;
       document.body.classList.toggle('nav-hidden', data.settings.navHidden);
       save();
       toast(data.settings.navHidden ? '已隐藏任务栏（再次点击可显示）' : '已显示任务栏');
-    });
+    };
   };
 
   /* ---------- 主题弹窗：实时预览 ---------- */
