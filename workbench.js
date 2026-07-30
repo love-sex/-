@@ -1255,6 +1255,10 @@ const App = (() => {
           extractLineart(canvas, _lineartImg, thickness, contrast, bg);
           resultCard.classList.remove('lineart-processing');
           toast('线稿提取完成');
+          // 滚动到结果区域
+          setTimeout(() => {
+            resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 100);
         } catch (err) {
           console.error(err);
           resultCard.classList.remove('lineart-processing');

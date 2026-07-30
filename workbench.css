@@ -212,19 +212,23 @@ body {  body {
 
 /* 主内容区 */
 .app-main {
-  flex: 1; overflow-y: auto;
+  flex: 1;
   padding: 12px;
   padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 20px);
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
+  min-height: 0;
 }
 .app-main::-webkit-scrollbar { width: 6px; }
 .app-main::-webkit-scrollbar-thumb { background: rgba(var(--primary-rgb),0.15); border-radius: 3px; }
 
-/* 移动端触摸滚动优化 */
+/* 桌面端：主内容区滚动 */
+@media (min-width: 800px) {
+  .app-main { overflow-y: auto; scroll-behavior: smooth; }
+}
+
+/* 移动端：body 自然滚动 */
 @media (max-width: 799px) {
-  .app-main { touch-action: pan-y; -webkit-overflow-scrolling: touch; overflow-y: auto; }
-  body { touch-action: pan-y; }
+  body { overflow: auto; -webkit-overflow-scrolling: touch; }
+  .app-main { overflow: visible; flex: none; }
 }
 .view-content, .home-content { max-width: 680px; margin: 0 auto; }
 
