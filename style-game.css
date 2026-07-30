@@ -15,7 +15,60 @@
     pointer-events: none;
     cursor: grab;
     user-select: none;
-    transition: none;
+    transition: opacity .2s ease, transform .2s ease;
+}
+.game-container.game-hidden {
+    opacity: 0;
+    transform: scale(0.8);
+    pointer-events: none;
+}
+
+/* 隐藏按钮（在容器内） */
+.game-toggle-btn {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 0;
+    background: rgba(0,0,0,0.45);
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    transition: background .15s ease;
+}
+.game-toggle-btn:hover {
+    background: rgba(220,80,80,0.8);
+}
+
+/* 恢复按钮（容器隐藏后显示） */
+.game-restore-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 0;
+    background: linear-gradient(135deg, #6366f1, #a855f7);
+    color: #fff;
+    font-size: 20px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(139,92,246,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+.game-restore-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(139,92,246,0.5);
 }
 
 .game-container:active {

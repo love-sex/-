@@ -817,7 +817,8 @@
     </div><!-- end wbContainer -->
 
     <!-- 游戏化系统（保留） -->
-    <div class="game-container">
+    <div class="game-container" id="gameContainer">
+        <button class="game-toggle-btn" id="gameToggleBtn" title="隐藏小助手">✕</button>
         <div class="exp-bar-container">
             <div class="exp-header">
                 <span class="level-badge" id="levelBadge">Lv.1 新手</span>
@@ -839,6 +840,9 @@
             </div>
         </div>
     </div>
+
+    <!-- 小助手恢复按钮（隐藏后显示） -->
+    <button class="game-restore-btn" id="gameRestoreBtn" title="显示小助手" style="display:none;">🤖</button>
 
     <!-- 通知 -->
     <div class="notification" id="notification"></div>

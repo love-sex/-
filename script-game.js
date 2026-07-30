@@ -304,4 +304,22 @@ let gameManager;
 document.addEventListener('DOMContentLoaded', () => {
     gameManager = new GamificationManager();
     initDraggableAI();
+    initGameToggle();
 });
+
+// 小助手隐藏/显示切换
+function initGameToggle() {
+    const container = document.getElementById('gameContainer');
+    const toggleBtn = document.getElementById('gameToggleBtn');
+    const restoreBtn = document.getElementById('gameRestoreBtn');
+    if (!container || !toggleBtn || !restoreBtn) return;
+    toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        container.classList.add('game-hidden');
+        restoreBtn.style.display = 'flex';
+    });
+    restoreBtn.addEventListener('click', () => {
+        container.classList.remove('game-hidden');
+        restoreBtn.style.display = 'none';
+    });
+}
