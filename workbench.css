@@ -85,7 +85,7 @@ body {  body {
     flex-direction: column;
   }
   /* 工作台在动态背景 canvas 上方 */
-  #wbContainer { position: relative; z-index: 1; }
+  #wbContainer { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
   /* 兜底：登录后强制隐藏动态背景 canvas（即使其他代码尝试重新显示） */
   #dynamicBgCanvas.wb-hidden-bg { display: none !important; }
 
