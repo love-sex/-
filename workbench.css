@@ -216,9 +216,19 @@ body {  body {
   padding: 12px;
   padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 20px);
   scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 }
 .app-main::-webkit-scrollbar { width: 6px; }
 .app-main::-webkit-scrollbar-thumb { background: rgba(var(--primary-rgb),0.15); border-radius: 3px; }
+.view-content, .home-content { max-width: 680px; margin: 0 auto; }
+
+/* 滚轮滑动支持 */
+.wheel-scroll {
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
 
 .view-content, .home-content { max-width: 680px; margin: 0 auto; }
 

@@ -1913,6 +1913,49 @@ const App = (() => {
     });
 
     updateSyncStatus(true);
+
+    // 滚轮滑动支持（手机端方便滑动内容）
+    initWheelScroll();
+  };
+
+  // 滚轮平滑滑动支持
+  const initWheelScroll = () => {
+    // 为所有可滚动区域添加滚轮平滑滚动
+    const scrollables = document.querySelectorAll('.app-main, .view-content, .home-content, .wheel-scroll');
+    scrollables.forEach(el => {
+      el.addEventListener('wheel', (e) => {
+        // 阻止默认滚动，使用平滑滚动
+        e.preventDefault();
+        const delta = e.deltaY || e.detail || 0;
+        el.scrollBy({
+          top: delta,
+          behavior: 'smooth'
+        });
+      }, { passive: false });
+    });
+
+    // 全局滚轮支持：如果事件目标不在可滚动区域内，滚动最近的父级可滚动元素
+    document.addEventListener('wheel', (e) => {
+      let target = e.target;
+      // 找到最近的可滚动父元素
+      while (target && target !== document.body) {
+        if (target.scrollHeight > target.clientHeight + 5) {
+          // 检查是否需要滚动
+          const scrollTop = target.scrollTop;
+          const scrollHeight = target.scrollHeight;
+          const clientHeight = target.clientHeight;
+          const delta = e.deltaY || e.detail || 0;
+          // 如果在顶部且向上滚动，或已经在底部且向下滚动，则不拦截
+          if ((delta < 0 && scrollTop <= 0) || (delta > 0 && scrollTop + clientHeight >= scrollHeight - 1)) {
+            break;
+          }
+          e.preventDefault();
+          target.scrollBy({ top: delta, behavior: 'smooth' });
+          return;
+        }
+        target = target.parentElement;
+      }
+    }, { passive: false });
   };
 
   return { init };
