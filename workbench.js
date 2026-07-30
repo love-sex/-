@@ -1146,6 +1146,61 @@ const App = (() => {
     });
   };
 
+  /* ---------- 可拖动浮动按钮 ---------- */
+  const makeDraggable = (el) => {
+    if (!el) return;
+    let isDragging = false;
+    let startX, startY, startRight, startBottom;
+
+    const onDown = (e) => {
+      e.preventDefault();
+      isDragging = true;
+      el.style.cursor = 'grabbing';
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      startX = clientX;
+      startY = clientY;
+      const style = window.getComputedStyle(el);
+      startRight = parseInt(style.right) || 0;
+      startBottom = parseInt(style.bottom) || 0;
+      const evt = e.touches ? 'touch' : 'mouse';
+      document.addEventListener(evt + 'move', getMoveHandler(), { passive: false });
+      document.addEventListener(evt + 'up', getUpHandler());
+    };
+
+    const getMoveHandler = () => (e) => {
+      if (!isDragging) return;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      moveTo(clientX, clientY);
+    };
+
+    const getUpHandler = () => () => {
+      isDragging = false;
+      el.style.cursor = 'grab';
+    };
+
+    const moveTo = (clientX, clientY) => {
+      const deltaX = startX - clientX;
+      const deltaY = startY - clientY;
+      let newRight = startRight + deltaX;
+      let newBottom = startBottom + deltaY;
+      const maxRight = window.innerWidth - el.offsetWidth;
+      const maxBottom = window.innerHeight - el.offsetHeight;
+      newRight = Math.max(0, Math.min(newRight, maxRight));
+      newBottom = Math.max(0, Math.min(newBottom, maxBottom));
+      el.style.right = newRight + 'px';
+      el.style.bottom = newBottom + 'px';
+      el.style.left = 'auto';
+      el.style.top = 'auto';
+    };
+
+    el.addEventListener('mousedown', onDown);
+    el.addEventListener('touchstart', onDown, { passive: true });
+    el.style.cursor = 'grab';
+    el.style.userSelect = 'none';
+  };
+
   /* ---------- 图片提取线稿 ---------- */
   let _lineartImg = null; // 缓存原图 Image 对象
   const bindLineart = () => {
@@ -1411,7 +1466,7 @@ const App = (() => {
   const applyAppearance = () => {
     const accent  = data.settings.accent  || 'gold';
     const density = data.settings.density || 'comfortable';
-    const navHidden = !!data.settings.navHidden;
+    const navHidden = false; // 始终显示导航栏，眼睛按钮不再持久化隐藏状态
     // 主题：preset / custom 都由 applyTheme 处理
     applyTheme();
     document.body.setAttribute('data-accent', accent);
@@ -1437,33 +1492,30 @@ const App = (() => {
     }
   };
 
-  // 眼睛按钮：隐藏/显示所有界面内容（禅模式）
+  // 眼睛按钮：隐藏/显示所有界面内容（禅模式）- 不持久化状态
+  let _eyeHidden = false;
   const bindNavToggle = () => {
     const btn = document.getElementById('navToggleFab');
     if (!btn) return;
     btn.onclick = () => {
-      data.settings.navHidden = !data.settings.navHidden;
-      document.body.classList.toggle('nav-hidden', data.settings.navHidden);
-      // 隐藏/显示所有界面元素
+      _eyeHidden = !_eyeHidden;
+      document.body.classList.toggle('nav-hidden', _eyeHidden);
       const nav = document.getElementById('bottomNav');
       const appMain = document.querySelector('.app-main');
       const dateBar = document.querySelector('.date-bar');
       const calPanel = document.querySelector('.calendar-panel');
-      if (data.settings.navHidden) {
-        // 隐藏全部
+      if (_eyeHidden) {
         if (nav) nav.style.setProperty('display', 'none', 'important');
         if (appMain) appMain.style.display = 'none';
         if (dateBar) dateBar.style.display = 'none';
         if (calPanel) calPanel.style.display = 'none';
       } else {
-        // 恢复全部
         if (nav) nav.style.removeProperty('display');
         if (appMain) appMain.style.removeProperty('display');
         if (dateBar) dateBar.style.removeProperty('display');
         if (calPanel) calPanel.style.removeProperty('display');
       }
-      save();
-      toast(data.settings.navHidden ? '已隐藏所有内容（再次点击可恢复）' : '已恢复显示');
+      toast(_eyeHidden ? '已隐藏所有内容（再次点击可恢复）' : '已恢复显示');
     };
   };
 
@@ -1811,6 +1863,10 @@ const App = (() => {
     load();
     applyAppearance();
     bindNavToggle();
+    // 眼睛按钮和助手按钮可拖动
+    makeDraggable(document.getElementById('navToggleFab'));
+    makeDraggable(document.getElementById('gameToggleBtn'));
+    makeDraggable(document.getElementById('gameRestoreBtn'));
     renderCalendar();
     bindTodo();
     bindSport();
