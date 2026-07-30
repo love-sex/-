@@ -42,7 +42,7 @@ const App = (() => {
   });
 
   const defaultData = () => ({
-    settings: { theme: 'brown', layout: 'auto', density: 'comfortable', accent: 'gold', navHidden: false, bgMuted: true, bgOverlay: 30,
+    settings: { theme: 'brown', layout: 'auto', density: 'comfortable', accent: 'gold', navHidden: false, bgMuted: false, bgOverlay: 30,
       hiddenUI: { dateBar: true, calendarPanel: true, bottomNav: true, pageHead: true, statRow: true, quickTodo: true }
     },
     dates: {},
@@ -236,19 +236,19 @@ const App = (() => {
 
     if (isVideo) {
       video.src = _bgObjectURL;
-      video.muted = data.settings.bgMuted !== false;
+      video.muted = false;
+      video.volume = data.settings.bgMuted === false ? 1 : 0;
       video.loop = true; video.playsInline = true;
       video.hidden = false;
       ovlRow.style.display = '';
       sndRow.style.display = '';
-      muteBtn.textContent = video.muted ? '🔇 静音' : '🔊 有声';
+      muteBtn.textContent = video.volume === 0 ? '🔇 静音' : '🔊 有声';
       ovl.hidden = false;
       video.play().catch(err => {
-        // 自动播放被阻止时，提示用户点击页面
         console.warn('video autoplay blocked', err);
       });
       const prev = $('#bgPreview');
-      prev.innerHTML = `<video src="${_bgObjectURL}" playsinline ${data.settings.bgMuted !== false ? 'muted' : ''}></video><div class="bg-info">🎬 ${escapeHtml(blob.type)} · ${sizeText}</div>`;
+      prev.innerHTML = `<video src="${_bgObjectURL}" playsinline></video><div class="bg-info">🎬 ${escapeHtml(blob.type)} · ${sizeText}</div>`;
     } else {
       layer.style.backgroundImage = `url(${_bgObjectURL})`;
       layer.hidden = false;
@@ -1393,8 +1393,8 @@ const App = (() => {
       await idb.save('customBg', f);
       // 记录 MIME 方便恢复
       data.settings.bgType = (f.type || '').startsWith('video/') ? 'video' : 'image';
-      // 上传后视频默认静音（避免被浏览器策略拦截自动播放）
-      data.settings.bgMuted = data.settings.bgType === 'video';
+      // 上传后视频默认有声（用 volume 控制，不受浏览器 muted 策略限制）
+      if (data.settings.bgType === 'video') data.settings.bgMuted = false;
       save();
       applyBackground();
       toast('背景已' + (f.type.startsWith('video/') ? '上传视频' : '上传图片') + '（' + (f.size/1024/1024).toFixed(2) + ' MB）');
@@ -1422,13 +1422,18 @@ const App = (() => {
 
     muteBtn.onclick = () => {
       const v = $('#bgVideo');
-      v.muted = !v.muted;
-      data.settings.bgMuted = v.muted;
-      muteBtn.textContent = v.muted ? '🔇 静音' : '🔊 有声';
-      // 取消静音后需要重新播放（浏览器策略）
-      if (!v.muted) {
-        v.play().catch(err => console.warn('video play after unmute failed', err));
+      // 用 volume 控制声音，避免浏览器 muted 策略限制
+      if (v.volume === 0) {
+        v.volume = 1;
+        data.settings.bgMuted = false;
+        muteBtn.textContent = '🔊 有声';
+      } else {
+        v.volume = 0;
+        data.settings.bgMuted = true;
+        muteBtn.textContent = '🔇 静音';
       }
+      // 确保播放中
+      v.play().catch(() => {});
       save();
     };
   };
