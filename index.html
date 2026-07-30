@@ -244,15 +244,64 @@
                         <button class="back-btn" data-back>← 返回首页</button>
                         <h2 class="page-title">📝 To-do List</h2>
                     </div>
-                    <div class="stat-row">
-                        <div class="stat-card"><div class="stat-num" id="todoStatPending">0</div><div class="stat-label">待办</div></div>
-                        <div class="stat-card"><div class="stat-num" id="todoStatDone">0</div><div class="stat-label">已完成</div></div>
-                        <div class="stat-card"><div class="stat-num" id="todoStatTotal">0</div><div class="stat-label">待完成</div></div>
+
+                    <!-- 4 个统计卡片（按图2） -->
+                    <div class="stat-row stat-row-4">
+                        <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-num" id="todoStatTotal">0</div><div class="stat-label">总任务</div></div>
+                        <div class="stat-card"><div class="stat-icon">⏳</div><div class="stat-num" id="todoStatPending">0</div><div class="stat-label">待完成</div></div>
+                        <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-num" id="todoStatDone">0</div><div class="stat-label">已完成</div></div>
+                        <div class="stat-card"><div class="stat-icon">📊</div><div class="stat-num" id="todoStatRate">0%</div><div class="stat-label">完成率</div></div>
                     </div>
-                    <div class="input-row">
-                        <input type="text" id="todoInput" placeholder="添加待办事项...">
-                        <button class="btn btn-primary" id="todoAddBtn">+</button>
+
+                    <!-- 输入区：text + 优先级 + 分类 + 日期 + 添加 -->
+                    <div class="todo-input-bar">
+                        <input type="text" id="todoInput" placeholder="输入新的待办事项...">
+                        <select id="todoPriorityInput" title="优先级">
+                            <option value="medium">🟡 中优先级</option>
+                            <option value="high">🔴 高优先级</option>
+                            <option value="low">🟢 低优先级</option>
+                        </select>
+                        <select id="todoCategoryInput" title="分类">
+                            <option value="">默认</option>
+                        </select>
+                        <input type="date" id="todoDateInput" title="日期">
+                        <button class="btn btn-primary" id="todoAddBtn">添加任务</button>
                     </div>
+
+                    <!-- 筛选 / 排序 -->
+                    <div class="todo-filters">
+                        <div class="tabs tabs-sm" id="todoFilterTabs">
+                            <button class="tab tab-active" data-filter="all">全部</button>
+                            <button class="tab" data-filter="pending">待完成</button>
+                            <button class="tab" data-filter="done">已完成</button>
+                        </div>
+                        <div class="todo-filter-extras">
+                            <select id="todoCategoryFilter" title="分类筛选">
+                                <option value="">所有分类</option>
+                            </select>
+                            <select id="todoSort" title="排序">
+                                <option value="date">按日期排序</option>
+                                <option value="created">按创建时间</option>
+                                <option value="priority">按优先级</option>
+                                <option value="name">按名称</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 任务分类管理 -->
+                    <div class="card">
+                        <div class="card-title">🏷 任务分类</div>
+                        <div class="category-chips" id="categoryChips">
+                            <span class="chip chip-active" data-cat="">全部</span>
+                        </div>
+                        <div class="opt-row" style="margin-top:10px;">
+                            <input type="text" id="newCategoryName" placeholder="添加新分类..." maxlength="12">
+                            <input type="color" id="newCategoryColor" value="#c9a35a" title="分类颜色">
+                            <button class="btn btn-gold" id="addCategoryBtn">添加</button>
+                        </div>
+                    </div>
+
+                    <!-- 任务列表 -->
                     <div class="todo-list" id="todoList"></div>
                 </div>
             </section>
@@ -553,34 +602,54 @@
                         </div>
                     </div>
                     <div class="card appearance-card">
-                        <div class="card-title">🖼 外观</div>
-                        <p class="muted" style="margin:-4px 0 12px;">个性化你的工作台主题与布局密度，所有设置自动保存。</p>
+                        <div class="card-title">🎨 自定义主题</div>
+                        <p class="muted" style="margin:-4px 0 12px;">选择预设主题或添加自己的主题。背景支持上传任意大小、任意格式的图片与视频。</p>
 
-                        <!-- 主题色板（视觉化选择） -->
+                        <!-- 我的主题：主题色板 + 添加按钮 -->
                         <div class="opt-block">
-                            <label class="opt-label">主题色</label>
-                            <div class="theme-swatches" id="themeSwatches">
-                                <button type="button" class="swatch swatch-brown" data-theme="brown" title="深棕（默认）">
-                                    <span class="swatch-name">深棕</span>
-                                </button>
-                                <button type="button" class="swatch swatch-mocha" data-theme="mocha" title="摩卡">
-                                    <span class="swatch-name">摩卡</span>
-                                </button>
-                                <button type="button" class="swatch swatch-sage" data-theme="sage" title="鼠尾草">
-                                    <span class="swatch-name">鼠尾草</span>
-                                </button>
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                <label class="opt-label" style="margin:0;">🌈 我的主题</label>
+                                <button type="button" class="btn btn-gold btn-sm" id="addThemeBtn">+ 添加主题</button>
+                            </div>
+                            <div class="theme-grid" id="themeGrid">
+                                <!-- 动态渲染 -->
                             </div>
                         </div>
 
-                        <div class="opt-row">
-                            <label>主题（兼容下拉）</label>
-                            <select id="themeSelect">
-                                <option value="brown">深棕 (默认)</option>
-                                <option value="mocha">摩卡</option>
-                                <option value="sage">鼠尾草</option>
-                            </select>
+                        <!-- 自定义颜色（高级） -->
+                        <div class="opt-block">
+                            <label class="opt-label">🎨 自定义颜色</label>
+                            <div class="opt-row">
+                                <label>主色调</label>
+                                <input type="color" id="customPrimaryColor" value="#6366f1">
+                            </div>
+                            <div class="opt-row">
+                                <label>背景色</label>
+                                <input type="color" id="customBgColor" value="#f8fafc">
+                            </div>
                         </div>
 
+                        <!-- 背景图片 / 视频 -->
+                        <div class="opt-block">
+                            <label class="opt-label">🖼 背景图片/视频</label>
+                            <input type="file" id="bgFileInput" accept="image/*,video/*" hidden>
+                            <div class="opt-row">
+                                <button type="button" class="btn btn-ghost" id="bgUploadBtn">📤 上传图片或视频</button>
+                                <button type="button" class="btn btn-ghost" id="bgClearBtn">🗑 清除背景</button>
+                            </div>
+                            <div id="bgPreview" class="bg-preview"></div>
+                            <div class="opt-row" id="bgOverlayRow" style="display:none;">
+                                <label>背景遮罩</label>
+                                <input type="range" id="bgOverlay" min="0" max="80" value="30" style="flex:1;">
+                                <span id="bgOverlayVal" style="width:40px;text-align:right;font-size:12px;">30%</span>
+                            </div>
+                            <div class="opt-row" id="bgSoundRow" style="display:none;">
+                                <label>声音</label>
+                                <button type="button" class="btn btn-ghost btn-sm" id="bgMuteBtn">🔇 静音</button>
+                            </div>
+                        </div>
+
+                        <!-- 其他布局/密度/强调 -->
                         <div class="opt-row">
                             <label>布局</label>
                             <select id="layoutSelect">
@@ -626,6 +695,17 @@
 
         </main>
 
+        <!-- 浮动：隐藏/显示任务栏 按钮（首页右下角） -->
+        <button class="nav-toggle-fab" id="navToggleFab" title="隐藏/显示底部任务栏" aria-label="切换任务栏">
+            <svg class="ic-eye-on" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+            <svg class="ic-eye-off" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+            </svg>
+        </button>
+
         <!-- 底部导航 -->
         <nav class="bottom-nav" id="bottomNav">
             <button class="nav-item nav-active" data-nav="home">
@@ -647,6 +727,48 @@
                 <div class="nav-icon">✍️</div><div class="nav-label">摘录</div>
             </button>
         </nav>
+
+        <!-- 背景层：图片/视频（在所有内容之下） -->
+        <div class="bg-layer" id="bgLayer" hidden></div>
+        <video id="bgVideo" class="bg-video" autoplay loop muted playsinline hidden></video>
+        <div class="bg-overlay" id="bgOverlayLayer" hidden></div>
+
+        <!-- 添加主题弹窗 -->
+        <div class="modal-mask" id="addThemeModal" hidden>
+            <div class="modal-card">
+                <h3 style="margin:0 0 12px;font-size:16px;">🎨 添加自定义主题</h3>
+                <p class="muted" style="font-size:12px;margin:0 0 14px;">为主题起个名字，挑 4 个颜色。保存后可随时切换、删除。</p>
+                <div class="modal-row">
+                    <label>主题名称</label>
+                    <input type="text" id="newThemeName" maxlength="10" placeholder="如：薄荷、星空">
+                </div>
+                <div class="modal-row">
+                    <label>主色调</label>
+                    <input type="color" id="newThemePrimary" value="#6366f1">
+                </div>
+                <div class="modal-row">
+                    <label>强调色</label>
+                    <input type="color" id="newThemeAccent" value="#c9a35a">
+                </div>
+                <div class="modal-row">
+                    <label>文字色</label>
+                    <input type="color" id="newThemeText" value="#2d1f15">
+                </div>
+                <div class="modal-row">
+                    <label>背景色</label>
+                    <input type="color" id="newThemeBg" value="#f8fafc">
+                </div>
+                <div class="modal-preview" id="newThemePreview">
+                    <div class="mp-bar"><span class="mp-dot mp-dot1"></span><span class="mp-dot mp-dot2"></span></div>
+                    <div class="mp-text">预览效果</div>
+                    <div class="mp-btn">主按钮</div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-ghost" id="addThemeCancel">取消</button>
+                    <button class="btn btn-primary" id="addThemeSave">保存主题</button>
+                </div>
+            </div>
+        </div>
 
         <!-- Toast -->
         <div class="toast" id="toast"></div>

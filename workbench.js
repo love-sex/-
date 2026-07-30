@@ -42,8 +42,17 @@ const App = (() => {
   });
 
   const defaultData = () => ({
-    settings: { theme: 'brown', layout: 'auto', density: 'comfortable', accent: 'gold' },
+    settings: { theme: 'brown', layout: 'auto', density: 'comfortable', accent: 'gold', navHidden: false, bgMuted: true, bgOverlay: 30 },
     dates: {},
+    // 全局待办（独立于日历日期）：每条任务带优先级 / 分类 / 日期
+    todos: [],
+    todoCategories: [], // [{id, name, color}]
+    todoFilter: 'all', // 'all' | 'pending' | 'done'
+    todoSort: 'date',  // 'date' | 'created' | 'priority' | 'name'
+    todoCatFilter: '', // '' 或 categoryId
+    // 自定义主题：用户通过"添加主题"创建
+    customThemes: [], // [{id, name, primary, accent, text, bg}]
+    // 全局数据（粉丝、健身体重历史等）
     global: {
       fanHistory: [
         { month: '2026-01', fans: 200 }, { month: '2026-02', fans: 350 },
@@ -58,6 +67,201 @@ const App = (() => {
       ]
     }
   });
+
+  /* ---------- 主题系统：预设 + 用户自定义 ---------- */
+  // 3 个内置主题：仅 ID/名称/渐变 class；CSS 变量在 [data-theme="xxx"] 中定义
+  const PRESET_THEMES = [
+    { id: 'brown', name: '深棕',  cls: 'ti-brown' },
+    { id: 'mocha', name: '摩卡',  cls: 'ti-mocha' },
+    { id: 'sage',  name: '鼠尾草', cls: 'ti-sage'  },
+  ];
+
+  const getAllThemes = () => {
+    const customs = (data.customThemes || []).map(t => ({
+      id: 'custom:' + t.id, name: t.name, custom: t,
+    }));
+    return [...PRESET_THEMES, ...customs];
+  };
+
+  const findCurrentTheme = () => {
+    const key = data.settings.theme || 'brown';
+    if (key.startsWith('custom:')) {
+      const id = key.slice(7);
+      const t = (data.customThemes || []).find(x => x.id === id);
+      return t ? { id: key, name: t.name, custom: t } : PRESET_THEMES[0];
+    }
+    return PRESET_THEMES.find(p => p.id === key) || PRESET_THEMES[0];
+  };
+
+  // 应用主题：preset 走 CSS，custom 走 inline CSS 变量
+  const applyTheme = () => {
+    const key = data.settings.theme || 'brown';
+    if (key.startsWith('custom:')) {
+      const id = key.slice(7);
+      const t = (data.customThemes || []).find(x => x.id === id);
+      if (t) {
+        document.body.removeAttribute('data-theme'); // 清掉预设主题
+        // 写入主题变量
+        const set = (k, v) => document.body.style.setProperty(k, v);
+        const hexToRgb = h => {
+          const x = h.replace('#','');
+          const v = x.length === 3 ? x.split('').map(c=>c+c).join('') : x;
+          const n = parseInt(v, 16);
+          return [(n>>16)&255, (n>>8)&255, n&255];
+        };
+        set('--primary', t.primary);
+        set('--primary-rgb', hexToRgb(t.primary).join(', '));
+        set('--primary-light', t.primary);
+        set('--text', t.text);
+        set('--bg', t.bg);
+        set('--bg-soft', t.bg);
+        set('--surface', t.bg);
+        set('--surface-2', t.bg);
+        set('--accent', t.accent);
+        set('--accent-deep', t.accent);
+        set('--accent-light', t.accent);
+      }
+    } else {
+      // 清除 inline 变量，回退到 [data-theme] CSS
+      ['--primary','--primary-rgb','--primary-light','--text','--bg','--bg-soft','--surface','--surface-2','--accent','--accent-deep','--accent-light']
+        .forEach(k => document.body.style.removeProperty(k));
+      document.body.setAttribute('data-theme', key);
+    }
+  };
+
+  // 渲染主题色板（在设置面板中）
+  const renderThemeGrid = () => {
+    const grid = $('#themeGrid');
+    if (!grid) return;
+    const cur = data.settings.theme || 'brown';
+    let html = '';
+    PRESET_THEMES.forEach(p => {
+      html += `<div class="theme-item preset ${p.cls} ${cur === p.id ? 'active' : ''}" data-theme="${p.id}">
+        <span class="theme-item-name">${p.name}</span>
+      </div>`;
+    });
+    (data.customThemes || []).forEach(t => {
+      const key = 'custom:' + t.id;
+      html += `<div class="theme-item custom ${cur === key ? 'active' : ''}" data-theme="${key}"
+        style="--ti-bg:${t.bg};--ti-primary:${t.primary};--ti-accent:${t.accent};--ti-text:${t.text}">
+        <span class="theme-item-name">${escapeHtml(t.name)}</span>
+        <button class="theme-item-del" data-del-theme="${t.id}" title="删除主题">×</button>
+      </div>`;
+    });
+    grid.innerHTML = html;
+  };
+
+  /* ---------- IndexedDB：存图片/视频 Blob（localStorage 太小） ---------- */
+  const IDB_NAME = 'workbench-bg';
+  const IDB_STORE = 'files';
+  const idb = {
+    _open: null,
+    open() {
+      if (this._open) return this._open;
+      this._open = new Promise((resolve, reject) => {
+        const req = indexedDB.open(IDB_NAME, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror   = () => reject(req.error);
+      });
+      return this._open;
+    },
+    async save(key, blob) {
+      const db = await this.open();
+      return new Promise((res, rej) => {
+        const tx = db.transaction(IDB_STORE, 'readwrite');
+        tx.objectStore(IDB_STORE).put(blob, key);
+        tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+      });
+    },
+    async load(key) {
+      const db = await this.open();
+      return new Promise((res, rej) => {
+        const tx = db.transaction(IDB_STORE, 'readonly');
+        const req = tx.objectStore(IDB_STORE).get(key);
+        req.onsuccess = () => res(req.result || null);
+        req.onerror   = () => rej(req.error);
+      });
+    },
+    async remove(key) {
+      const db = await this.open();
+      return new Promise((res, rej) => {
+        const tx = db.transaction(IDB_STORE, 'readwrite');
+        tx.objectStore(IDB_STORE).delete(key);
+        tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+      });
+    }
+  };
+
+  // 当前背景的 ObjectURL（避免内存泄漏）
+  let _bgObjectURL = null;
+  const clearBgObjectURL = () => {
+    if (_bgObjectURL) { URL.revokeObjectURL(_bgObjectURL); _bgObjectURL = null; }
+  };
+
+  // 应用背景（type = 'image' | 'video' | null）
+  const applyBackground = async () => {
+    const layer  = $('#bgLayer');
+    const video  = $('#bgVideo');
+    const ovl    = $('#bgOverlayLayer');
+    const muteBtn = $('#bgMuteBtn');
+    const ovlRow = $('#bgOverlayRow');
+    const sndRow = $('#bgSoundRow');
+    const ovlVal = $('#bgOverlayVal');
+    const ovlInp = $('#bgOverlay');
+
+    // 重置
+    clearBgObjectURL();
+    layer.style.backgroundImage = '';
+    layer.hidden = true;
+    video.pause(); video.removeAttribute('src'); video.load();
+    video.hidden = true;
+    ovl.hidden = true;
+    ovlRow.style.display = 'none';
+    sndRow.style.display = 'none';
+
+    const blob = await idb.load('customBg').catch(() => null);
+    if (!blob) {
+      const prev = $('#bgPreview'); if (prev) prev.innerHTML = '';
+      return;
+    }
+    _bgObjectURL = URL.createObjectURL(blob);
+    const isVideo = (blob.type || '').startsWith('video/');
+    const sizeText = (blob.size / 1024 / 1024).toFixed(2) + ' MB';
+
+    if (isVideo) {
+      video.src = _bgObjectURL;
+      video.muted = data.settings.bgMuted !== false;
+      video.loop = true; video.playsInline = true;
+      video.hidden = false;
+      ovlRow.style.display = '';
+      sndRow.style.display = '';
+      muteBtn.textContent = video.muted ? '🔇 静音' : '🔊 有声';
+      ovl.hidden = false;
+      video.play().catch(err => {
+        // 自动播放被阻止时，提示用户点击页面
+        console.warn('video autoplay blocked', err);
+      });
+      const prev = $('#bgPreview');
+      prev.innerHTML = `<video src="${_bgObjectURL}" muted playsinline></video><div class="bg-info">🎬 ${escapeHtml(blob.type)} · ${sizeText}</div>`;
+    } else {
+      layer.style.backgroundImage = `url(${_bgObjectURL})`;
+      layer.hidden = false;
+      ovl.hidden = false;
+      ovlRow.style.display = '';
+      const prev = $('#bgPreview');
+      prev.innerHTML = `<img src="${_bgObjectURL}" alt=""><div class="bg-info">🖼 ${escapeHtml(blob.type || 'image')} · ${sizeText}</div>`;
+    }
+
+    // 遮罩
+    const pct = +data.settings.bgOverlay || 0;
+    ovl.style.background = `rgba(0,0,0,${pct/100})`;
+    ovlInp.value = pct;
+    ovlVal.textContent = pct + '%';
+  };
 
   let data = defaultData();
 
@@ -170,11 +374,14 @@ const App = (() => {
     const todayKey = fmtDate(today);
     const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth()+1).padStart(2,'0')}`;
 
-    // 待办统计
+    // 待办统计（全局 data.todos，兼容旧 data.dates）
     let pending = 0, done = 0;
-    Object.values(data.dates).forEach(d => {
-      d.todos.forEach(t => t.done ? done++ : pending++);
-    });
+    data.todos.forEach(t => t.done ? done++ : pending++);
+    if (data.todos.length === 0) {
+      Object.values(data.dates).forEach(d => {
+        (d.todos || []).forEach(t => t.done ? done++ : pending++);
+      });
+    }
     $('#homeTodoCount').textContent = pending;
 
     // 运动统计（本月）
@@ -207,16 +414,28 @@ const App = (() => {
     (todayDay.sport.records || []).forEach(r => tMin += Number(r.duration || 0));
     $('#ovSport').textContent = tMin;
 
-    // 今日快速待办
+    // 今日快速待办（来自 data.todos 中 date === 今天的）
     const qt = $('#homeQuickTodo');
     qt.innerHTML = '';
-    todayDay.todos.slice(0, 5).forEach(t => {
+    const todayTodos = data.todos
+      .filter(t => t.date === todayKey || (!t.date && todayKey === todayKey))
+      .slice(0, 5);
+    todayTodos.forEach(t => {
       const row = document.createElement('div');
-      row.className = 'todo-item' + (t.done ? ' done' : '');
-      row.innerHTML = `<input type="checkbox" ${t.done ? 'checked' : ''} disabled><span class="todo-text">${t.text}</span>`;
+      row.className = 'todo-item prio-' + (t.priority || 'medium') + (t.done ? ' done' : '');
+      row.innerHTML = `<input type="checkbox" ${t.done ? 'checked' : ''} disabled><span class="todo-text">${escapeHtml(t.text)}</span>`;
       qt.appendChild(row);
     });
-    if (!todayDay.todos.length) qt.innerHTML = '<p class="muted" style="text-align:center;margin:0;">暂无待办，去添加吧～</p>';
+    // 兼容旧数据：data.dates[key].todos
+    if (todayTodos.length === 0 && (todayDay.todos || []).length) {
+      todayDay.todos.slice(0, 5).forEach(t => {
+        const row = document.createElement('div');
+        row.className = 'todo-item' + (t.done ? ' done' : '');
+        row.innerHTML = `<input type="checkbox" ${t.done ? 'checked' : ''} disabled><span class="todo-text">${escapeHtml(t.text)}</span>`;
+        qt.appendChild(row);
+      });
+    }
+    if (!qt.children.length) qt.innerHTML = '<p class="muted" style="text-align:center;margin:0;">暂无待办，去添加吧～</p>';
 
     // 最近内容
     const recent = $('#homeRecent');
@@ -236,49 +455,193 @@ const App = (() => {
     if (!recs.length) recent.innerHTML = '<p class="muted" style="text-align:center;margin:0;">暂无记录</p>';
   };
 
-  /* ---------- To-do ---------- */
-  const renderTodo = () => {
-    const day = getDay();
-    const list = $('#todoList');
-    list.innerHTML = '';
-    day.todos.forEach((t, idx) => {
-      const row = document.createElement('div');
-      row.className = 'todo-item' + (t.done ? ' done' : '');
-      row.innerHTML = `
-        <input type="checkbox" ${t.done ? 'checked' : ''} data-idx="${idx}">
-        <span class="todo-text">${t.text}</span>
-        <button class="todo-del" data-idx="${idx}">×</button>
-      `;
-      list.appendChild(row);
-    });
-    const pending = day.todos.filter(t => !t.done).length;
-    const done = day.todos.filter(t => t.done).length;
-    $('#todoStatPending').textContent = pending;
-    $('#todoStatDone').textContent = done;
-    $('#todoStatTotal').textContent = pending;
-    if (!day.todos.length) list.innerHTML = '<p class="muted" style="text-align:center;">暂无待办</p>';
+  /* ---------- To-do（全局待办 + 分类 + 优先级 + 筛选排序） ---------- */
+  // 简单 id
+  const todoId = () => 't_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+  // 分类下拉选项
+  const refreshCategorySelects = () => {
+    const opts = data.todoCategories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    const tci = $('#todoCategoryInput');
+    if (tci) tci.innerHTML = `<option value="">默认</option>${opts}`;
+    const tcf = $('#todoCategoryFilter');
+    if (tcf) tcf.innerHTML = `<option value="">所有分类</option>${opts}`;
   };
+
+  // 分类 chips
+  const renderCategoryChips = () => {
+    const wrap = $('#categoryChips');
+    if (!wrap) return;
+    const active = data.todoCatFilter || '';
+    let html = `<span class="chip ${active === '' ? 'chip-active' : ''}" data-cat="">全部</span>`;
+    data.todoCategories.forEach(c => {
+      html += `<span class="chip ${active === c.id ? 'chip-active' : ''}" data-cat="${c.id}" data-has-color="true" style="--chip-color:${c.color}">
+        ${c.name}
+        <span class="chip-x" data-del-cat="${c.id}" title="删除分类">×</span>
+      </span>`;
+    });
+    wrap.innerHTML = html;
+  };
+
+  const renderTodo = () => {
+    refreshCategorySelects();
+    renderCategoryChips();
+
+    const filter = data.todoFilter || 'all';
+    const sort   = data.todoSort   || 'date';
+    const cat    = data.todoCatFilter || '';
+
+    // 1. 过滤
+    let list = data.todos.slice();
+    if (filter === 'pending') list = list.filter(t => !t.done);
+    if (filter === 'done')    list = list.filter(t => t.done);
+    if (cat)                  list = list.filter(t => (t.categoryId || '') === cat);
+
+    // 2. 排序
+    const prioOrder = { high: 0, medium: 1, low: 2 };
+    if (sort === 'date') {
+      list.sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999'));
+    } else if (sort === 'created') {
+      list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    } else if (sort === 'priority') {
+      list.sort((a, b) => (prioOrder[a.priority] ?? 1) - (prioOrder[b.priority] ?? 1));
+    } else if (sort === 'name') {
+      list.sort((a, b) => (a.text || '').localeCompare(b.text || ''));
+    }
+
+    // 3. 统计（始终显示全局）
+    const total   = data.todos.length;
+    const pending = data.todos.filter(t => !t.done).length;
+    const done    = data.todos.filter(t =>  t.done).length;
+    const rate    = total ? Math.round(done / total * 100) : 0;
+    $('#todoStatTotal').textContent   = total;
+    $('#todoStatPending').textContent = pending;
+    $('#todoStatDone').textContent    = done;
+    $('#todoStatRate').textContent    = rate + '%';
+
+    // 4. 渲染列表
+    const ul = $('#todoList');
+    ul.innerHTML = '';
+    if (!list.length) {
+      ul.innerHTML = '<p class="todo-empty">暂无任务，添加一个吧 ✨</p>';
+      return;
+    }
+    list.forEach(t => {
+      const cat = data.todoCategories.find(c => c.id === t.categoryId);
+      const row = document.createElement('div');
+      row.className = 'todo-item prio-' + (t.priority || 'medium') + (t.done ? ' done' : '');
+      row.innerHTML = `
+        <input type="checkbox" ${t.done ? 'checked' : ''} data-tid="${t.id}" data-act="toggle" title="标记完成">
+        <div class="todo-item-main">
+          <div class="todo-item-text">${escapeHtml(t.text)}</div>
+          <div class="todo-item-meta">
+            <span class="todo-tag prio-${t.priority || 'medium'}">${{high:'🔴 高',medium:'🟡 中',low:'🟢 低'}[t.priority || 'medium']}</span>
+            ${cat ? `<span class="todo-tag cat-tag" style="--tag-color:${cat.color}">${escapeHtml(cat.name)}</span>` : ''}
+            ${t.date ? `<span class="todo-tag">📅 ${t.date}</span>` : ''}
+          </div>
+        </div>
+        <div class="todo-actions">
+          <button class="todo-icon-btn" data-tid="${t.id}" data-act="edit" title="编辑">✏️</button>
+          <button class="todo-icon-btn del" data-tid="${t.id}" data-act="del" title="删除">🗑</button>
+        </div>
+      `;
+      ul.appendChild(row);
+    });
+  };
+
+  // HTML 转义防 XSS
+  const escapeHtml = s => String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
   const bindTodo = () => {
-    $('#todoAddBtn').onclick = () => {
+    // 添加任务
+    const addOne = () => {
       const input = $('#todoInput');
       const v = input.value.trim();
-      if (!v) return;
-      getDay().todos.push({ text: v, done: false, created: Date.now() });
+      if (!v) { input.focus(); return; }
+      const priority = $('#todoPriorityInput').value;
+      const catId    = $('#todoCategoryInput').value;
+      const date     = $('#todoDateInput').value || '';
+      data.todos.push({ id: todoId(), text: v, done: false, priority, categoryId: catId, date, createdAt: Date.now() });
       input.value = '';
       save(); renderTodo(); renderHome();
+      input.focus();
     };
-    $('#todoInput').onkeydown = e => { if (e.key === 'Enter') $('#todoAddBtn').click(); };
+    $('#todoAddBtn').onclick = addOne;
+    $('#todoInput').onkeydown = e => { if (e.key === 'Enter') addOne(); };
+
+    // 列表点击（勾选 / 编辑 / 删除）
     $('#todoList').onclick = e => {
-      const idx = e.target.dataset.idx;
-      if (idx == null) return;
-      const day = getDay();
-      if (e.target.tagName === 'INPUT') {
-        day.todos[idx].done = e.target.checked;
-      } else if (e.target.classList.contains('todo-del')) {
-        day.todos.splice(idx, 1);
+      const tid = e.target.dataset.tid;
+      const act = e.target.dataset.act;
+      if (!tid) return;
+      const t = data.todos.find(x => x.id === tid);
+      if (!t) return;
+      if (act === 'toggle') {
+        t.done = e.target.checked;
+      } else if (act === 'del') {
+        if (!confirm('确定删除此任务？')) return;
+        data.todos = data.todos.filter(x => x.id !== tid);
+      } else if (act === 'edit') {
+        const nt = prompt('修改任务内容：', t.text);
+        if (nt != null) {
+          const v = nt.trim();
+          if (v) t.text = v;
+        }
       }
       save(); renderTodo(); renderHome();
     };
+
+    // 筛选 tabs
+    $('#todoFilterTabs').onclick = e => {
+      const f = e.target.dataset.filter;
+      if (!f) return;
+      data.todoFilter = f;
+      $('#todoFilterTabs').querySelectorAll('.tab').forEach(b => b.classList.toggle('tab-active', b === e.target));
+      renderTodo();
+    };
+
+    // 分类筛选 / 排序
+    $('#todoCategoryFilter').onchange = e => { data.todoCatFilter = e.target.value; renderTodo(); };
+    $('#todoSort').onchange           = e => { data.todoSort     = e.target.value; renderTodo(); };
+
+    // 分类 chips 点击
+    $('#categoryChips').onclick = e => {
+      // 删除分类
+      if (e.target.dataset.delCat) {
+        const cid = e.target.dataset.delCat;
+        const cat = data.todoCategories.find(c => c.id === cid);
+        if (!cat) return;
+        const used = data.todos.some(t => t.categoryId === cid);
+        const msg = used
+          ? `分类「${cat.name}」下还有任务，删除后这些任务将变为默认分类。继续？`
+          : `确定删除分类「${cat.name}」？`;
+        if (!confirm(msg)) return;
+        data.todoCategories = data.todoCategories.filter(c => c.id !== cid);
+        data.todos.forEach(t => { if (t.categoryId === cid) t.categoryId = ''; });
+        if (data.todoCatFilter === cid) data.todoCatFilter = '';
+        save(); renderTodo();
+        return;
+      }
+      // 选中分类
+      const chip = e.target.closest('.chip');
+      if (!chip) return;
+      data.todoCatFilter = chip.dataset.cat || '';
+      save(); renderTodo();
+    };
+
+    // 添加新分类
+    $('#addCategoryBtn').onclick = () => {
+      const nameEl = $('#newCategoryName');
+      const colorEl = $('#newCategoryColor');
+      const name = nameEl.value.trim();
+      if (!name) { nameEl.focus(); return; }
+      const color = colorEl.value || '#c9a35a';
+      const id = 'c_' + Date.now().toString(36);
+      data.todoCategories.push({ id, name, color });
+      nameEl.value = '';
+      save(); renderTodo();
+    };
+    $('#newCategoryName').onkeydown = e => { if (e.key === 'Enter') $('#addCategoryBtn').click(); };
   };
 
   /* ---------- 运动 ---------- */
@@ -803,29 +1166,142 @@ const App = (() => {
   /* ---------- 设置 ---------- */
   // 应用外观设置到 DOM（不刷新页面的情况下立即生效）
   const applyAppearance = () => {
-    const theme   = data.settings.theme   || 'brown';
-    const density = data.settings.density || 'comfortable';
     const accent  = data.settings.accent  || 'gold';
-    document.body.setAttribute('data-theme', theme);
+    const density = data.settings.density || 'comfortable';
+    const navHidden = !!data.settings.navHidden;
+    // 主题：preset / custom 都由 applyTheme 处理
+    applyTheme();
     document.body.setAttribute('data-accent', accent);
+    document.body.classList.toggle('nav-hidden', navHidden);
     // 日历密度切换
     const cd = document.getElementById('calendarDays');
     if (cd) cd.classList.toggle('cal-compact', density === 'compact');
-    // 主题色板高亮
-    document.querySelectorAll('#themeSwatches .swatch').forEach(sw => {
-      sw.classList.toggle('active', sw.dataset.theme === theme);
+  };
+
+  // 切换任务栏（底部 nav）可见性
+  const bindNavToggle = () => {
+    const btn = document.getElementById('navToggleFab');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      data.settings.navHidden = !data.settings.navHidden;
+      document.body.classList.toggle('nav-hidden', data.settings.navHidden);
+      save();
+      toast(data.settings.navHidden ? '已隐藏任务栏（再次点击可显示）' : '已显示任务栏');
     });
   };
 
+  /* ---------- 主题弹窗：实时预览 ---------- */
+  const updateThemePreview = () => {
+    const preview = $('#newThemePreview');
+    if (!preview) return;
+    const p = $('#newThemePrimary').value;
+    const a = $('#newThemeAccent').value;
+    const t = $('#newThemeText').value;
+    const b = $('#newThemeBg').value;
+    preview.style.setProperty('--mp-bg', b);
+    preview.style.setProperty('--mp-text', t);
+    preview.style.setProperty('--mp-primary', p);
+    preview.style.setProperty('--mp-accent', a);
+  };
+  const openAddThemeModal = () => {
+    const m = $('#addThemeModal'); if (!m) return;
+    m.hidden = false;
+    $('#newThemeName').value = '';
+    $('#newThemePrimary').value = '#6366f1';
+    $('#newThemeAccent').value = '#c9a35a';
+    $('#newThemeText').value = '#2d1f15';
+    $('#newThemeBg').value = '#f8fafc';
+    updateThemePreview();
+    setTimeout(() => $('#newThemeName').focus(), 50);
+  };
+  const closeAddThemeModal = () => { const m = $('#addThemeModal'); if (m) m.hidden = true; };
+  const bindAddThemeModal = () => {
+    ['#newThemePrimary','#newThemeAccent','#newThemeText','#newThemeBg'].forEach(sel => {
+      const el = $(sel); if (el) el.addEventListener('input', updateThemePreview);
+    });
+    $('#addThemeCancel').onclick = closeAddThemeModal;
+    $('#addThemeSave').onclick = () => {
+      const name = $('#newThemeName').value.trim();
+      if (!name) { toast('请输入主题名称'); $('#newThemeName').focus(); return; }
+      const t = {
+        id: 'th_' + Date.now().toString(36),
+        name: name.slice(0, 10),
+        primary: $('#newThemePrimary').value,
+        accent:  $('#newThemeAccent').value,
+        text:    $('#newThemeText').value,
+        bg:      $('#newThemeBg').value,
+      };
+      data.customThemes = data.customThemes || [];
+      data.customThemes.push(t);
+      data.settings.theme = 'custom:' + t.id;
+      save();
+      applyAppearance();
+      renderThemeGrid();
+      closeAddThemeModal();
+      toast('主题「' + t.name + '」已添加并应用');
+    };
+    // 点击遮罩关闭
+    $('#addThemeModal').addEventListener('click', e => { if (e.target.id === 'addThemeModal') closeAddThemeModal(); });
+  };
+
+  /* ---------- 背景上传 ---------- */
+  const bindBackground = () => {
+    const file = $('#bgFileInput');
+    const upBtn = $('#bgUploadBtn');
+    const clrBtn = $('#bgClearBtn');
+    const ovlInp = $('#bgOverlay');
+    const muteBtn = $('#bgMuteBtn');
+
+    upBtn.onclick = () => file.click();
+
+    file.onchange = async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      // 不限制大小/格式：直接存 IDB
+      await idb.save('customBg', f);
+      // 记录 MIME 方便恢复
+      data.settings.bgType = (f.type || '').startsWith('video/') ? 'video' : 'image';
+      // 上传后视频默认静音（避免被浏览器策略拦截自动播放）
+      data.settings.bgMuted = data.settings.bgType === 'video';
+      save();
+      applyBackground();
+      toast('背景已' + (f.type.startsWith('video/') ? '上传视频' : '上传图片') + '（' + (f.size/1024/1024).toFixed(2) + ' MB）');
+      // 重置 input，允许重复上传同名文件
+      file.value = '';
+    };
+
+    clrBtn.onclick = async () => {
+      if (!confirm('确定清除背景？')) return;
+      await idb.remove('customBg').catch(() => {});
+      data.settings.bgType = null;
+      save();
+      applyBackground();
+      toast('已清除背景');
+    };
+
+    ovlInp.oninput = () => {
+      const v = +ovlInp.value;
+      data.settings.bgOverlay = v;
+      const ovl = $('#bgOverlayLayer');
+      ovl.style.background = `rgba(0,0,0,${v/100})`;
+      $('#bgOverlayVal').textContent = v + '%';
+      save();
+    };
+
+    muteBtn.onclick = () => {
+      const v = $('#bgVideo');
+      v.muted = !v.muted;
+      data.settings.bgMuted = v.muted;
+      muteBtn.textContent = v.muted ? '🔇 静音' : '🔊 有声';
+      save();
+    };
+  };
+
   const renderSettings = () => {
-    $('#themeSelect').value   = data.settings.theme   || 'brown';
+    renderThemeGrid();
     $('#layoutSelect').value  = data.settings.layout  || 'auto';
     const ds = $('#densitySelect'); if (ds) ds.value = data.settings.density || 'comfortable';
     const as = $('#accentSelect');  if (as) as.value = data.settings.accent   || 'gold';
-    // 同步色板
-    document.querySelectorAll('#themeSwatches .swatch').forEach(sw => {
-      sw.classList.toggle('active', sw.dataset.theme === (data.settings.theme || 'brown'));
-    });
     const hl = $('#historyList');
     hl.innerHTML = '';
     Object.keys(data.dates).sort().reverse().forEach(date => {
@@ -857,35 +1333,50 @@ const App = (() => {
       };
       reader.readAsText(file);
     };
-    // 主题：色板点击
-    document.querySelectorAll('#themeSwatches .swatch').forEach(sw => {
-      sw.addEventListener('click', () => {
-        const t = sw.dataset.theme;
-        data.settings.theme = t;
-        document.body.setAttribute('data-theme', t);
-        $('#themeSelect').value = t;
-        // 切换 active 状态
-        document.querySelectorAll('#themeSwatches .swatch').forEach(s => s.classList.toggle('active', s === sw));
+    // 主题：色板点击（preset + custom）
+    $('#themeGrid').onclick = e => {
+      const delId = e.target.dataset.delTheme;
+      if (delId) {
+        const t = (data.customThemes || []).find(x => x.id === delId);
+        if (!t) return;
+        if (!confirm(`确定删除主题「${t.name}」？`)) return;
+        data.customThemes = data.customThemes.filter(x => x.id !== delId);
+        if (data.settings.theme === 'custom:' + delId) data.settings.theme = 'brown';
         save();
-        toast('主题已切换：' + (t === 'brown' ? '深棕' : t === 'mocha' ? '摩卡' : '鼠尾草'));
-      });
-    });
-    // 主题：下拉（兼容旧版）
-    $('#themeSelect').onchange = e => {
-      const t = e.target.value;
-      data.settings.theme = t;
-      document.body.setAttribute('data-theme', t);
-      document.querySelectorAll('#themeSwatches .swatch').forEach(s => s.classList.toggle('active', s.dataset.theme === t));
+        applyAppearance();
+        renderThemeGrid();
+        return;
+      }
+      const item = e.target.closest('.theme-item');
+      if (!item) return;
+      const key = item.dataset.theme;
+      if (!key) return;
+      data.settings.theme = key;
+      applyAppearance();
+      renderThemeGrid();
       save();
+      const t = findCurrentTheme();
+      toast('已切换到：' + t.name);
     };
+    // 添加主题
+    $('#addThemeBtn').onclick = openAddThemeModal;
+    // 自定义主色/背景色（高级，临时覆盖）
+    const onCustomColor = () => {
+      const p = $('#customPrimaryColor').value;
+      const b = $('#customBgColor').value;
+      document.body.style.setProperty('--primary', p);
+      document.body.style.setProperty('--bg', b);
+      document.body.style.setProperty('--surface', b);
+    };
+    $('#customPrimaryColor').oninput = onCustomColor;
+    $('#customBgColor').oninput = onCustomColor;
+
     $('#layoutSelect').onchange = e => { data.settings.layout = e.target.value; save(); };
-    // 日历密度
     $('#densitySelect').onchange = e => {
       data.settings.density = e.target.value;
       applyAppearance();
       save();
     };
-    // 主色强调
     $('#accentSelect').onchange = e => {
       data.settings.accent = e.target.value;
       applyAppearance();
@@ -972,8 +1463,8 @@ const App = (() => {
   /* ---------- 初始化 ---------- */
   const init = () => {
     load();
-    document.body.setAttribute('data-theme', data.settings.theme);
     applyAppearance();
+    bindNavToggle();
     renderCalendar();
     bindTodo();
     bindSport();
@@ -982,6 +1473,9 @@ const App = (() => {
     bindExcerpt();
     bindStudy();
     bindSettings();
+    bindAddThemeModal();
+    bindBackground();
+    applyBackground(); // 恢复背景
     bindTabs();
 
     // 导航
