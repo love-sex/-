@@ -42,7 +42,7 @@ const App = (() => {
   });
 
   const defaultData = () => ({
-    settings: { theme: 'brown', layout: 'auto' },
+    settings: { theme: 'brown', layout: 'auto', density: 'comfortable', accent: 'gold' },
     dates: {},
     global: {
       fanHistory: [
@@ -801,9 +801,31 @@ const App = (() => {
   };
 
   /* ---------- 设置 ---------- */
+  // 应用外观设置到 DOM（不刷新页面的情况下立即生效）
+  const applyAppearance = () => {
+    const theme   = data.settings.theme   || 'brown';
+    const density = data.settings.density || 'comfortable';
+    const accent  = data.settings.accent  || 'gold';
+    document.body.setAttribute('data-theme', theme);
+    document.body.setAttribute('data-accent', accent);
+    // 日历密度切换
+    const cd = document.getElementById('calendarDays');
+    if (cd) cd.classList.toggle('cal-compact', density === 'compact');
+    // 主题色板高亮
+    document.querySelectorAll('#themeSwatches .swatch').forEach(sw => {
+      sw.classList.toggle('active', sw.dataset.theme === theme);
+    });
+  };
+
   const renderSettings = () => {
-    $('#themeSelect').value = data.settings.theme;
-    $('#layoutSelect').value = data.settings.layout;
+    $('#themeSelect').value   = data.settings.theme   || 'brown';
+    $('#layoutSelect').value  = data.settings.layout  || 'auto';
+    const ds = $('#densitySelect'); if (ds) ds.value = data.settings.density || 'comfortable';
+    const as = $('#accentSelect');  if (as) as.value = data.settings.accent   || 'gold';
+    // 同步色板
+    document.querySelectorAll('#themeSwatches .swatch').forEach(sw => {
+      sw.classList.toggle('active', sw.dataset.theme === (data.settings.theme || 'brown'));
+    });
     const hl = $('#historyList');
     hl.innerHTML = '';
     Object.keys(data.dates).sort().reverse().forEach(date => {
@@ -835,12 +857,40 @@ const App = (() => {
       };
       reader.readAsText(file);
     };
+    // 主题：色板点击
+    document.querySelectorAll('#themeSwatches .swatch').forEach(sw => {
+      sw.addEventListener('click', () => {
+        const t = sw.dataset.theme;
+        data.settings.theme = t;
+        document.body.setAttribute('data-theme', t);
+        $('#themeSelect').value = t;
+        // 切换 active 状态
+        document.querySelectorAll('#themeSwatches .swatch').forEach(s => s.classList.toggle('active', s === sw));
+        save();
+        toast('主题已切换：' + (t === 'brown' ? '深棕' : t === 'mocha' ? '摩卡' : '鼠尾草'));
+      });
+    });
+    // 主题：下拉（兼容旧版）
     $('#themeSelect').onchange = e => {
-      data.settings.theme = e.target.value;
-      document.body.setAttribute('data-theme', e.target.value);
+      const t = e.target.value;
+      data.settings.theme = t;
+      document.body.setAttribute('data-theme', t);
+      document.querySelectorAll('#themeSwatches .swatch').forEach(s => s.classList.toggle('active', s.dataset.theme === t));
       save();
     };
     $('#layoutSelect').onchange = e => { data.settings.layout = e.target.value; save(); };
+    // 日历密度
+    $('#densitySelect').onchange = e => {
+      data.settings.density = e.target.value;
+      applyAppearance();
+      save();
+    };
+    // 主色强调
+    $('#accentSelect').onchange = e => {
+      data.settings.accent = e.target.value;
+      applyAppearance();
+      save();
+    };
     $('#clearAllBtn').onclick = () => {
       if (confirm('确定清空所有数据？此操作不可恢复。')) {
         data = defaultData();
@@ -923,6 +973,7 @@ const App = (() => {
   const init = () => {
     load();
     document.body.setAttribute('data-theme', data.settings.theme);
+    applyAppearance();
     renderCalendar();
     bindTodo();
     bindSport();

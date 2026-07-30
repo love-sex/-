@@ -552,22 +552,58 @@
                             <input type="file" id="importFile" accept="application/json" style="display:none;">
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card appearance-card">
                         <div class="card-title">🖼 外观</div>
+                        <p class="muted" style="margin:-4px 0 12px;">个性化你的工作台主题与布局密度，所有设置自动保存。</p>
+
+                        <!-- 主题色板（视觉化选择） -->
+                        <div class="opt-block">
+                            <label class="opt-label">主题色</label>
+                            <div class="theme-swatches" id="themeSwatches">
+                                <button type="button" class="swatch swatch-brown" data-theme="brown" title="深棕（默认）">
+                                    <span class="swatch-name">深棕</span>
+                                </button>
+                                <button type="button" class="swatch swatch-mocha" data-theme="mocha" title="摩卡">
+                                    <span class="swatch-name">摩卡</span>
+                                </button>
+                                <button type="button" class="swatch swatch-sage" data-theme="sage" title="鼠尾草">
+                                    <span class="swatch-name">鼠尾草</span>
+                                </button>
+                            </div>
+                        </div>
+
                         <div class="opt-row">
-                            <label>主题</label>
+                            <label>主题（兼容下拉）</label>
                             <select id="themeSelect">
                                 <option value="brown">深棕 (默认)</option>
                                 <option value="mocha">摩卡</option>
                                 <option value="sage">鼠尾草</option>
                             </select>
                         </div>
+
                         <div class="opt-row">
                             <label>布局</label>
                             <select id="layoutSelect">
                                 <option value="auto">自动（手机竖版/电脑横版）</option>
                                 <option value="portrait">强制竖版</option>
                                 <option value="landscape">强制横版</option>
+                            </select>
+                        </div>
+
+                        <div class="opt-row">
+                            <label>日历密度</label>
+                            <select id="densitySelect">
+                                <option value="comfortable">舒适（推荐）</option>
+                                <option value="compact">紧凑（格子更小）</option>
+                            </select>
+                        </div>
+
+                        <div class="opt-row">
+                            <label>主色强调</label>
+                            <select id="accentSelect">
+                                <option value="gold">金色（默认）</option>
+                                <option value="primary">主色（深棕）</option>
+                                <option value="muted">低调灰</option>
                             </select>
                         </div>
                     </div>
