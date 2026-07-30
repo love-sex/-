@@ -898,8 +898,9 @@ body.nav-hidden .nav-toggle-fab { bottom: 14px; }
     width: 80px; height: auto; flex-direction: column; justify-content: flex-start;
     padding: 14px 0; border-top: none; border-right: 1px solid rgba(var(--primary-rgb),0.08);
     box-shadow: 2px 0 10px rgba(61,40,23,0.05);
+    overflow-y: auto;
   }
-  .nav-item { flex: 0 0 70px; }
+  .nav-item { flex: 0 0 64px; }
   .app-main { margin-left: 80px; padding-bottom: 20px; }
   .date-bar, .calendar-panel { margin-left: 80px; }
   .date-pill { display: inline-block; }
