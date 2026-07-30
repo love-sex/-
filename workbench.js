@@ -518,26 +518,41 @@ const App = (() => {
     $('#todoStatPending').textContent = pending;
     $('#todoStatDone').textContent    = done;
     $('#todoStatRate').textContent    = rate + '%';
+    // 进度条
+    const pb = $('#todoProgressBar');
+    if (pb) { pb.style.width = rate + '%'; pb.style.background = rate === 100 ? 'var(--success)' : 'var(--accent)'; }
 
     // 4. 渲染列表
     const ul = $('#todoList');
     ul.innerHTML = '';
     if (!list.length) {
-      ul.innerHTML = '<p class="todo-empty">暂无任务，添加一个吧 ✨</p>';
+      const emptyMsg = filter === 'done' ? '暂无已完成任务' : (filter === 'pending' ? '暂无待完成任务，太棒了！🎉' : '暂无任务，添加一个吧 ✨');
+      const emptyHint = cat ? '（当前分类下）' : '';
+      ul.innerHTML = `<div class="todo-empty"><div class="todo-empty-icon">📝</div><div>${emptyMsg}${emptyHint}</div></div>`;
       return;
     }
     list.forEach(t => {
       const cat = data.todoCategories.find(c => c.id === t.categoryId);
       const row = document.createElement('div');
       row.className = 'todo-item prio-' + (t.priority || 'medium') + (t.done ? ' done' : '');
+      // 到期提醒
+      let dueTip = '';
+      if (t.date && !t.done) {
+        const today = new Date(); today.setHours(0,0,0,0);
+        const due = new Date(t.date);
+        const diff = Math.ceil((due - today) / 86400000);
+        if (diff < 0) dueTip = '<span class="due-badge overdue">已逾期</span>';
+        else if (diff === 0) dueTip = '<span class="due-badge today">今天</span>';
+        else if (diff <= 2) dueTip = `<span class="due-badge soon">${diff}天后</span>`;
+      }
       row.innerHTML = `
         <input type="checkbox" ${t.done ? 'checked' : ''} data-tid="${t.id}" data-act="toggle" title="标记完成">
         <div class="todo-item-main">
-          <div class="todo-item-text">${escapeHtml(t.text)}</div>
+          <div class="todo-item-text" data-tid="${t.id}" data-act="edit">${escapeHtml(t.text)}</div>
           <div class="todo-item-meta">
             <span class="todo-tag prio-${t.priority || 'medium'}">${{high:'🔴 高',medium:'🟡 中',low:'🟢 低'}[t.priority || 'medium']}</span>
             ${cat ? `<span class="todo-tag cat-tag" style="--tag-color:${cat.color}">${escapeHtml(cat.name)}</span>` : ''}
-            ${t.date ? `<span class="todo-tag">📅 ${t.date}</span>` : ''}
+            ${t.date ? `<span class="todo-tag">${dueTip}📅 ${t.date}</span>` : ''}
           </div>
         </div>
         <div class="todo-actions">
@@ -569,7 +584,7 @@ const App = (() => {
     $('#todoAddBtn').onclick = addOne;
     $('#todoInput').onkeydown = e => { if (e.key === 'Enter') addOne(); };
 
-    // 列表点击（勾选 / 编辑 / 删除）
+    // 列表点击（勾选 / 行内编辑 / 删除）
     $('#todoList').onclick = e => {
       const tid = e.target.dataset.tid;
       const act = e.target.dataset.act;
@@ -578,17 +593,46 @@ const App = (() => {
       if (!t) return;
       if (act === 'toggle') {
         t.done = e.target.checked;
+        // 完成动画
+        if (t.done) {
+          const row = e.target.closest('.todo-item');
+          if (row) { row.classList.add('just-checked'); setTimeout(() => row.classList.remove('just-checked'), 300); }
+        }
+        save(); renderTodo(); renderHome();
       } else if (act === 'del') {
         if (!confirm('确定删除此任务？')) return;
         data.todos = data.todos.filter(x => x.id !== tid);
+        save(); renderTodo(); renderHome();
       } else if (act === 'edit') {
-        const nt = prompt('修改任务内容：', t.text);
-        if (nt != null) {
-          const v = nt.trim();
+        // 行内编辑：把文本替换为 input
+        const textEl = e.target.closest('.todo-item-text');
+        if (!textEl || textEl.querySelector('input')) return;
+        const orig = t.text;
+        textEl.innerHTML = `<input type="text" value="${escapeHtml(orig)}" class="todo-inline-edit" data-tid="${tid}">`;
+        const inp = textEl.querySelector('input');
+        inp.focus();
+        inp.setSelectionRange(inp.value.length, inp.value.length);
+        const commit = () => {
+          const v = inp.value.trim();
           if (v) t.text = v;
-        }
+          save(); renderTodo(); renderHome();
+        };
+        inp.onblur = commit;
+        inp.onkeydown = ev => {
+          if (ev.key === 'Enter') { ev.preventDefault(); inp.blur(); }
+          if (ev.key === 'Escape') { inp.value = orig; inp.blur(); }
+        };
       }
+    };
+
+    // 清除已完成
+    $('#clearDoneBtn').onclick = () => {
+      const doneCount = data.todos.filter(t => t.done).length;
+      if (doneCount === 0) { toast('没有已完成的任务'); return; }
+      if (!confirm(`清除 ${doneCount} 个已完成的任务？`)) return;
+      data.todos = data.todos.filter(t => !t.done);
       save(); renderTodo(); renderHome();
+      toast(`已清除 ${doneCount} 个任务`);
     };
 
     // 筛选 tabs

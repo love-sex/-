@@ -245,13 +245,14 @@
                         <h2 class="page-title">📝 To-do List</h2>
                     </div>
 
-                    <!-- 4 个统计卡片（按图2） -->
+                    <!-- 4 个统计卡片 + 进度条 -->
                     <div class="stat-row stat-row-4">
                         <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-num" id="todoStatTotal">0</div><div class="stat-label">总任务</div></div>
                         <div class="stat-card"><div class="stat-icon">⏳</div><div class="stat-num" id="todoStatPending">0</div><div class="stat-label">待完成</div></div>
                         <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-num" id="todoStatDone">0</div><div class="stat-label">已完成</div></div>
                         <div class="stat-card"><div class="stat-icon">📊</div><div class="stat-num" id="todoStatRate">0%</div><div class="stat-label">完成率</div></div>
                     </div>
+                    <div class="todo-progress"><div class="todo-progress-bar" id="todoProgressBar" style="width:0%"></div></div>
 
                     <!-- 输入区：text + 优先级 + 分类 + 日期 + 添加 -->
                     <div class="todo-input-bar">
@@ -302,6 +303,10 @@
                     </div>
 
                     <!-- 任务列表 -->
+                    <div class="todo-list-header">
+                        <span class="todo-list-title">任务列表</span>
+                        <button class="btn btn-sm btn-ghost" id="clearDoneBtn" title="清除已完成任务">清除已完成</button>
+                    </div>
                     <div class="todo-list" id="todoList"></div>
                 </div>
             </section>
