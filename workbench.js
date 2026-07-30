@@ -1248,14 +1248,13 @@ const App = (() => {
       const thickness = Number(thickInp.value);
       const contrast = Number(contrInp.value);
       const bg = bgSelect.value;
-      // 显示处理中
       resultCard.style.display = 'block';
       resultCard.classList.add('lineart-processing');
-      // 用 setTimeout 让 UI 先更新
       setTimeout(() => {
         try {
           extractLineart(canvas, _lineartImg, thickness, contrast, bg);
           resultCard.classList.remove('lineart-processing');
+          toast('线稿提取完成');
         } catch (err) {
           console.error(err);
           resultCard.classList.remove('lineart-processing');
@@ -1264,14 +1263,34 @@ const App = (() => {
       }, 50);
     };
 
-    // 下载
+    // 下载（兼容移动端）
     downloadBtn.onclick = () => {
       if (!canvas.width) return toast('请先生成线稿');
-      const link = document.createElement('a');
-      link.download = '线稿_' + Date.now() + '.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-      toast('已下载');
+      try {
+        const dataURL = canvas.toDataURL('image/png');
+        // 移动端兼容：在新窗口打开图片，用户长按保存
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (isMobile) {
+          const win = window.open('');
+          if (win) {
+            win.document.write('<img src="' + dataURL + '" style="max-width:100%;" /><p style="text-align:center;font-size:14px;color:#666;">长按图片保存</p>');
+          } else {
+            // 弹窗被阻止时用 iframe 方式
+            const a = document.createElement('a');
+            a.href = dataURL;
+            a.target = '_blank';
+            a.click();
+          }
+        } else {
+          const link = document.createElement('a');
+          link.download = '线稿_' + Date.now() + '.png';
+          link.href = dataURL;
+          link.click();
+        }
+        toast('已下载');
+      } catch (err) {
+        toast('下载失败：' + err.message);
+      }
     };
 
     // 重新上传
@@ -1287,13 +1306,23 @@ const App = (() => {
 
   // 线稿提取算法：灰度 → 反相模糊 → 颜色减淡混合
   const extractLineart = (canvas, img, thickness, contrast, bg) => {
-    const w = img.naturalWidth || img.width;
-    const h = img.naturalHeight || img.height;
+    let w = img.naturalWidth || img.width;
+    let h = img.naturalHeight || img.height;
+
+    // 限制最大尺寸，避免大图片处理过慢（最长边不超过1200px）
+    const MAX_SIZE = 1200;
+    let scale = 1;
+    if (w > MAX_SIZE || h > MAX_SIZE) {
+      scale = MAX_SIZE / Math.max(w, h);
+      w = Math.round(w * scale);
+      h = Math.round(h * scale);
+    }
+
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext('2d');
 
-    // 1. 绘制原图
+    // 1. 绘制原图（缩放到合适大小）
     ctx.drawImage(img, 0, 0, w, h);
 
     // 2. 获取像素数据
@@ -1308,51 +1337,85 @@ const App = (() => {
 
     // 4. 创建反相模糊图层（用于颜色减淡）
     const blurData = new Uint8ClampedArray(data);
-    // 反相
     for (let i = 0; i < blurData.length; i += 4) {
       blurData[i] = 255 - blurData[i];
       blurData[i + 1] = 255 - blurData[i + 1];
       blurData[i + 2] = 255 - blurData[i + 2];
     }
-    // 高斯模糊（根据线条粗细决定模糊半径）
-    const radius = Math.max(1, thickness);
-    gaussianBlur(blurData, w, h, radius);
+    // 使用快速盒式模糊（比高斯模糊快很多）
+    const radius = Math.max(1, Math.round(thickness * scale));
+    boxBlur(blurData, w, h, radius);
 
-    // 5. 颜色减淡混合
+    // 5. 颜色减淡混合 + 对比度
     for (let i = 0; i < data.length; i += 4) {
       for (let c = 0; c < 3; c++) {
         const base = data[i + c];
         const blend = blurData[i + c];
-        // 颜色减淡：base / (255 - blend) * 255
-        let val = blend === 255 ? 255 : Math.min(255, (base / (255 - blend)) * 255);
-        // 对比度调整
+        let val = blend >= 255 ? 255 : Math.min(255, (base / (255 - blend)) * 255);
         val = ((val / 255 - 0.5) * contrast + 0.5) * 255;
-        val = Math.max(0, Math.min(255, val));
-        data[i + c] = val;
+        data[i + c] = Math.max(0, Math.min(255, val));
       }
     }
 
-    // 6. 根据背景设置输出
+    // 6. 背景处理
     if (bg === 'black') {
-      // 黑底白线：反相
       for (let i = 0; i < data.length; i += 4) {
         data[i] = 255 - data[i];
         data[i + 1] = 255 - data[i + 1];
         data[i + 2] = 255 - data[i + 2];
+        data[i + 3] = 255;
       }
     } else if (bg === 'transparent') {
-      // 透明背景：线稿部分保留，白色变透明
       for (let i = 0; i < data.length; i += 4) {
         const brightness = (data[i] + data[i + 1] + data[i + 2]) / 3;
-        if (brightness > 240) {
-          data[i + 3] = 0; // 透明
+        if (brightness > 230) {
+          data[i + 3] = 0;
         } else {
           data[i + 3] = 255;
         }
       }
+    } else {
+      // 白底：确保 alpha 为 255
+      for (let i = 3; i < data.length; i += 4) data[i] = 255;
     }
 
     ctx.putImageData(imgData, 0, 0);
+  };
+
+  // 快速盒式模糊（比高斯模糊快 3-5 倍，效果接近）
+  const boxBlur = (data, w, h, radius) => {
+    if (radius < 1) return;
+    const temp = new Uint8ClampedArray(data);
+    const r = Math.min(radius, 20);
+    // 水平
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        for (let c = 0; c < 3; c++) {
+          let sum = 0, count = 0;
+          for (let k = -r; k <= r; k++) {
+            const xx = Math.min(w - 1, Math.max(0, x + k));
+            sum += temp[(y * w + xx) * 4 + c];
+            count++;
+          }
+          data[(y * w + x) * 4 + c] = sum / count;
+        }
+      }
+    }
+    // 垂直
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        for (let c = 0; c < 3; c++) {
+          let sum = 0, count = 0;
+          for (let k = -r; k <= r; k++) {
+            const yy = Math.min(h - 1, Math.max(0, y + k));
+            sum += data[(yy * w + x) * 4 + c];
+            count++;
+          }
+          temp[(y * w + x) * 4 + c] = sum / count;
+        }
+      }
+    }
+    for (let i = 0; i < data.length; i++) data[i] = temp[i];
   };
 
   // 高斯模糊（用于线稿边缘柔化）
@@ -1918,8 +1981,12 @@ const App = (() => {
     initWheelScroll();
   };
 
-  // 滚轮平滑滑动支持
+  // 滚轮平滑滑动支持（仅桌面端，移动端使用原生触摸滚动）
   const initWheelScroll = () => {
+    // 检测是否为触摸设备，如果是则不处理滚轮事件（避免干扰触摸滚动)
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (isTouchDevice) return;
+
     const main = document.getElementById('appMain');
     if (!main) return;
 
@@ -1934,7 +2001,7 @@ const App = (() => {
       // 内容未溢出，不处理
       if (sh <= ch + 5) return;
 
-      // 在顶部且向上滚动，或已到底部且向下滚动，不拦截（交给原生）
+      // 在顶部且向上滚动，或已到底部且向下滚动，不拦截
       if ((delta < 0 && st <= 0) || (delta > 0 && st + ch >= sh - 2)) return;
 
       e.preventDefault();
