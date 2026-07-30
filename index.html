@@ -24,13 +24,15 @@
     <!-- 兜底：确保登录容器可见（即使主脚本出错也能看到登录框） -->
     <script>
         (function(){
-            var runs = 0; // 仅在页面加载初期执行，避免干扰登录后状态
+            var runs = 0;
             function ensureAuthVisible(){
                 runs++;
+                // 已登录时不强制显示登录页
+                var token = localStorage.getItem('todoApp_token');
+                var user = localStorage.getItem('todoApp_currentUser');
+                if (token && user) return;
                 var ac = document.getElementById('authContainer');
                 var wb = document.getElementById('wbContainer');
-                // 只在前 2 次执行（DOMContentLoaded + 1.5s）才强制状态
-                // 之后让主脚本自由控制
                 if (runs <= 2) {
                     if (ac) {
                         ac.classList.remove('hidden');
@@ -46,7 +48,6 @@
             } else {
                 ensureAuthVisible();
             }
-            // 1.5秒后兜底一次（仅在登录页加载时生效，不影响登录后）
             setTimeout(ensureAuthVisible, 1500);
         })();
     </script>
@@ -771,7 +772,7 @@
 
         <!-- 背景层：图片/视频（在所有内容之下） -->
         <div class="bg-layer" id="bgLayer" hidden></div>
-        <video id="bgVideo" class="bg-video" autoplay loop muted playsinline hidden></video>
+        <video id="bgVideo" class="bg-video" autoplay loop playsinline hidden></video>
         <div class="bg-overlay" id="bgOverlayLayer" hidden></div>
 
         <!-- 添加主题弹窗 -->

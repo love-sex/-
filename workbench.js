@@ -248,7 +248,7 @@ const App = (() => {
         console.warn('video autoplay blocked', err);
       });
       const prev = $('#bgPreview');
-      prev.innerHTML = `<video src="${_bgObjectURL}" muted playsinline></video><div class="bg-info">🎬 ${escapeHtml(blob.type)} · ${sizeText}</div>`;
+      prev.innerHTML = `<video src="${_bgObjectURL}" playsinline ${data.settings.bgMuted !== false ? 'muted' : ''}></video><div class="bg-info">🎬 ${escapeHtml(blob.type)} · ${sizeText}</div>`;
     } else {
       layer.style.backgroundImage = `url(${_bgObjectURL})`;
       layer.hidden = false;
@@ -1222,51 +1222,51 @@ const App = (() => {
     // 日历密度切换
     const cd = document.getElementById('calendarDays');
     if (cd) cd.classList.toggle('cal-compact', density === 'compact');
-    // 任务栏隐藏：直接给 .bottom-nav 设 inline style（最稳）
+    // 眼睛按钮：隐藏/显示所有界面内容
     const nav = document.getElementById('bottomNav');
-    if (nav) {
-      if (navHidden) {
-        nav.style.setProperty('display', 'none', 'important');
-        document.querySelectorAll('.app-main,.date-bar,.calendar-panel').forEach(el => el.style.marginLeft = '0');
-      } else {
-        nav.style.removeProperty('display');
-        document.querySelectorAll('.app-main,.date-bar,.calendar-panel').forEach(el => el.style.removeProperty('margin-left'));
-      }
+    const appMain = document.querySelector('.app-main');
+    const dateBar = document.querySelector('.date-bar');
+    const calPanel = document.querySelector('.calendar-panel');
+    if (navHidden) {
+      if (nav) nav.style.setProperty('display', 'none', 'important');
+      if (appMain) appMain.style.display = 'none';
+      if (dateBar) dateBar.style.display = 'none';
+      if (calPanel) calPanel.style.display = 'none';
+    } else {
+      if (nav) nav.style.removeProperty('display');
+      if (appMain) appMain.style.removeProperty('display');
+      if (dateBar) dateBar.style.removeProperty('display');
+      if (calPanel) calPanel.style.removeProperty('display');
     }
   };
 
-  // 切换任务栏（底部 nav）可见性
+  // 眼睛按钮：隐藏/显示所有界面内容（禅模式）
   const bindNavToggle = () => {
     const btn = document.getElementById('navToggleFab');
     if (!btn) return;
-    // 用 onclick（属性赋值，多次 init 不会累加 handler）
     btn.onclick = () => {
       data.settings.navHidden = !data.settings.navHidden;
       document.body.classList.toggle('nav-hidden', data.settings.navHidden);
-      // 直接给 .bottom-nav 设置 inline style（兼容 desktop landscape 模式下的 sidebar）
+      // 隐藏/显示所有界面元素
       const nav = document.getElementById('bottomNav');
-      if (nav) {
-        if (data.settings.navHidden) {
-          nav.style.setProperty('display', 'none', 'important');
-          // 取消 desktop 下的 margin-left 偏移
-          const am = document.querySelector('.app-main');
-          if (am) am.style.marginLeft = '0';
-          const db = document.querySelector('.date-bar');
-          if (db) db.style.marginLeft = '0';
-          const cp = document.querySelector('.calendar-panel');
-          if (cp) cp.style.marginLeft = '0';
-        } else {
-          nav.style.removeProperty('display');
-          const am = document.querySelector('.app-main');
-          if (am) am.style.removeProperty('margin-left');
-          const db = document.querySelector('.date-bar');
-          if (db) db.style.removeProperty('margin-left');
-          const cp = document.querySelector('.calendar-panel');
-          if (cp) cp.style.removeProperty('margin-left');
-        }
+      const appMain = document.querySelector('.app-main');
+      const dateBar = document.querySelector('.date-bar');
+      const calPanel = document.querySelector('.calendar-panel');
+      if (data.settings.navHidden) {
+        // 隐藏全部
+        if (nav) nav.style.setProperty('display', 'none', 'important');
+        if (appMain) appMain.style.display = 'none';
+        if (dateBar) dateBar.style.display = 'none';
+        if (calPanel) calPanel.style.display = 'none';
+      } else {
+        // 恢复全部
+        if (nav) nav.style.removeProperty('display');
+        if (appMain) appMain.style.removeProperty('display');
+        if (dateBar) dateBar.style.removeProperty('display');
+        if (calPanel) calPanel.style.removeProperty('display');
       }
       save();
-      toast(data.settings.navHidden ? '已隐藏任务栏（再次点击可显示）' : '已显示任务栏');
+      toast(data.settings.navHidden ? '已隐藏所有内容（再次点击可恢复）' : '已恢复显示');
     };
   };
 
@@ -1425,6 +1425,10 @@ const App = (() => {
       v.muted = !v.muted;
       data.settings.bgMuted = v.muted;
       muteBtn.textContent = v.muted ? '🔇 静音' : '🔊 有声';
+      // 取消静音后需要重新播放（浏览器策略）
+      if (!v.muted) {
+        v.play().catch(err => console.warn('video play after unmute failed', err));
+      }
       save();
     };
   };
