@@ -804,6 +804,27 @@ body {  body {
   border-radius: 4px; font-size: 11px;
 }
 
+/* 图片提取线稿 */
+.lineart-preview {
+  border-radius: var(--radius-sm); overflow: hidden;
+  background: rgba(var(--primary-rgb),0.04);
+  min-height: 60px; display: flex; align-items: center; justify-content: center;
+}
+.lineart-preview img { max-width: 100%; max-height: 300px; object-fit: contain; display: block; }
+.lineart-result-wrap {
+  border-radius: var(--radius-sm); overflow: hidden;
+  background: rgba(var(--primary-rgb),0.04);
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100px;
+}
+.lineart-result-wrap canvas { max-width: 100%; max-height: 400px; object-fit: contain; }
+.lineart-processing { position: relative; }
+.lineart-processing::after {
+  content: '处理中...'; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); color: #fff; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; border-radius: var(--radius-sm);
+}
+
 /* 紧凑模式加强：移动端更紧凑 */
 .calendar-days.cal-compact .cal-dot { bottom: 2px; width: 3px; height: 3px; }
 .history-list { display: flex; flex-direction: column; gap: 6px; }

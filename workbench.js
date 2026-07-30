@@ -1146,6 +1146,203 @@ const App = (() => {
     });
   };
 
+  /* ---------- 图片提取线稿 ---------- */
+  let _lineartImg = null; // 缓存原图 Image 对象
+  const bindLineart = () => {
+    const fileInput = $('#lineartFile');
+    const uploadBtn = $('#lineartUploadBtn');
+    const preview = $('#lineartPreview');
+    const originImg = $('#lineartOriginImg');
+    const optsCard = $('#lineartOptsCard');
+    const resultCard = $('#lineartResultCard');
+    const canvas = $('#lineartCanvas');
+    const processBtn = $('#lineartProcessBtn');
+    const downloadBtn = $('#lineartDownloadBtn');
+    const resetBtn = $('#lineartResetBtn');
+    const thickInp = $('#lineartThickness');
+    const contrInp = $('#lineartContrast');
+    const bgSelect = $('#lineartBg');
+
+    // 参数显示
+    thickInp.oninput = () => $('#lineartThicknessVal').textContent = thickInp.value;
+    contrInp.oninput = () => $('#lineartContrastVal').textContent = contrInp.value;
+
+    // 选择图片
+    uploadBtn.onclick = () => fileInput.click();
+    fileInput.onchange = e => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const img = new Image();
+        img.onload = () => {
+          _lineartImg = img;
+          originImg.src = ev.target.result;
+          preview.style.display = 'flex';
+          optsCard.style.display = 'block';
+          resultCard.style.display = 'none';
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(f);
+    };
+
+    // 提取线稿
+    processBtn.onclick = () => {
+      if (!_lineartImg) return toast('请先上传图片');
+      const thickness = Number(thickInp.value);
+      const contrast = Number(contrInp.value);
+      const bg = bgSelect.value;
+      // 显示处理中
+      resultCard.style.display = 'block';
+      resultCard.classList.add('lineart-processing');
+      // 用 setTimeout 让 UI 先更新
+      setTimeout(() => {
+        try {
+          extractLineart(canvas, _lineartImg, thickness, contrast, bg);
+          resultCard.classList.remove('lineart-processing');
+        } catch (err) {
+          console.error(err);
+          resultCard.classList.remove('lineart-processing');
+          toast('处理失败：' + err.message);
+        }
+      }, 50);
+    };
+
+    // 下载
+    downloadBtn.onclick = () => {
+      if (!canvas.width) return toast('请先生成线稿');
+      const link = document.createElement('a');
+      link.download = '线稿_' + Date.now() + '.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      toast('已下载');
+    };
+
+    // 重新上传
+    resetBtn.onclick = () => {
+      _lineartImg = null;
+      fileInput.value = '';
+      preview.style.display = 'none';
+      optsCard.style.display = 'none';
+      resultCard.style.display = 'none';
+      canvas.width = 0; canvas.height = 0;
+    };
+  };
+
+  // 线稿提取算法：灰度 → 反相模糊 → 颜色减淡混合
+  const extractLineart = (canvas, img, thickness, contrast, bg) => {
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+
+    // 1. 绘制原图
+    ctx.drawImage(img, 0, 0, w, h);
+
+    // 2. 获取像素数据
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const data = imgData.data;
+
+    // 3. 转灰度
+    for (let i = 0; i < data.length; i += 4) {
+      const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+      data[i] = data[i + 1] = data[i + 2] = gray;
+    }
+
+    // 4. 创建反相模糊图层（用于颜色减淡）
+    const blurData = new Uint8ClampedArray(data);
+    // 反相
+    for (let i = 0; i < blurData.length; i += 4) {
+      blurData[i] = 255 - blurData[i];
+      blurData[i + 1] = 255 - blurData[i + 1];
+      blurData[i + 2] = 255 - blurData[i + 2];
+    }
+    // 高斯模糊（根据线条粗细决定模糊半径）
+    const radius = Math.max(1, thickness);
+    gaussianBlur(blurData, w, h, radius);
+
+    // 5. 颜色减淡混合
+    for (let i = 0; i < data.length; i += 4) {
+      for (let c = 0; c < 3; c++) {
+        const base = data[i + c];
+        const blend = blurData[i + c];
+        // 颜色减淡：base / (255 - blend) * 255
+        let val = blend === 255 ? 255 : Math.min(255, (base / (255 - blend)) * 255);
+        // 对比度调整
+        val = ((val / 255 - 0.5) * contrast + 0.5) * 255;
+        val = Math.max(0, Math.min(255, val));
+        data[i + c] = val;
+      }
+    }
+
+    // 6. 根据背景设置输出
+    if (bg === 'black') {
+      // 黑底白线：反相
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = 255 - data[i];
+        data[i + 1] = 255 - data[i + 1];
+        data[i + 2] = 255 - data[i + 2];
+      }
+    } else if (bg === 'transparent') {
+      // 透明背景：线稿部分保留，白色变透明
+      for (let i = 0; i < data.length; i += 4) {
+        const brightness = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        if (brightness > 240) {
+          data[i + 3] = 0; // 透明
+        } else {
+          data[i + 3] = 255;
+        }
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+  };
+
+  // 高斯模糊（用于线稿边缘柔化）
+  const gaussianBlur = (data, w, h, radius) => {
+    if (radius < 1) return;
+    const kernel = [];
+    const sigma = radius / 3;
+    let sum = 0;
+    for (let x = -radius; x <= radius; x++) {
+      const g = Math.exp(-(x * x) / (2 * sigma * sigma));
+      kernel.push(g);
+      sum += g;
+    }
+    for (let i = 0; i < kernel.length; i++) kernel[i] /= sum;
+
+    const temp = new Uint8ClampedArray(data);
+    // 水平模糊
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        for (let c = 0; c < 3; c++) {
+          let val = 0;
+          for (let k = -radius; k <= radius; k++) {
+            const xx = Math.min(w - 1, Math.max(0, x + k));
+            val += temp[(y * w + xx) * 4 + c] * kernel[k + radius];
+          }
+          data[(y * w + x) * 4 + c] = val;
+        }
+      }
+    }
+    // 垂直模糊
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        for (let c = 0; c < 3; c++) {
+          let val = 0;
+          for (let k = -radius; k <= radius; k++) {
+            const yy = Math.min(h - 1, Math.max(0, y + k));
+            val += data[(yy * w + x) * 4 + c] * kernel[k + radius];
+          }
+          temp[(y * w + x) * 4 + c] = val;
+        }
+      }
+    }
+    for (let i = 0; i < data.length; i++) data[i] = temp[i];
+  };
+
   /* ---------- 学习工作 ---------- */
   const renderStudy = () => {
     const day = getDay();
@@ -1620,6 +1817,7 @@ const App = (() => {
     bindFinance();
     bindAccount();
     bindExcerpt();
+    bindLineart();
     bindStudy();
     bindSettings();
     bindAddThemeModal();

@@ -549,6 +549,57 @@
                 </div>
             </section>
 
+            <!-- ============ 图片提取线稿 ============ -->
+            <section class="view" data-view="lineart" style="display:none;">
+                <div class="view-content">
+                    <div class="page-head">
+                        <button class="back-btn" data-back>← 返回首页</button>
+                        <h2 class="page-title">🖊 图片提取线稿</h2>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">📤 上传图片</div>
+                        <p class="muted" style="margin:-4px 0 12px;">支持任意大小、任意格式的图片，在本地浏览器处理，不上传服务器。</p>
+                        <input type="file" id="lineartFile" accept="image/*" hidden>
+                        <button class="btn btn-primary btn-block" id="lineartUploadBtn" style="margin-bottom:12px;">📤 选择图片</button>
+                        <div class="lineart-preview" id="lineartPreview" style="display:none;">
+                            <img id="lineartOriginImg" alt="原图">
+                        </div>
+                    </div>
+                    <div class="card" id="lineartOptsCard" style="display:none;">
+                        <div class="card-title">🎛 参数调节</div>
+                        <div class="opt-row">
+                            <label>线条粗细</label>
+                            <input type="range" id="lineartThickness" min="1" max="5" value="2" style="flex:1;">
+                            <span id="lineartThicknessVal" style="width:30px;text-align:right;font-size:12px;">2</span>
+                        </div>
+                        <div class="opt-row">
+                            <label>对比度</label>
+                            <input type="range" id="lineartContrast" min="1" max="10" value="5" style="flex:1;">
+                            <span id="lineartContrastVal" style="width:30px;text-align:right;font-size:12px;">5</span>
+                        </div>
+                        <div class="opt-row">
+                            <label>背景</label>
+                            <select id="lineartBg" style="flex:1;">
+                                <option value="white">白底黑线</option>
+                                <option value="black">黑底白线</option>
+                                <option value="transparent">透明背景</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-gold btn-block" id="lineartProcessBtn">✨ 提取线稿</button>
+                    </div>
+                    <div class="card" id="lineartResultCard" style="display:none;">
+                        <div class="card-title">🖼 线稿结果</div>
+                        <div class="lineart-result-wrap">
+                            <canvas id="lineartCanvas"></canvas>
+                        </div>
+                        <div class="btn-row" style="margin-top:12px;">
+                            <button class="btn btn-primary" id="lineartDownloadBtn">💾 下载线稿</button>
+                            <button class="btn btn-ghost" id="lineartResetBtn">🔄 重新上传</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- ============ 学习工作 ============ -->
             <section class="view" data-view="study" style="display:none;">
                 <div class="view-content">
@@ -767,6 +818,9 @@
             </button>
             <button class="nav-item" data-nav="excerpt">
                 <div class="nav-icon">✍️</div><div class="nav-label">摘录</div>
+            </button>
+            <button class="nav-item" data-nav="lineart">
+                <div class="nav-icon">🖊</div><div class="nav-label">线稿</div>
             </button>
         </nav>
 
