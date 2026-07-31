@@ -1255,10 +1255,6 @@ const App = (() => {
           extractLineart(canvas, _lineartImg, thickness, contrast, bg);
           resultCard.classList.remove('lineart-processing');
           toast('线稿提取完成');
-          // 滚动到结果区域
-          setTimeout(() => {
-            resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }, 100);
         } catch (err) {
           console.error(err);
           resultCard.classList.remove('lineart-processing');
@@ -1309,114 +1305,185 @@ const App = (() => {
   };
 
   // 线稿提取算法：灰度 → 反相模糊 → 颜色减淡混合
+  // Sobel 边缘检测线稿提取
   const extractLineart = (canvas, img, thickness, contrast, bg) => {
     let w = img.naturalWidth || img.width;
     let h = img.naturalHeight || img.height;
 
-    // 限制最大尺寸，避免大图片处理过慢（最长边不超过1200px）
+    // 限制最大尺寸（最长边不超过1200px）
     const MAX_SIZE = 1200;
-    let scale = 1;
     if (w > MAX_SIZE || h > MAX_SIZE) {
-      scale = MAX_SIZE / Math.max(w, h);
-      w = Math.round(w * scale);
-      h = Math.round(h * scale);
+      const s = MAX_SIZE / Math.max(w, h);
+      w = Math.round(w * s);
+      h = Math.round(h * s);
     }
 
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext('2d');
-
-    // 1. 绘制原图（缩放到合适大小）
     ctx.drawImage(img, 0, 0, w, h);
 
-    // 2. 获取像素数据
     const imgData = ctx.getImageData(0, 0, w, h);
     const data = imgData.data;
+    const len = w * h;
 
-    // 3. 转灰度
-    for (let i = 0; i < data.length; i += 4) {
-      const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-      data[i] = data[i + 1] = data[i + 2] = gray;
+    // 1. 转灰度到数组
+    const gray = new Float32Array(len);
+    for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+      gray[p] = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
     }
 
-    // 4. 创建反相模糊图层（用于颜色减淡）
-    const blurData = new Uint8ClampedArray(data);
-    for (let i = 0; i < blurData.length; i += 4) {
-      blurData[i] = 255 - blurData[i];
-      blurData[i + 1] = 255 - blurData[i + 1];
-      blurData[i + 2] = 255 - blurData[i + 2];
-    }
-    // 使用快速盒式模糊（比高斯模糊快很多）
-    const radius = Math.max(1, Math.round(thickness * scale));
-    boxBlur(blurData, w, h, radius);
+    // 2. 高斯模糊（降噪，半径可调）
+    const blurRadius = Math.max(1, thickness);
+    const blurred = new Float32Array(gray);
+    gaussianBlurFloat(blurred, w, h, blurRadius);
 
-    // 5. 颜色减淡混合 + 对比度
-    for (let i = 0; i < data.length; i += 4) {
-      for (let c = 0; c < 3; c++) {
-        const base = data[i + c];
-        const blend = blurData[i + c];
-        let val = blend >= 255 ? 255 : Math.min(255, (base / (255 - blend)) * 255);
-        val = ((val / 255 - 0.5) * contrast + 0.5) * 255;
-        data[i + c] = Math.max(0, Math.min(255, val));
+    // 3. Sobel 边缘检测
+    const edges = new Float32Array(len);
+    let maxGrad = 0;
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const idx = y * w + x;
+        // Sobel X: [-1,0,1; -2,0,2; -1,0,1]
+        const gx = (-blurred[(y-1)*w+(x-1)] + blurred[(y-1)*w+(x+1)]
+                     -2*blurred[y*w+(x-1)] + 2*blurred[y*w+(x+1)]
+                     -blurred[(y+1)*w+(x-1)] + blurred[(y+1)*w+(x+1)]);
+        // Sobel Y: [-1,-2,-1; 0,0,0; 1,2,1]
+        const gy = (-blurred[(y-1)*w+(x-1)] - 2*blurred[(y-1)*w+x] - blurred[(y-1)*w+(x+1)]
+                     +blurred[(y+1)*w+(x-1)] + 2*blurred[(y+1)*w+x] + blurred[(y+1)*w+(x+1)]);
+        const mag = Math.sqrt(gx * gx + gy * gy);
+        edges[idx] = mag;
+        if (mag > maxGrad) maxGrad = mag;
       }
     }
 
-    // 6. 背景处理
-    if (bg === 'black') {
-      for (let i = 0; i < data.length; i += 4) {
-        data[i] = 255 - data[i];
-        data[i + 1] = 255 - data[i + 1];
-        data[i + 2] = 255 - data[i + 2];
-        data[i + 3] = 255;
-      }
-    } else if (bg === 'transparent') {
-      for (let i = 0; i < data.length; i += 4) {
-        const brightness = (data[i] + data[i + 1] + data[i + 2]) / 3;
-        if (brightness > 230) {
-          data[i + 3] = 0;
-        } else {
-          data[i + 3] = 255;
+    // 4. 归一化 + 对比度增强
+    const factor = maxGrad > 0 ? 255 / maxGrad : 1;
+    for (let i = 0; i < len; i++) {
+      let v = edges[i] * factor;
+      // 对比度
+      v = ((v / 255 - 0.5) * contrast + 0.5) * 255;
+      edges[i] = Math.max(0, Math.min(255, v));
+    }
+
+    // 5. 自适应阈值（Otsu 方法）+ 降低阈值使线条更完整
+    let threshold = otsuThreshold(edges);
+    threshold = Math.max(20, threshold * 0.7); // 降低阈值，让更多边缘通过
+
+    // 6. 边缘膨胀（使线条更粗更连续）
+    const dilated = new Float32Array(edges);
+    const dilateRadius = Math.max(1, thickness - 1);
+    if (dilateRadius >= 1) {
+      for (let y = dilateRadius; y < h - dilateRadius; y++) {
+        for (let x = dilateRadius; x < w - dilateRadius; x++) {
+          const idx = y * w + x;
+          if (edges[idx] > threshold) {
+            for (let dy = -dilateRadius; dy <= dilateRadius; dy++) {
+              for (let dx = -dilateRadius; dx <= dilateRadius; dx++) {
+                const nIdx = (y + dy) * w + (x + dx);
+                if (edges[nIdx] > threshold * 0.5) {
+                  dilated[nIdx] = Math.max(dilated[nIdx], edges[idx] * 0.8);
+                }
+              }
+            }
+          }
         }
       }
-    } else {
-      // 白底：确保 alpha 为 255
-      for (let i = 3; i < data.length; i += 4) data[i] = 255;
+    }
+
+    // 7. 输出到 canvas
+    for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+      const edgeVal = dilated[p];
+      const isEdge = edgeVal > threshold;
+
+      if (bg === 'transparent') {
+        if (isEdge) {
+          data[i] = 0; data[i+1] = 0; data[i+2] = 0; data[i+3] = 255;
+        } else {
+          data[i] = 0; data[i+1] = 0; data[i+2] = 0; data[i+3] = 0;
+        }
+      } else if (bg === 'black') {
+        if (isEdge) {
+          data[i] = 255; data[i+1] = 255; data[i+2] = 255; data[i+3] = 255;
+        } else {
+          data[i] = 0; data[i+1] = 0; data[i+2] = 0; data[i+3] = 255;
+        }
+      } else {
+        // 白底黑线
+        if (isEdge) {
+          data[i] = 0; data[i+1] = 0; data[i+2] = 0; data[i+3] = 255;
+        } else {
+          data[i] = 255; data[i+1] = 255; data[i+2] = 255; data[i+3] = 255;
+        }
+      }
     }
 
     ctx.putImageData(imgData, 0, 0);
   };
 
-  // 快速盒式模糊（比高斯模糊快 3-5 倍，效果接近）
-  const boxBlur = (data, w, h, radius) => {
+  // Otsu 自适应阈值
+  const otsuThreshold = (values) => {
+    const hist = new Array(256).fill(0);
+    const len = values.length;
+    for (let i = 0; i < len; i++) {
+      hist[Math.min(255, Math.max(0, Math.round(values[i])))]++;
+    }
+    let sum = 0;
+    for (let i = 0; i < 256; i++) sum += i * hist[i];
+    let sumB = 0, wB = 0, wF = 0;
+    let maxVar = 0, threshold = 128;
+    for (let t = 0; t < 256; t++) {
+      wB += hist[t];
+      if (wB === 0) continue;
+      wF = len - wB;
+      if (wF === 0) break;
+      sumB += t * hist[t];
+      const mB = sumB / wB;
+      const mF = (sum - sumB) / wF;
+      const varBetween = wB * wF * (mB - mF) * (mB - mF);
+      if (varBetween > maxVar) {
+        maxVar = varBetween;
+        threshold = t;
+      }
+    }
+    return threshold;
+  };
+
+  // 高斯模糊（Float32Array 版本）
+  const gaussianBlurFloat = (data, w, h, radius) => {
     if (radius < 1) return;
-    const temp = new Uint8ClampedArray(data);
-    const r = Math.min(radius, 20);
+    const r = Math.min(radius, 10);
+    const sigma = r / 2;
+    const kernel = [];
+    let sum = 0;
+    for (let x = -r; x <= r; x++) {
+      const g = Math.exp(-(x * x) / (2 * sigma * sigma));
+      kernel.push(g);
+      sum += g;
+    }
+    for (let i = 0; i < kernel.length; i++) kernel[i] /= sum;
+
+    const temp = new Float32Array(data);
     // 水平
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        for (let c = 0; c < 3; c++) {
-          let sum = 0, count = 0;
-          for (let k = -r; k <= r; k++) {
-            const xx = Math.min(w - 1, Math.max(0, x + k));
-            sum += temp[(y * w + xx) * 4 + c];
-            count++;
-          }
-          data[(y * w + x) * 4 + c] = sum / count;
+        let val = 0;
+        for (let k = -r; k <= r; k++) {
+          const xx = Math.min(w - 1, Math.max(0, x + k));
+          val += temp[y * w + xx] * kernel[k + r];
         }
+        data[y * w + x] = val;
       }
     }
     // 垂直
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        for (let c = 0; c < 3; c++) {
-          let sum = 0, count = 0;
-          for (let k = -r; k <= r; k++) {
-            const yy = Math.min(h - 1, Math.max(0, y + k));
-            sum += data[(yy * w + x) * 4 + c];
-            count++;
-          }
-          temp[(y * w + x) * 4 + c] = sum / count;
+        let val = 0;
+        for (let k = -r; k <= r; k++) {
+          const yy = Math.min(h - 1, Math.max(0, y + k));
+          val += data[yy * w + x] * kernel[k + r];
         }
+        temp[y * w + x] = val;
       }
     }
     for (let i = 0; i < data.length; i++) data[i] = temp[i];
@@ -1985,32 +2052,11 @@ const App = (() => {
     initWheelScroll();
   };
 
-  // 滚轮平滑滑动支持（仅桌面端，移动端使用原生触摸滚动）
+  // 页面滚动：使用原生滚动（桌面端鼠标滚轮，移动端手指滑动）
   const initWheelScroll = () => {
-    // 检测是否为触摸设备，如果是则不处理滚轮事件（避免干扰触摸滚动)
-    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    if (isTouchDevice) return;
-
-    const main = document.getElementById('appMain');
-    if (!main) return;
-
-    document.addEventListener('wheel', (e) => {
-      const delta = e.deltaY || e.detail || 0;
-      if (delta === 0) return;
-
-      const st = main.scrollTop;
-      const sh = main.scrollHeight;
-      const ch = main.clientHeight;
-
-      // 内容未溢出，不处理
-      if (sh <= ch + 5) return;
-
-      // 在顶部且向上滚动，或已到底部且向下滚动，不拦截
-      if ((delta < 0 && st <= 0) || (delta > 0 && st + ch >= sh - 2)) return;
-
-      e.preventDefault();
-      main.scrollBy({ top: delta, behavior: 'smooth' });
-    }, { passive: false });
+    // 不做任何自定义处理，使用浏览器原生滚动
+    // 桌面端：.app-main 有 overflow-y: auto，鼠标滚轮自然滚动
+    // 移动端：body 有 overflow: auto，手指滑动自然滚动
   };
 
   return { init };
