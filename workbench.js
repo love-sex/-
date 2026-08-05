@@ -1359,16 +1359,17 @@ const App = (() => {
 
     // 4. 归一化 + 对比度增强
     const factor = maxGrad > 0 ? 255 / maxGrad : 1;
+    const contrastFactor = 1 + (contrast - 1) * 0.18;
     for (let i = 0; i < len; i++) {
       let v = edges[i] * factor;
-      // 对比度
-      v = ((v / 255 - 0.5) * contrast + 0.5) * 255;
+      v = ((v / 255 - 0.5) * contrastFactor + 0.5) * 255;
       edges[i] = Math.max(0, Math.min(255, v));
     }
 
-    // 5. 自适应阈值（Otsu 方法）+ 降低阈值使线条更完整
+    // 5. 自适应阈值：降低门槛，保留浅色细线
     let threshold = otsuThreshold(edges);
-    threshold = Math.max(20, threshold * 0.7); // 降低阈值，让更多边缘通过
+    threshold = Math.max(10, threshold * 0.58);
+    const edgeRange = Math.max(18, threshold * 0.7);
 
     // 6. 边缘膨胀（使线条更粗更连续）
     const dilated = new Float32Array(edges);
@@ -1394,27 +1395,19 @@ const App = (() => {
     // 7. 输出到 canvas
     for (let i = 0, p = 0; i < data.length; i += 4, p++) {
       const edgeVal = dilated[p];
+      const edgeStrength = Math.max(0, Math.min(1, (edgeVal - threshold + edgeRange) / edgeRange));
       const isEdge = edgeVal > threshold;
 
       if (bg === 'transparent') {
-        if (isEdge) {
-          data[i] = 0; data[i+1] = 0; data[i+2] = 0; data[i+3] = 255;
-        } else {
-          data[i] = 0; data[i+1] = 0; data[i+2] = 0; data[i+3] = 0;
-        }
+        data[i] = 0; data[i+1] = 0; data[i+2] = 0;
+        data[i+3] = Math.round(edgeStrength * 255);
       } else if (bg === 'black') {
-        if (isEdge) {
-          data[i] = 255; data[i+1] = 255; data[i+2] = 255; data[i+3] = 255;
-        } else {
-          data[i] = 0; data[i+1] = 0; data[i+2] = 0; data[i+3] = 255;
-        }
+        const value = Math.round(255 * edgeStrength);
+        data[i] = value; data[i+1] = value; data[i+2] = value; data[i+3] = 255;
       } else {
-        // 白底黑线
-        if (isEdge) {
-          data[i] = 0; data[i+1] = 0; data[i+2] = 0; data[i+3] = 255;
-        } else {
-          data[i] = 255; data[i+1] = 255; data[i+2] = 255; data[i+3] = 255;
-        }
+        // 白底黑线，边缘采用抗锯齿灰度过渡
+        const value = Math.round(255 * (1 - edgeStrength));
+        data[i] = value; data[i+1] = value; data[i+2] = value; data[i+3] = 255;
       }
     }
 
@@ -2054,9 +2047,22 @@ const App = (() => {
 
   // 页面滚动：使用原生滚动（桌面端鼠标滚轮，移动端手指滑动）
   const initWheelScroll = () => {
-    // 不做任何自定义处理，使用浏览器原生滚动
-    // 桌面端：.app-main 有 overflow-y: auto，鼠标滚轮自然滚动
-    // 移动端：body 有 overflow: auto，手指滑动自然滚动
+    const main = $('#appMain');
+    if (!main) return;
+
+    // 当浏览器未将滚轮交给可滚动容器时，显式转发到工作台主内容区。
+    main.addEventListener('wheel', event => {
+      if (event.defaultPrevented || event.ctrlKey) return;
+      const target = event.target.closest('input, select, textarea, button, .bottom-nav');
+      if (target && !target.classList.contains('app-main')) return;
+      if (main.scrollHeight <= main.clientHeight) return;
+      const atTop = main.scrollTop <= 0 && event.deltaY < 0;
+      const atBottom = main.scrollTop + main.clientHeight >= main.scrollHeight - 1 && event.deltaY > 0;
+      if (!atTop && !atBottom) {
+        main.scrollTop += event.deltaY;
+        event.preventDefault();
+      }
+    }, { passive: false });
   };
 
   return { init };

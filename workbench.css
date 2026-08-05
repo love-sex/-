@@ -64,7 +64,50 @@ html, body {
   overflow: hidden;
 }
 
-button, input, select, textarea {
+html:has(#wbContainer:not([style*="display: none"])),
+body:has(#wbContainer:not([style*="display: none"])) {
+  overscroll-behavior: none;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+#wbContainer {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+#wbContainer .app-main {
+  min-height: 0;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 800px) {
+  #wbContainer .app-main {
+    overflow-x: hidden;
+    overflow-y: auto;
+    height: 0;
+    flex: 1 1 auto;
+    scrollbar-gutter: stable;
+  }
+}
+
+@media (max-width: 799px) {
+  html, body { overflow-y: auto; }
+  #wbContainer { min-height: 100%; height: auto; overflow: visible; }
+  #wbContainer .app-main { overflow: visible; height: auto; flex: none; }
+}
+
   font-family: inherit;
   font-size: inherit;
   outline: none;
