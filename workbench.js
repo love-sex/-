@@ -2045,24 +2045,29 @@ const App = (() => {
     initWheelScroll();
   };
 
-  // 页面滚动：使用原生滚动（桌面端鼠标滚轮，移动端手指滑动）
+  // 页面滚动：统一将工作台内的滚轮事件交给可滚动主内容区
   const initWheelScroll = () => {
     const main = $('#appMain');
-    if (!main) return;
+    const container = $('#wbContainer');
+    if (!main || !container) return;
 
-    // 当浏览器未将滚轮交给可滚动容器时，显式转发到工作台主内容区。
-    main.addEventListener('wheel', event => {
-      if (event.defaultPrevented || event.ctrlKey) return;
-      const target = event.target.closest('input, select, textarea, button, .bottom-nav');
-      if (target && !target.classList.contains('app-main')) return;
-      if (main.scrollHeight <= main.clientHeight) return;
-      const atTop = main.scrollTop <= 0 && event.deltaY < 0;
-      const atBottom = main.scrollTop + main.clientHeight >= main.scrollHeight - 1 && event.deltaY > 0;
-      if (!atTop && !atBottom) {
-        main.scrollTop += event.deltaY;
-        event.preventDefault();
-      }
-    }, { passive: false });
+    const isFormControl = target => target && target.closest('input, select, textarea, button, [contenteditable="true"], .bottom-nav');
+    const canScroll = deltaY => {
+      if (main.scrollHeight <= main.clientHeight) return false;
+      if (deltaY < 0) return main.scrollTop > 0;
+      if (deltaY > 0) return main.scrollTop + main.clientHeight < main.scrollHeight - 1;
+      return false;
+    };
+
+    const handleWheel = event => {
+      if (event.defaultPrevented || event.ctrlKey || !container.contains(event.target)) return;
+      if (isFormControl(event.target) || !canScroll(event.deltaY)) return;
+      main.scrollTop += event.deltaY;
+      event.preventDefault();
+    };
+
+    // 在工作台容器捕获阶段处理，避免子元素或覆盖层吞掉滚轮事件。
+    container.addEventListener('wheel', handleWheel, { passive: false, capture: true });
   };
 
   return { init };
