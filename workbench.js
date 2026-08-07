@@ -1264,46 +1264,74 @@ const App = (() => {
 
     processBtn.onclick = async () => {
       if (!source.src || !source.videoWidth) return toast('请先上传视频并等待视频信息加载');
-      if (!window.MediaRecorder) return toast('当前浏览器不支持视频处理');
+      if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return toast('当前浏览器不支持视频处理');
       const mimeType = getSupportedMime();
       if (!mimeType) return toast('当前浏览器不支持视频编码');
       processBtn.disabled = true;
       resultCard.style.display = 'block';
       resultCard.classList.add('video-enhance-processing');
       status.textContent = '正在处理，请保持页面打开...';
+      let recorder;
+      let rafId = 0;
+      let canvasStream;
+      let mediaStream;
+      let stopped = false;
       try {
         const target = getTargetSize(source, Number(qualitySelect.value));
         const canvas = document.createElement('canvas');
         canvas.width = target.width;
         canvas.height = target.height;
         const ctx = canvas.getContext('2d', { alpha: false });
-        const stream = canvas.captureStream(30);
-        const audioContext = new AudioContext();
-        const audioSource = audioContext.createMediaElementSource(source);
-        const destination = audioContext.createMediaStreamDestination();
-        audioSource.connect(destination);
-        const combined = new MediaStream([...stream.getVideoTracks(), ...destination.stream.getAudioTracks()]);
-        const recorder = new MediaRecorder(combined, { mimeType, videoBitsPerSecond: Number(qualitySelect.value) >= 2160 ? 18000000 : 8000000 });
+        canvasStream = canvas.captureStream(30);
+        const audioTracks = typeof source.captureStream === 'function' ? source.captureStream().getAudioTracks() : [];
+        mediaStream = new MediaStream([...canvasStream.getVideoTracks(), ...audioTracks]);
+        recorder = new MediaRecorder(mediaStream, { mimeType, videoBitsPerSecond: Number(qualitySelect.value) >= 2160 ? 18000000 : 8000000 });
         const chunks = [];
-        recorder.ondataavailable = event => event.data.size && chunks.push(event.data);
+        let rejectDone;
         const done = new Promise((resolve, reject) => {
+          rejectDone = reject;
+          recorder.ondataavailable = event => event.data.size && chunks.push(event.data);
           recorder.onerror = () => reject(new Error('视频编码失败'));
           recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
         });
+        const stopRecording = () => {
+          if (stopped) return;
+          stopped = true;
+          if (rafId) cancelAnimationFrame(rafId);
+          if (recorder && recorder.state === 'recording') recorder.stop();
+        };
+        const failProcessing = () => {
+          if (stopped) return;
+          stopped = true;
+          if (rafId) cancelAnimationFrame(rafId);
+          rejectDone(new Error('视频读取失败'));
+          if (recorder && recorder.state === 'recording') recorder.stop();
+        };
+        source.addEventListener('ended', stopRecording, { once: true });
+        source.addEventListener('error', failProcessing, { once: true });
+        source.pause();
         source.currentTime = 0;
-        await source.play();
         recorder.start(250);
+        try {
+          await source.play();
+        } catch (error) {
+          rejectDone(error);
+          stopRecording();
+          throw error;
+        }
         const draw = () => {
-          if (source.ended || recorder.state !== 'recording') return;
+          if (stopped || !recorder || recorder.state !== 'recording') return;
           ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
-          requestAnimationFrame(draw);
+          if (source.ended || (Number.isFinite(source.duration) && source.currentTime >= source.duration - 0.05)) {
+            stopRecording();
+            return;
+          }
+          rafId = requestAnimationFrame(draw);
         };
         draw();
-        source.onended = () => recorder.stop();
         const blob = await done;
         source.pause();
-        audioSource.disconnect();
-        await audioContext.close();
+        if (!blob.size) throw new Error('未生成有效视频');
         clearUrl('result');
         _videoEnhanceResultUrl = URL.createObjectURL(blob);
         result.src = _videoEnhanceResultUrl;
@@ -1315,6 +1343,10 @@ const App = (() => {
         status.textContent = '处理失败：' + error.message;
         toast('处理失败：' + error.message);
       } finally {
+        if (rafId) cancelAnimationFrame(rafId);
+        if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
+        if (canvasStream) canvasStream.getTracks().forEach(track => track.stop());
+        source.pause();
         processBtn.disabled = false;
         resultCard.classList.remove('video-enhance-processing');
       }
