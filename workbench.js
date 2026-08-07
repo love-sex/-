@@ -1285,8 +1285,11 @@ const App = (() => {
         canvas.height = target.height;
         const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
         const trackFps = 30;
-        canvasStream = canvas.captureStream(trackFps);
+        canvasStream = canvas.captureStream(0);
         const canvasTrack = canvasStream.getVideoTracks()[0];
+        const usesManualFrames = typeof canvasTrack.requestFrame === 'function';
+        source.defaultPlaybackRate = 1;
+        source.playbackRate = 1;
         const sourceStream = typeof source.captureStream === 'function' ? source.captureStream() : null;
         const audioTracks = sourceStream ? sourceStream.getAudioTracks() : [];
         mediaStream = new MediaStream([canvasTrack, ...audioTracks]);
@@ -1328,7 +1331,7 @@ const App = (() => {
         const drawFrame = () => {
           if (stopped || recorder.state !== 'recording' || source.readyState < 2) return;
           ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
-          if (typeof canvasTrack.requestFrame === 'function') canvasTrack.requestFrame();
+          if (usesManualFrames) canvasTrack.requestFrame();
         };
         const scheduleFrame = () => {
           if (stopped) return;
@@ -1344,11 +1347,19 @@ const App = (() => {
         };
         source.addEventListener('ended', stopRecording, { once: true });
         source.addEventListener('error', failProcessing, { once: true });
+        source.addEventListener('ratechange', () => {
+          if (source.playbackRate !== 1) source.playbackRate = 1;
+        });
         source.addEventListener('stalled', () => {
           status.textContent = '视频读取暂时停滞，正在等待数据...';
         }, { once: true });
         source.pause();
         source.currentTime = 0;
+        await new Promise(resolve => {
+          if (source.readyState >= 3) return resolve();
+          source.addEventListener('canplaythrough', resolve, { once: true });
+          source.addEventListener('loadeddata', resolve, { once: true });
+        });
         recorder.start(1000);
         const duration = Number.isFinite(source.duration) && source.duration > 0 ? source.duration : 0;
         stopTimer = window.setTimeout(() => {
