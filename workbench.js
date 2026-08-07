@@ -1272,8 +1272,8 @@ const App = (() => {
       resultCard.classList.add('video-enhance-processing');
       status.textContent = '正在处理，请保持页面打开...';
       let recorder;
-      let rafId = 0;
-      let drawTimer = 0;
+      let frameRequestId = 0;
+      let frameTimer = 0;
       let stopTimer = 0;
       let canvasStream;
       let mediaStream;
@@ -1283,11 +1283,17 @@ const App = (() => {
         const canvas = document.createElement('canvas');
         canvas.width = target.width;
         canvas.height = target.height;
-        const ctx = canvas.getContext('2d', { alpha: false });
-        const outputFps = Number(qualitySelect.value) >= 2160 ? 12 : 15;
-        canvasStream = canvas.captureStream(outputFps);
-        mediaStream = new MediaStream(canvasStream.getVideoTracks());
-        recorder = new MediaRecorder(mediaStream, { mimeType, videoBitsPerSecond: Number(qualitySelect.value) >= 2160 ? 12000000 : 6000000 });
+        const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+        const trackFps = 30;
+        canvasStream = canvas.captureStream(trackFps);
+        const canvasTrack = canvasStream.getVideoTracks()[0];
+        const sourceStream = typeof source.captureStream === 'function' ? source.captureStream() : null;
+        const audioTracks = sourceStream ? sourceStream.getAudioTracks() : [];
+        mediaStream = new MediaStream([canvasTrack, ...audioTracks]);
+        recorder = new MediaRecorder(mediaStream, {
+          mimeType,
+          videoBitsPerSecond: Number(qualitySelect.value) >= 2160 ? 16000000 : 8000000
+        });
         const chunks = [];
         let rejectDone;
         const done = new Promise((resolve, reject) => {
@@ -1300,8 +1306,10 @@ const App = (() => {
           if (stopped) return;
           stopped = true;
           if (stopTimer) clearTimeout(stopTimer);
-          if (rafId) cancelAnimationFrame(rafId);
-          if (drawTimer) clearInterval(drawTimer);
+          if (frameRequestId && typeof source.cancelVideoFrameCallback === 'function') {
+            source.cancelVideoFrameCallback(frameRequestId);
+          }
+          if (frameTimer) clearTimeout(frameTimer);
           if (recorder && recorder.state === 'recording') {
             recorder.requestData();
             recorder.stop();
@@ -1310,9 +1318,29 @@ const App = (() => {
         const failProcessing = () => {
           if (stopped) return;
           stopped = true;
-          if (rafId) cancelAnimationFrame(rafId);
+          if (stopTimer) clearTimeout(stopTimer);
+          if (frameRequestId && typeof source.cancelVideoFrameCallback === 'function') {
+            source.cancelVideoFrameCallback(frameRequestId);
+          }
           rejectDone(new Error('视频读取失败'));
           if (recorder && recorder.state === 'recording') recorder.stop();
+        };
+        const drawFrame = () => {
+          if (stopped || recorder.state !== 'recording' || source.readyState < 2) return;
+          ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+          if (typeof canvasTrack.requestFrame === 'function') canvasTrack.requestFrame();
+        };
+        const scheduleFrame = () => {
+          if (stopped) return;
+          if (typeof source.requestVideoFrameCallback === 'function') {
+            frameRequestId = source.requestVideoFrameCallback(() => {
+              drawFrame();
+              scheduleFrame();
+            });
+          } else {
+            drawFrame();
+            frameTimer = window.setTimeout(scheduleFrame, 1000 / trackFps);
+          }
         };
         source.addEventListener('ended', stopRecording, { once: true });
         source.addEventListener('error', failProcessing, { once: true });
@@ -1321,11 +1349,11 @@ const App = (() => {
         }, { once: true });
         source.pause();
         source.currentTime = 0;
-        recorder.start(250);
+        recorder.start(1000);
         const duration = Number.isFinite(source.duration) && source.duration > 0 ? source.duration : 0;
         stopTimer = window.setTimeout(() => {
           if (!stopped) stopRecording();
-        }, Math.max(30000, (duration + 3) * 1000));
+        }, Math.max(30000, (duration + 5) * 1000));
         try {
           await source.play();
         } catch (error) {
@@ -1333,10 +1361,7 @@ const App = (() => {
           stopRecording();
           throw error;
         }
-        drawTimer = window.setInterval(() => {
-          if (stopped || !recorder || recorder.state !== 'recording') return;
-          ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
-        }, 1000 / outputFps);
+        scheduleFrame();
         const blob = await Promise.race([
           done,
           new Promise((_, reject) => window.setTimeout(() => reject(new Error('视频编码超时，请尝试较短视频或降低输出画质')), 120000))
@@ -1354,8 +1379,10 @@ const App = (() => {
         status.textContent = '处理失败：' + error.message;
         toast('处理失败：' + error.message);
       } finally {
-        if (rafId) cancelAnimationFrame(rafId);
-        if (drawTimer) clearInterval(drawTimer);
+        if (frameRequestId && typeof source.cancelVideoFrameCallback === 'function') {
+          source.cancelVideoFrameCallback(frameRequestId);
+        }
+        if (frameTimer) clearTimeout(frameTimer);
         if (stopTimer) clearTimeout(stopTimer);
         if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
         if (canvasStream) canvasStream.getTracks().forEach(track => track.stop());
