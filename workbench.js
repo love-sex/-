@@ -1273,6 +1273,7 @@ const App = (() => {
       status.textContent = '正在处理，请保持页面打开...';
       let recorder;
       let rafId = 0;
+      let drawTimer = 0;
       let stopTimer = 0;
       let canvasStream;
       let mediaStream;
@@ -1283,9 +1284,10 @@ const App = (() => {
         canvas.width = target.width;
         canvas.height = target.height;
         const ctx = canvas.getContext('2d', { alpha: false });
-        canvasStream = canvas.captureStream(30);
+        const outputFps = Number(qualitySelect.value) >= 2160 ? 12 : 15;
+        canvasStream = canvas.captureStream(outputFps);
         mediaStream = new MediaStream(canvasStream.getVideoTracks());
-        recorder = new MediaRecorder(mediaStream, { mimeType, videoBitsPerSecond: Number(qualitySelect.value) >= 2160 ? 18000000 : 8000000 });
+        recorder = new MediaRecorder(mediaStream, { mimeType, videoBitsPerSecond: Number(qualitySelect.value) >= 2160 ? 12000000 : 6000000 });
         const chunks = [];
         let rejectDone;
         const done = new Promise((resolve, reject) => {
@@ -1299,14 +1301,10 @@ const App = (() => {
           stopped = true;
           if (stopTimer) clearTimeout(stopTimer);
           if (rafId) cancelAnimationFrame(rafId);
+          if (drawTimer) clearInterval(drawTimer);
           if (recorder && recorder.state === 'recording') {
             recorder.requestData();
-            window.setTimeout(() => {
-              if (recorder.state === 'recording') recorder.stop();
-            }, 100);
-            window.setTimeout(() => {
-              if (recorder.state === 'recording') rejectDone(new Error('视频编码未能结束，请更换浏览器重试'));
-            }, 3000);
+            recorder.stop();
           }
         };
         const failProcessing = () => {
@@ -1318,13 +1316,16 @@ const App = (() => {
         };
         source.addEventListener('ended', stopRecording, { once: true });
         source.addEventListener('error', failProcessing, { once: true });
+        source.addEventListener('stalled', () => {
+          status.textContent = '视频读取暂时停滞，正在等待数据...';
+        }, { once: true });
         source.pause();
         source.currentTime = 0;
         recorder.start(250);
         const duration = Number.isFinite(source.duration) && source.duration > 0 ? source.duration : 0;
         stopTimer = window.setTimeout(() => {
           if (!stopped) stopRecording();
-        }, Math.max(30000, (duration + 10) * 1000));
+        }, Math.max(30000, (duration + 3) * 1000));
         try {
           await source.play();
         } catch (error) {
@@ -1332,16 +1333,10 @@ const App = (() => {
           stopRecording();
           throw error;
         }
-        const draw = () => {
+        drawTimer = window.setInterval(() => {
           if (stopped || !recorder || recorder.state !== 'recording') return;
           ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
-          if (source.ended || (Number.isFinite(source.duration) && source.currentTime >= source.duration - 0.05)) {
-            stopRecording();
-            return;
-          }
-          rafId = requestAnimationFrame(draw);
-        };
-        draw();
+        }, 1000 / outputFps);
         const blob = await Promise.race([
           done,
           new Promise((_, reject) => window.setTimeout(() => reject(new Error('视频编码超时，请尝试较短视频或降低输出画质')), 120000))
@@ -1360,6 +1355,7 @@ const App = (() => {
         toast('处理失败：' + error.message);
       } finally {
         if (rafId) cancelAnimationFrame(rafId);
+        if (drawTimer) clearInterval(drawTimer);
         if (stopTimer) clearTimeout(stopTimer);
         if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
         if (canvasStream) canvasStream.getTracks().forEach(track => track.stop());
