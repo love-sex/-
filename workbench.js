@@ -1363,29 +1363,6 @@ const App = (() => {
         ]);
         source.pause();
         if (!blob.size) throw new Error('未生成有效视频');
-        if (duration > 0) {
-          const probe = document.createElement('video');
-          probe.preload = 'metadata';
-          const probeUrl = URL.createObjectURL(blob);
-          probe.src = probeUrl;
-          const probeDuration = await new Promise(resolve => {
-            let settled = false;
-            const finish = value => {
-              if (settled) return;
-              settled = true;
-              resolve(Number.isFinite(value) ? value : 0);
-            };
-            probe.onloadedmetadata = () => finish(probe.duration);
-            probe.onerror = () => finish(0);
-            window.setTimeout(() => finish(0), 5000);
-          });
-          probe.removeAttribute('src');
-          probe.load();
-          URL.revokeObjectURL(probeUrl);
-          if (probeDuration > 0 && probeDuration < duration * 0.95) {
-            throw new Error('输出视频时长异常，请重新处理');
-          }
-        }
         clearUrl('result');
         _videoEnhanceResultUrl = URL.createObjectURL(blob);
         result.src = _videoEnhanceResultUrl;
