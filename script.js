@@ -644,7 +644,8 @@ class TodoManager {
         // 显示想想工作台
         const wb = document.getElementById('wbContainer');
         if (wb) {
-            wb.style.display = 'block';
+            // 工作台必须保持纵向 flex 布局，app-main 才能获得独立滚动高度。
+            wb.style.display = 'flex';
             // 显示当前用户名
             const wbUser = document.getElementById('wbUsername');
             if (wbUser) wbUser.textContent = '👤 ' + this.auth.username;
