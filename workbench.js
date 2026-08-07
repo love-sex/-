@@ -1273,6 +1273,7 @@ const App = (() => {
       status.textContent = '正在处理，请保持页面打开...';
       let recorder;
       let rafId = 0;
+      let stopTimer = 0;
       let canvasStream;
       let mediaStream;
       let stopped = false;
@@ -1283,8 +1284,7 @@ const App = (() => {
         canvas.height = target.height;
         const ctx = canvas.getContext('2d', { alpha: false });
         canvasStream = canvas.captureStream(30);
-        const audioTracks = typeof source.captureStream === 'function' ? source.captureStream().getAudioTracks() : [];
-        mediaStream = new MediaStream([...canvasStream.getVideoTracks(), ...audioTracks]);
+        mediaStream = new MediaStream(canvasStream.getVideoTracks());
         recorder = new MediaRecorder(mediaStream, { mimeType, videoBitsPerSecond: Number(qualitySelect.value) >= 2160 ? 18000000 : 8000000 });
         const chunks = [];
         let rejectDone;
@@ -1297,8 +1297,17 @@ const App = (() => {
         const stopRecording = () => {
           if (stopped) return;
           stopped = true;
+          if (stopTimer) clearTimeout(stopTimer);
           if (rafId) cancelAnimationFrame(rafId);
-          if (recorder && recorder.state === 'recording') recorder.stop();
+          if (recorder && recorder.state === 'recording') {
+            recorder.requestData();
+            window.setTimeout(() => {
+              if (recorder.state === 'recording') recorder.stop();
+            }, 100);
+            window.setTimeout(() => {
+              if (recorder.state === 'recording') rejectDone(new Error('视频编码未能结束，请更换浏览器重试'));
+            }, 3000);
+          }
         };
         const failProcessing = () => {
           if (stopped) return;
@@ -1312,6 +1321,10 @@ const App = (() => {
         source.pause();
         source.currentTime = 0;
         recorder.start(250);
+        const duration = Number.isFinite(source.duration) && source.duration > 0 ? source.duration : 0;
+        stopTimer = window.setTimeout(() => {
+          if (!stopped) stopRecording();
+        }, Math.max(30000, (duration + 10) * 1000));
         try {
           await source.play();
         } catch (error) {
@@ -1329,7 +1342,10 @@ const App = (() => {
           rafId = requestAnimationFrame(draw);
         };
         draw();
-        const blob = await done;
+        const blob = await Promise.race([
+          done,
+          new Promise((_, reject) => window.setTimeout(() => reject(new Error('视频编码超时，请尝试较短视频或降低输出画质')), 120000))
+        ]);
         source.pause();
         if (!blob.size) throw new Error('未生成有效视频');
         clearUrl('result');
@@ -1344,6 +1360,7 @@ const App = (() => {
         toast('处理失败：' + error.message);
       } finally {
         if (rafId) cancelAnimationFrame(rafId);
+        if (stopTimer) clearTimeout(stopTimer);
         if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
         if (canvasStream) canvasStream.getTracks().forEach(track => track.stop());
         source.pause();
