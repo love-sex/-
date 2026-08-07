@@ -1368,16 +1368,21 @@ const App = (() => {
           probe.preload = 'metadata';
           const probeUrl = URL.createObjectURL(blob);
           probe.src = probeUrl;
-          await new Promise(resolve => {
-            const finish = () => {
-              URL.revokeObjectURL(probeUrl);
-              resolve();
+          const probeDuration = await new Promise(resolve => {
+            let settled = false;
+            const finish = value => {
+              if (settled) return;
+              settled = true;
+              resolve(Number.isFinite(value) ? value : 0);
             };
-            probe.onloadedmetadata = finish;
-            probe.onerror = finish;
-            window.setTimeout(finish, 5000);
+            probe.onloadedmetadata = () => finish(probe.duration);
+            probe.onerror = () => finish(0);
+            window.setTimeout(() => finish(0), 5000);
           });
-          if (!Number.isFinite(probe.duration) || probe.duration < duration * 0.95) {
+          probe.removeAttribute('src');
+          probe.load();
+          URL.revokeObjectURL(probeUrl);
+          if (probeDuration > 0 && probeDuration < duration * 0.95) {
             throw new Error('输出视频时长异常，请重新处理');
           }
         }
