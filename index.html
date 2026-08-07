@@ -197,10 +197,10 @@
                                 <div class="module-name">摘录本</div>
                                 <div class="module-stat">文案 · 笔记 · 播客</div>
                             </button>
-                            <button class="module-card" data-target="lineart">
-                                <div class="module-icon">🖊</div>
-                                <div class="module-name">图片线稿</div>
-                                <div class="module-stat">提取 · 下载</div>
+                            <button class="module-card" data-target="videoEnhance">
+                                <div class="module-icon">🎬</div>
+                                <div class="module-name">视频高清</div>
+                                <div class="module-stat">1080P · 4K</div>
                             </button>
                             <button class="module-card" data-target="study">
                                 <div class="module-icon">📚</div>
@@ -554,52 +554,44 @@
                 </div>
             </section>
 
-            <!-- ============ 图片提取线稿 ============ -->
-            <section class="view" data-view="lineart" style="display:none;">
+            <!-- ============ 视频高清 ============ -->
+            <section class="view" data-view="videoEnhance" style="display:none;">
                 <div class="view-content">
                     <div class="page-head">
                         <button class="back-btn" data-back>← 返回首页</button>
-                        <h2 class="page-title">🖊 图片提取线稿</h2>
+                        <h2 class="page-title">🎬 视频高清</h2>
                     </div>
                     <div class="card">
-                        <div class="card-title">📤 上传图片</div>
-                        <p class="muted" style="margin:-4px 0 12px;">支持任意大小、任意格式的图片，在本地浏览器处理，不上传服务器。</p>
-                        <input type="file" id="lineartFile" accept="image/*" hidden>
-                        <button class="btn btn-primary btn-block" id="lineartUploadBtn" style="margin-bottom:12px;">📤 选择图片</button>
-                        <div class="lineart-preview" id="lineartPreview" style="display:none;">
-                            <img id="lineartOriginImg" alt="原图">
+                        <div class="card-title">📤 上传视频</div>
+                        <p class="muted" style="margin:-4px 0 12px;">支持常见视频格式，文件大小不设上限；视频仅在本地浏览器处理，不上传服务器。</p>
+                        <input type="file" id="videoEnhanceFile" accept="video/*" hidden>
+                        <button class="btn btn-primary btn-block" id="videoEnhanceUploadBtn" style="margin-bottom:12px;">📤 选择视频</button>
+                        <div class="video-enhance-preview" id="videoEnhancePreview" style="display:none;">
+                            <video id="videoEnhanceSource" controls playsinline preload="metadata"></video>
+                            <div class="muted" id="videoEnhanceInfo"></div>
                         </div>
                     </div>
-                    <div class="card" id="lineartOptsCard" style="display:none;">
-                        <div class="card-title">🎛 参数调节</div>
+                    <div class="card" id="videoEnhanceOptsCard" style="display:none;">
+                        <div class="card-title">🎛 输出设置</div>
                         <div class="opt-row">
-                            <label>线条粗细</label>
-                            <input type="range" id="lineartThickness" min="1" max="5" value="2" style="flex:1;">
-                            <span id="lineartThicknessVal" style="width:30px;text-align:right;font-size:12px;">2</span>
-                        </div>
-                        <div class="opt-row">
-                            <label>对比度</label>
-                            <input type="range" id="lineartContrast" min="1" max="10" value="5" style="flex:1;">
-                            <span id="lineartContrastVal" style="width:30px;text-align:right;font-size:12px;">5</span>
-                        </div>
-                        <div class="opt-row">
-                            <label>背景</label>
-                            <select id="lineartBg" style="flex:1;">
-                                <option value="white">白底黑线</option>
-                                <option value="black">黑底白线</option>
-                                <option value="transparent">透明背景</option>
+                            <label for="videoEnhanceQuality">目标画质</label>
+                            <select id="videoEnhanceQuality" style="flex:1;">
+                                <option value="1080">1080p 高清</option>
+                                <option value="2160">4K 超高清</option>
                             </select>
                         </div>
-                        <button class="btn btn-gold btn-block" id="lineartProcessBtn">✨ 提取线稿</button>
+                        <p class="muted" style="margin:0 0 12px;">浏览器会按比例放大画面并重新编码。放大不会恢复原视频已丢失的细节；编码能力取决于浏览器。</p>
+                        <button class="btn btn-gold btn-block" id="videoEnhanceProcessBtn">✨ 开始高清处理</button>
                     </div>
-                    <div class="card" id="lineartResultCard" style="display:none;">
-                        <div class="card-title">🖼 线稿结果</div>
-                        <div class="lineart-result-wrap">
-                            <canvas id="lineartCanvas"></canvas>
+                    <div class="card" id="videoEnhanceResultCard" style="display:none;">
+                        <div class="card-title">🎞 高清结果</div>
+                        <div class="video-enhance-result-wrap">
+                            <video id="videoEnhanceResult" controls playsinline></video>
                         </div>
+                        <div class="muted" id="videoEnhanceStatus" style="margin-top:10px;"></div>
                         <div class="btn-row" style="margin-top:12px;">
-                            <button class="btn btn-primary" id="lineartDownloadBtn">💾 下载线稿</button>
-                            <button class="btn btn-ghost" id="lineartResetBtn">🔄 重新上传</button>
+                            <button class="btn btn-primary" id="videoEnhanceDownloadBtn">💾 下载视频</button>
+                            <button class="btn btn-ghost" id="videoEnhanceResetBtn">🔄 重新上传</button>
                         </div>
                     </div>
                 </div>
@@ -824,8 +816,8 @@
             <button class="nav-item" data-nav="excerpt">
                 <div class="nav-icon">✍️</div><div class="nav-label">摘录</div>
             </button>
-            <button class="nav-item" data-nav="lineart">
-                <div class="nav-icon">🖊</div><div class="nav-label">线稿</div>
+            <button class="nav-item" data-nav="videoEnhance">
+                <div class="nav-icon">🎬</div><div class="nav-label">视频高清</div>
             </button>
         </nav>
 

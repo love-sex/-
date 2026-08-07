@@ -1201,8 +1201,147 @@ const App = (() => {
     el.style.userSelect = 'none';
   };
 
-  /* ---------- 图片提取线稿 ---------- */
-  let _lineartImg = null; // 缓存原图 Image 对象
+  /* ---------- 视频高清 ---------- */
+  let _videoEnhanceSourceUrl = null;
+  let _videoEnhanceResultUrl = null;
+  const bindVideoEnhance = () => {
+    const fileInput = $('#videoEnhanceFile');
+    const uploadBtn = $('#videoEnhanceUploadBtn');
+    const preview = $('#videoEnhancePreview');
+    const source = $('#videoEnhanceSource');
+    const info = $('#videoEnhanceInfo');
+    const optsCard = $('#videoEnhanceOptsCard');
+    const qualitySelect = $('#videoEnhanceQuality');
+    const processBtn = $('#videoEnhanceProcessBtn');
+    const resultCard = $('#videoEnhanceResultCard');
+    const result = $('#videoEnhanceResult');
+    const status = $('#videoEnhanceStatus');
+    const downloadBtn = $('#videoEnhanceDownloadBtn');
+    const resetBtn = $('#videoEnhanceResetBtn');
+
+    const clearUrl = key => {
+      if (key === 'source' && _videoEnhanceSourceUrl) URL.revokeObjectURL(_videoEnhanceSourceUrl);
+      if (key === 'result' && _videoEnhanceResultUrl) URL.revokeObjectURL(_videoEnhanceResultUrl);
+      if (key === 'source') _videoEnhanceSourceUrl = null;
+      if (key === 'result') _videoEnhanceResultUrl = null;
+    };
+
+    const formatBytes = bytes => {
+      if (!bytes) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+      return (bytes / Math.pow(1024, index)).toFixed(index ? 1 : 0) + ' ' + units[index];
+    };
+
+    const getTargetSize = (video, targetHeight) => {
+      const width = video.videoWidth || 16;
+      const height = video.videoHeight || 9;
+      const targetWidth = Math.max(2, Math.round(width * targetHeight / height / 2) * 2);
+      return { width: targetWidth, height: targetHeight };
+    };
+
+    const getSupportedMime = () => {
+      const types = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+      return types.find(type => window.MediaRecorder && MediaRecorder.isTypeSupported(type)) || '';
+    };
+
+    uploadBtn.onclick = () => fileInput.click();
+    fileInput.onchange = event => {
+      const file = event.target.files[0];
+      if (!file) return;
+      if (!file.type.startsWith('video/')) return toast('请选择视频文件');
+      clearUrl('source');
+      clearUrl('result');
+      _videoEnhanceSourceUrl = URL.createObjectURL(file);
+      source.src = _videoEnhanceSourceUrl;
+      source.load();
+      preview.style.display = 'block';
+      optsCard.style.display = 'block';
+      resultCard.style.display = 'none';
+      info.textContent = file.name + ' · ' + formatBytes(file.size);
+      status.textContent = '';
+    };
+
+    processBtn.onclick = async () => {
+      if (!source.src || !source.videoWidth) return toast('请先上传视频并等待视频信息加载');
+      if (!window.MediaRecorder) return toast('当前浏览器不支持视频处理');
+      const mimeType = getSupportedMime();
+      if (!mimeType) return toast('当前浏览器不支持视频编码');
+      processBtn.disabled = true;
+      resultCard.style.display = 'block';
+      resultCard.classList.add('video-enhance-processing');
+      status.textContent = '正在处理，请保持页面打开...';
+      try {
+        const target = getTargetSize(source, Number(qualitySelect.value));
+        const canvas = document.createElement('canvas');
+        canvas.width = target.width;
+        canvas.height = target.height;
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const stream = canvas.captureStream(30);
+        const audioContext = new AudioContext();
+        const audioSource = audioContext.createMediaElementSource(source);
+        const destination = audioContext.createMediaStreamDestination();
+        audioSource.connect(destination);
+        const combined = new MediaStream([...stream.getVideoTracks(), ...destination.stream.getAudioTracks()]);
+        const recorder = new MediaRecorder(combined, { mimeType, videoBitsPerSecond: Number(qualitySelect.value) >= 2160 ? 18000000 : 8000000 });
+        const chunks = [];
+        recorder.ondataavailable = event => event.data.size && chunks.push(event.data);
+        const done = new Promise((resolve, reject) => {
+          recorder.onerror = () => reject(new Error('视频编码失败'));
+          recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
+        });
+        source.currentTime = 0;
+        await source.play();
+        recorder.start(250);
+        const draw = () => {
+          if (source.ended || recorder.state !== 'recording') return;
+          ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+          requestAnimationFrame(draw);
+        };
+        draw();
+        source.onended = () => recorder.stop();
+        const blob = await done;
+        source.pause();
+        audioSource.disconnect();
+        await audioContext.close();
+        clearUrl('result');
+        _videoEnhanceResultUrl = URL.createObjectURL(blob);
+        result.src = _videoEnhanceResultUrl;
+        result.load();
+        status.textContent = '处理完成：' + target.width + ' × ' + target.height + ' · ' + formatBytes(blob.size);
+        toast('视频高清处理完成');
+      } catch (error) {
+        console.error(error);
+        status.textContent = '处理失败：' + error.message;
+        toast('处理失败：' + error.message);
+      } finally {
+        processBtn.disabled = false;
+        resultCard.classList.remove('video-enhance-processing');
+      }
+    };
+
+    downloadBtn.onclick = () => {
+      if (!_videoEnhanceResultUrl) return toast('请先完成视频处理');
+      const link = document.createElement('a');
+      link.download = '高清视频_' + Date.now() + '.webm';
+      link.href = _videoEnhanceResultUrl;
+      link.click();
+    };
+
+    resetBtn.onclick = () => {
+      clearUrl('source');
+      clearUrl('result');
+      fileInput.value = '';
+      source.removeAttribute('src');
+      result.removeAttribute('src');
+      preview.style.display = 'none';
+      optsCard.style.display = 'none';
+      resultCard.style.display = 'none';
+      status.textContent = '';
+    };
+  };
+
+  /* ---------- 已移除的图片提取线稿 ---------- */
   const bindLineart = () => {
     const fileInput = $('#lineartFile');
     const uploadBtn = $('#lineartUploadBtn');
@@ -2000,7 +2139,7 @@ const App = (() => {
     bindFinance();
     bindAccount();
     bindExcerpt();
-    bindLineart();
+    bindVideoEnhance();
     bindStudy();
     bindSettings();
     bindAddThemeModal();
