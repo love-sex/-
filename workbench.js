@@ -1272,7 +1272,6 @@ const App = (() => {
       resultCard.classList.add('video-enhance-processing');
       status.textContent = '正在处理，请保持页面打开...';
       let recorder;
-      let frameRequestId = 0;
       let frameTimer = 0;
       let stopTimer = 0;
       let canvasStream;
@@ -1285,9 +1284,8 @@ const App = (() => {
         canvas.height = target.height;
         const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
         const trackFps = 30;
-        canvasStream = canvas.captureStream(0);
+        canvasStream = canvas.captureStream(trackFps);
         const canvasTrack = canvasStream.getVideoTracks()[0];
-        const usesManualFrames = typeof canvasTrack.requestFrame === 'function';
         source.defaultPlaybackRate = 1;
         source.playbackRate = 1;
         const sourceStream = typeof source.captureStream === 'function' ? source.captureStream() : null;
@@ -1309,9 +1307,6 @@ const App = (() => {
           if (stopped) return;
           stopped = true;
           if (stopTimer) clearTimeout(stopTimer);
-          if (frameRequestId && typeof source.cancelVideoFrameCallback === 'function') {
-            source.cancelVideoFrameCallback(frameRequestId);
-          }
           if (frameTimer) clearTimeout(frameTimer);
           if (recorder && recorder.state === 'recording') {
             recorder.requestData();
@@ -1322,28 +1317,17 @@ const App = (() => {
           if (stopped) return;
           stopped = true;
           if (stopTimer) clearTimeout(stopTimer);
-          if (frameRequestId && typeof source.cancelVideoFrameCallback === 'function') {
-            source.cancelVideoFrameCallback(frameRequestId);
-          }
           rejectDone(new Error('视频读取失败'));
           if (recorder && recorder.state === 'recording') recorder.stop();
         };
         const drawFrame = () => {
           if (stopped || recorder.state !== 'recording' || source.readyState < 2) return;
           ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
-          if (usesManualFrames) canvasTrack.requestFrame();
         };
         const scheduleFrame = () => {
           if (stopped) return;
-          if (typeof source.requestVideoFrameCallback === 'function') {
-            frameRequestId = source.requestVideoFrameCallback(() => {
-              drawFrame();
-              scheduleFrame();
-            });
-          } else {
-            drawFrame();
-            frameTimer = window.setTimeout(scheduleFrame, 1000 / trackFps);
-          }
+          drawFrame();
+          frameTimer = window.setTimeout(scheduleFrame, 1000 / trackFps);
         };
         source.addEventListener('ended', stopRecording, { once: true });
         source.addEventListener('error', failProcessing, { once: true });
@@ -1379,6 +1363,24 @@ const App = (() => {
         ]);
         source.pause();
         if (!blob.size) throw new Error('未生成有效视频');
+        if (duration > 0) {
+          const probe = document.createElement('video');
+          probe.preload = 'metadata';
+          const probeUrl = URL.createObjectURL(blob);
+          probe.src = probeUrl;
+          await new Promise(resolve => {
+            const finish = () => {
+              URL.revokeObjectURL(probeUrl);
+              resolve();
+            };
+            probe.onloadedmetadata = finish;
+            probe.onerror = finish;
+            window.setTimeout(finish, 5000);
+          });
+          if (!Number.isFinite(probe.duration) || probe.duration < duration * 0.95) {
+            throw new Error('输出视频时长异常，请重新处理');
+          }
+        }
         clearUrl('result');
         _videoEnhanceResultUrl = URL.createObjectURL(blob);
         result.src = _videoEnhanceResultUrl;
@@ -1390,9 +1392,6 @@ const App = (() => {
         status.textContent = '处理失败：' + error.message;
         toast('处理失败：' + error.message);
       } finally {
-        if (frameRequestId && typeof source.cancelVideoFrameCallback === 'function') {
-          source.cancelVideoFrameCallback(frameRequestId);
-        }
         if (frameTimer) clearTimeout(frameTimer);
         if (stopTimer) clearTimeout(stopTimer);
         if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
