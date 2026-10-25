@@ -17,6 +17,8 @@
     <link rel="stylesheet" href="workbench.css">
     <!-- 作品集样式 -->
     <link rel="stylesheet" href="portfolio.css">
+    <!-- 登录界面动效 -->
+    <link rel="stylesheet" href="login.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
@@ -56,19 +58,66 @@
 
     <!-- ========== 登录/注册页面 ========== -->
     <div class="auth-container" id="authContainer">
+        <div class="login-stage">
+            <header class="login-top">
+                <div class="login-brand">a.cre®</div>
+                <div class="login-top-right">
+                    <span class="login-top-note">PORTFOLIO / 2026</span>
+                    <button class="login-edit-btn" id="loginEditBtn" type="button">编辑图片</button>
+                </div>
+            </header>
+
+            <div class="login-headline">
+                <span class="line1">DESIGN</span>
+                <span class="line2">IN MOTION</span>
+            </div>
+
+            <div class="login-cards" id="loginCards">
+                <figure class="login-card" data-login-media>
+                    <img data-login-img="card1" src="assets/login/card-1.jpg" alt="">
+                    <button class="login-card-replace" type="button">更换</button>
+                </figure>
+                <figure class="login-card" data-login-media>
+                    <img data-login-img="card2" src="assets/login/card-2.jpg" alt="">
+                    <button class="login-card-replace" type="button">更换</button>
+                </figure>
+                <figure class="login-card" data-login-media>
+                    <img data-login-img="card3" src="assets/login/card-3.jpg" alt="">
+                    <button class="login-card-replace" type="button">更换</button>
+                </figure>
+                <figure class="login-card" data-login-media>
+                    <img data-login-img="card4" src="assets/login/card-4.jpg" alt="">
+                    <button class="login-card-replace" type="button">更换</button>
+                </figure>
+                <figure class="login-card" data-login-media>
+                    <img data-login-img="card5" src="assets/login/card-5.jpg" alt="">
+                    <button class="login-card-replace" type="button">更换</button>
+                </figure>
+                <figure class="login-card" data-login-media>
+                    <img data-login-img="card6" src="assets/login/card-6.jpg" alt="">
+                    <button class="login-card-replace" type="button">更换</button>
+                </figure>
+            </div>
+
+            <footer class="login-foot">
+                <span>Concepts, explorations, and interface experiments shared openly as part of our creative process.</span>
+                <span>© 2026 A.CRE — SHANGHAI</span>
+            </footer>
+        </div>
+
         <div class="auth-box">
             <div class="auth-header">
-                <div class="auth-logo">🌾</div>
-                <h1>想想工作台</h1>
-                <p>高效管理你的工作和生活</p>
+                <div class="auth-logo">A.</div>
+                <h1 id="authTitle">SIGN IN</h1>
+                <p id="authSubtitle">登录想想工作台 · 继续你的工作</p>
             </div>
             <form class="auth-form" id="loginForm">
                 <div class="form-group">
-                    <label>👤 用户名</label>
+                    <label>用户名</label>
                     <input type="text" id="loginUsername" placeholder="请输入用户名" required minlength="2" maxlength="20">
                 </div>
                 <div class="form-group">
-                    <label>🔒 密码</label>
+                    <label>密码</label>
                     <input type="password" id="loginPassword" placeholder="请输入密码" required minlength="6">
                 </div>
                 <button type="submit" class="auth-btn login-btn">登 录</button>
@@ -77,19 +126,19 @@
             </form>
             <form class="auth-form hidden" id="registerForm">
                 <div class="form-group">
-                    <label>👤 用户名</label>
+                    <label>用户名</label>
                     <input type="text" id="regUsername" placeholder="2-20个字符" required minlength="2" maxlength="20">
                 </div>
                 <div class="form-group">
-                    <label>🔒 密码</label>
+                    <label>密码</label>
                     <input type="password" id="regPassword" placeholder="至少6位密码" required minlength="6">
                 </div>
                 <div class="form-group">
-                    <label>🔒 确认密码</label>
+                    <label>确认密码</label>
                     <input type="password" id="regPasswordConfirm" placeholder="再次输入密码" required minlength="6">
                 </div>
                 <div class="form-group">
-                    <label>📧 邮箱（可选）</label>
+                    <label>邮箱（可选）</label>
                     <input type="email" id="regEmail" placeholder="example@email.com">
                 </div>
                 <button type="submit" class="auth-btn register-btn">注 册</button>
@@ -97,17 +146,23 @@
             </form>
             <form class="auth-form hidden" id="forgotForm">
                 <div class="forgot-info">
-                    <h3>🔑 找回密码</h3>
+                    <h3>找回密码</h3>
                     <p>请输入用户名和绑定邮箱重置密码</p>
                 </div>
-                <div class="form-group"><label>👤 用户名</label><input type="text" id="forgotUsername" required></div>
-                <div class="form-group"><label>📧 邮箱</label><input type="email" id="forgotEmail" required></div>
-                <div class="form-group"><label>🔒 新密码</label><input type="password" id="forgotNewPassword" required minlength="6"></div>
+                <div class="form-group"><label>用户名</label><input type="text" id="forgotUsername" required></div>
+                <div class="form-group"><label>邮箱</label><input type="email" id="forgotEmail" required></div>
+                <div class="form-group"><label>新密码</label><input type="password" id="forgotNewPassword" required minlength="6"></div>
                 <button type="submit" class="auth-btn reset-btn">重置密码</button>
                 <div class="auth-switch"><a href="#" id="showLoginFromForgot">返回登录</a></div>
             </form>
             <div class="auth-error" id="authError"></div>
         </div>
+
+        <div class="login-editbar" id="loginEditbar">
+            <span>点击任意卡片图片即可替换</span>
+            <button class="login-reset" id="loginResetBtn" type="button">恢复默认</button>
+        </div>
+        <input type="file" id="loginFileInput" accept="image/*" hidden>
     </div>
 
     <!-- ========== 想想工作台（登录后显示）========== -->
@@ -1064,5 +1119,6 @@ COLLECTION GRAPHICS DESIGN | 3D</p>
     <script src="script.js"></script>
     <script src="workbench.js"></script>
     <script src="portfolio.js"></script>
+    <script src="login-cards.js"></script>
 </body>
 </html>
