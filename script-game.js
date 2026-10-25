@@ -198,8 +198,8 @@ class GamificationManager {
     }
 }
 
-// ==================== AI机器人拖拽功能 ====================
-function initDraggableAI() {
+// ==================== 大肥鱼拖拽功能 ====================
+function initDraggableFish() {
     const container = document.querySelector('.game-container');
     if (!container) return;
 
@@ -303,11 +303,11 @@ let gameManager;
 
 document.addEventListener('DOMContentLoaded', () => {
     gameManager = new GamificationManager();
-    initDraggableAI();
+    initDraggableFish();
     initGameToggle();
 });
 
-// 小助手隐藏/显示切换
+// 大肥鱼隐藏/显示切换
 function initGameToggle() {
     const container = document.getElementById('gameContainer');
     const toggleBtn = document.getElementById('gameToggleBtn');

@@ -869,7 +869,7 @@
 
     <!-- 游戏化系统（保留） -->
     <div class="game-container" id="gameContainer">
-        <button class="game-toggle-btn" id="gameToggleBtn" title="隐藏小助手">✕</button>
+        <button class="game-toggle-btn" id="gameToggleBtn" title="隐藏大肥鱼" aria-label="隐藏大肥鱼">✕</button>
         <div class="exp-bar-container">
             <div class="exp-header">
                 <span class="level-badge" id="levelBadge">Lv.1 新手</span>
@@ -879,21 +879,95 @@
                 <div class="exp-fill" id="expFill" style="width: 0%"></div>
             </div>
         </div>
-        <div class="assistant-character" id="assistantChar">
-            <div class="character-sprite">
-                <div class="character-face">
-                    <div class="character-eyes">
-                        <div class="eye"></div>
-                        <div class="eye"></div>
-                    </div>
-                    <div class="character-mouth"></div>
-                </div>
-            </div>
+        <div class="assistant-character" id="assistantChar" role="img" aria-label="大肥鱼助手">
+            <svg class="fish-sprite" viewBox="0 0 240 220" aria-hidden="true" focusable="false">
+                <defs>
+                    <linearGradient id="fishBodyGrad" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#a5f3fc"/>
+                        <stop offset="45%" stop-color="#38bdf8"/>
+                        <stop offset="100%" stop-color="#0284c7"/>
+                    </linearGradient>
+                    <linearGradient id="fishTailGrad" x1="1" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#67e8f9"/>
+                        <stop offset="100%" stop-color="#0ea5e9"/>
+                    </linearGradient>
+                    <linearGradient id="fishFinGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#22d3ee"/>
+                        <stop offset="100%" stop-color="#0369a1"/>
+                    </linearGradient>
+                    <radialGradient id="fishBellyGrad" cx="50%" cy="35%" r="75%">
+                        <stop offset="0%" stop-color="#f0f9ff"/>
+                        <stop offset="100%" stop-color="#bae6fd"/>
+                    </radialGradient>
+                    <clipPath id="fishBodyClip">
+                        <ellipse cx="128" cy="112" rx="84" ry="68"/>
+                    </clipPath>
+                </defs>
+
+                <g class="fish-bubbles" fill="none" stroke="#7dd3fc" stroke-width="2">
+                    <circle cx="210" cy="58" r="7" opacity=".9"/>
+                    <circle cx="224" cy="36" r="4.5" opacity=".7"/>
+                    <circle cx="199" cy="28" r="3.5" opacity=".55"/>
+                </g>
+
+                <g class="fish-tail">
+                    <path d="M72 96 C52 78 30 58 14 52 C9 66 22 90 36 106 C22 114 10 128 14 144 C32 140 54 126 72 120 Z"
+                          fill="url(#fishTailGrad)" stroke="#0369a1" stroke-width="4" stroke-linejoin="round"/>
+                    <path d="M60 92 C46 80 33 68 24 60 M58 126 C44 134 31 138 22 139"
+                          fill="none" stroke="#e0f2fe" stroke-width="2.5" stroke-linecap="round" opacity=".55"/>
+                </g>
+
+                <g class="fish-fin-top">
+                    <path d="M92 58 C96 28 112 12 136 18 C148 22 154 38 156 56 C138 46 114 46 92 58 Z"
+                          fill="url(#fishFinGrad)" stroke="#0369a1" stroke-width="4" stroke-linejoin="round"/>
+                </g>
+
+                <g class="fish-fin-bottom">
+                    <path d="M100 176 C108 198 130 204 148 190 C132 188 116 184 100 176 Z"
+                          fill="url(#fishFinGrad)" stroke="#0369a1" stroke-width="4" stroke-linejoin="round"/>
+                </g>
+
+                <ellipse cx="128" cy="112" rx="84" ry="68" fill="url(#fishBodyGrad)" stroke="#0369a1" stroke-width="5"/>
+
+                <g clip-path="url(#fishBodyClip)">
+                    <ellipse cx="128" cy="148" rx="65" ry="38" fill="url(#fishBellyGrad)" opacity=".92"/>
+                    <ellipse cx="100" cy="72" rx="30" ry="13" fill="#ffffff" opacity=".38" transform="rotate(-16 100 72)"/>
+                    <g fill="none" stroke="#e0f2fe" stroke-width="2.5" stroke-linecap="round" opacity=".55">
+                        <path d="M62 96 q11 8 0 16"/>
+                        <path d="M78 84 q13 9 0 18"/>
+                        <path d="M68 124 q11 8 0 16"/>
+                    </g>
+                </g>
+
+                <g class="fish-fin-side">
+                    <path d="M104 128 C92 150 100 169 120 172 C133 173 142 166 146 156 C132 152 116 142 104 128 Z"
+                          fill="url(#fishFinGrad)" stroke="#0369a1" stroke-width="4" stroke-linejoin="round"/>
+                    <path d="M110 140 C112 152 120 160 132 162" fill="none" stroke="#e0f2fe" stroke-width="2.5" stroke-linecap="round" opacity=".6"/>
+                </g>
+
+                <g class="fish-eye">
+                    <circle cx="142" cy="92" r="20" fill="#f8fafc" stroke="#075985" stroke-width="3"/>
+                    <circle cx="149" cy="94" r="9" fill="#0f172a"/>
+                    <circle cx="146" cy="90" r="3.4" fill="#ffffff"/>
+                </g>
+                <g class="fish-eye fish-eye-right">
+                    <circle cx="180" cy="90" r="17" fill="#f8fafc" stroke="#075985" stroke-width="3"/>
+                    <circle cx="186" cy="92" r="7.5" fill="#0f172a"/>
+                    <circle cx="183" cy="88" r="3" fill="#ffffff"/>
+                </g>
+
+                <ellipse cx="120" cy="120" rx="11" ry="6" fill="#fb7185" opacity=".45"/>
+                <ellipse cx="202" cy="116" rx="8" ry="5" fill="#fb7185" opacity=".4"/>
+
+                <path d="M188 112 Q197 122 205 111" fill="none" stroke="#9f1239" stroke-width="4" stroke-linecap="round"/>
+                <ellipse cx="208" cy="118" rx="4" ry="6" fill="#fda4af" stroke="#9f1239" stroke-width="2"/>
+            </svg>
+            <span class="fish-name">大肥鱼</span>
         </div>
     </div>
 
-    <!-- 小助手恢复按钮（隐藏后显示） -->
-    <button class="game-restore-btn" id="gameRestoreBtn" title="显示小助手" style="display:none;">🤖</button>
+    <!-- 大肥鱼恢复按钮（隐藏后显示） -->
+    <button class="game-restore-btn" id="gameRestoreBtn" title="显示大肥鱼" aria-label="显示大肥鱼" style="display:none;">🐟</button>
 
     <!-- 通知 -->
     <div class="notification" id="notification"></div>
