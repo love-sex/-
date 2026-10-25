@@ -132,6 +132,15 @@ body:has(.auth-container:not(.hidden)) .exp-bar-container {
     filter: drop-shadow(0 8px 10px rgba(2, 132, 199, 0.28));
 }
 
+.pet-poster {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+}
+
 .pet-video {
     position: absolute;
     left: -73.08%;

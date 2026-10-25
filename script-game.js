@@ -351,6 +351,26 @@ function initPetSpeech() {
     });
 }
 
+// ==================== 视频回退 ====================
+function initPetVideoFallback() {
+    const video = document.querySelector('.pet-video');
+    const poster = document.querySelector('.pet-poster');
+    if (!video || !poster) return;
+
+    const showPoster = () => {
+        video.style.display = 'none';
+        poster.style.display = 'block';
+    };
+
+    video.addEventListener('playing', () => {
+        poster.style.display = 'none';
+    });
+    video.addEventListener('error', showPoster, true);
+    const source = video.querySelector('source');
+    if (source) source.addEventListener('error', showPoster);
+    if (!video.canPlayType('video/webm; codecs="vp9"')) showPoster();
+}
+
 // ==================== 全局实例 ====================
 let gameManager;
 
@@ -358,6 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
     gameManager = new GamificationManager();
     initDraggablePet();
     initPetSpeech();
+    initPetVideoFallback();
     initGameToggle();
 });
 
