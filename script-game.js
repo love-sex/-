@@ -362,9 +362,33 @@ function initPetVideoFallback() {
         poster.style.display = 'block';
     };
 
-    video.addEventListener('playing', () => {
-        poster.style.display = 'none';
-    });
+    // 检测视频首帧是否真的带透明通道；不支持 alpha 的浏览器退回静态图。
+    let checked = false;
+    const checkAlpha = () => {
+        if (checked) return;
+        checked = true;
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 8;
+            canvas.height = 8;
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(video, 0, 0, 8, 8);
+            const data = ctx.getImageData(0, 0, 8, 8).data;
+            let transparent = false;
+            for (let i = 3; i < data.length; i += 4) {
+                if (data[i] === 0) {
+                    transparent = true;
+                    break;
+                }
+            }
+            if (transparent) poster.style.display = 'none';
+            else showPoster();
+        } catch {
+            showPoster();
+        }
+    };
+
+    video.addEventListener('playing', () => setTimeout(checkAlpha, 180), { once: true });
     video.addEventListener('error', showPoster, true);
     const source = video.querySelector('source');
     if (source) source.addEventListener('error', showPoster);
