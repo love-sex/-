@@ -51,6 +51,12 @@ body:has(.auth-container:not(.hidden)) .game-restore-btn {
     border: 0;
     box-shadow: none;
     pointer-events: none;
+    animation: loginTopIn 0.8s cubic-bezier(0.16, 0.84, 0.24, 1) 0.1s both;
+}
+
+@keyframes loginTopIn {
+    from { opacity: 0; transform: translateY(-12px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .login-brand {
@@ -120,8 +126,16 @@ body:has(.auth-container:not(.hidden)) .game-restore-btn {
 }
 
 @keyframes loginHeadline {
-    from { opacity: 0; transform: translateY(34px); }
-    to { opacity: 1; transform: translateY(0); }
+    0% {
+        opacity: 0;
+        clip-path: inset(0 100% 0 0);
+        transform: translateX(-26px);
+    }
+    100% {
+        opacity: 1;
+        clip-path: inset(0 0 0 0);
+        transform: translateX(0);
+    }
 }
 
 /* ---------- 卡片网格 ---------- */
@@ -136,8 +150,9 @@ body:has(.auth-container:not(.hidden)) .game-restore-btn {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-rows: repeat(3, minmax(0, 1fr));
     gap: 1.15vw;
-    transform: rotate(-2deg);
+    transform: rotate(-2deg) translate3d(var(--px, 0px), var(--py, 0px), 0);
     transform-origin: 50% 50%;
+    transition: transform 0.35s cubic-bezier(0.16, 0.84, 0.24, 1);
 }
 
 .login-card {
@@ -167,7 +182,10 @@ body:has(.auth-container:not(.hidden)) .game-restore-btn {
     height: 100%;
     object-fit: cover;
     pointer-events: none;
+    transition: transform 0.7s cubic-bezier(0.16, 0.84, 0.24, 1);
 }
+
+.login-card:hover img { transform: scale(1.03); }
 
 .login-card-replace {
     position: absolute;
@@ -202,6 +220,12 @@ body:has(.auth-container:not(.hidden)) .game-restore-btn {
     font-size: 9px;
     line-height: 1.55;
     letter-spacing: 0.02em;
+    animation: loginFootIn 0.8s cubic-bezier(0.16, 0.84, 0.24, 1) 0.75s both;
+}
+
+@keyframes loginFootIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .login-foot span:first-child { max-width: 300px; }
@@ -393,7 +417,29 @@ body:has(.auth-container:not(.hidden)) .game-restore-btn {
     line-height: 1.5;
 }
 
-/* ---------- 图片编辑 ---------- */
+/* ---------- 图片与文字编辑 ---------- */
+.auth-container [data-login-text] {
+    white-space: pre-line;
+}
+
+.auth-container.login-editing [data-login-text] {
+    outline: 1px dashed rgba(20, 20, 28, 0.35);
+    outline-offset: 4px;
+    cursor: text;
+}
+
+.auth-container.login-editing [data-login-text]:focus {
+    outline: 2px solid #17171c;
+    background: rgba(255, 255, 255, 0.42);
+}
+
+.auth-container.login-editing .login-brand,
+.auth-container.login-editing .login-top-note,
+.auth-container.login-editing .login-headline span,
+.auth-container.login-editing .login-foot span {
+    pointer-events: auto;
+}
+
 .auth-container.login-editing .login-card {
     outline: 1px dashed rgba(20, 20, 28, 0.5);
     outline-offset: 4px;
