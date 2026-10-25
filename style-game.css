@@ -96,11 +96,11 @@ body:has(.auth-container:not(.hidden)) .exp-bar-container {
     display: none;
 }
 
-/* ===== 大肥鱼助手 ===== */
+/* ===== 大肥鱼助手（dsh-pet-indesktop 形象） ===== */
 .assistant-character {
     position: relative;
     width: 152px;
-    height: 170px;
+    height: 210px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -124,102 +124,92 @@ body:has(.auth-container:not(.hidden)) .exp-bar-container {
     50% { translate: 0 -8px; }
 }
 
-.fish-sprite {
-    display: block;
+.pet-stage {
+    position: relative;
     width: 100%;
-    height: auto;
-    overflow: visible;
-    filter: drop-shadow(0 10px 12px rgba(2, 132, 199, 0.35));
+    aspect-ratio: 260 / 320;
+    overflow: hidden;
+    filter: drop-shadow(0 8px 10px rgba(2, 132, 199, 0.28));
 }
 
-.fish-name {
-    margin-top: -2px;
+.pet-video {
+    position: absolute;
+    left: -73.08%;
+    top: -9.375%;
+    width: 246.15%;
+    max-width: none;
+    height: auto;
+    display: block;
+    pointer-events: none;
+    background: transparent;
+}
+
+.pet-name {
+    margin-top: 0;
     padding: 2px 12px 3px;
     border-radius: 999px;
-    background: linear-gradient(135deg, #38bdf8, #0284c7);
-    border: 1.5px solid rgba(255, 255, 255, 0.75);
-    box-shadow: 0 3px 10px rgba(2, 132, 199, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    background: linear-gradient(135deg, #4f7cff, #2447c9);
+    border: 1.5px solid rgba(255, 255, 255, 0.78);
+    box-shadow: 0 3px 10px rgba(36, 71, 201, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.4);
     color: #fff;
     font-size: 0.72rem;
     font-weight: 700;
     letter-spacing: 0.08em;
     line-height: 1.2;
     white-space: nowrap;
-    text-shadow: 0 1px 2px rgba(3, 105, 161, 0.25);
+    text-shadow: 0 1px 2px rgba(20, 45, 130, 0.35);
 }
 
-/* 尾巴、鱼鳍、眨眼与气泡动画 */
-.fish-tail {
-    transform-box: fill-box;
-    transform-origin: 100% 50%;
-    animation: tailSway 2.8s ease-in-out infinite;
+/* 点击助手时冒出的台词气泡 */
+.pet-speech {
+    position: absolute;
+    right: calc(100% + 12px);
+    bottom: 88px;
+    z-index: 20;
+    width: max-content;
+    max-width: 220px;
+    padding: 8px 12px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.97);
+    border: 1.5px solid rgba(79, 124, 255, 0.45);
+    box-shadow: 0 8px 22px rgba(36, 71, 201, 0.18);
+    color: #1e3a5f;
+    font-size: 0.76rem;
+    line-height: 1.45;
+    letter-spacing: 0.02em;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(4px) scale(0.96);
+    transform-origin: bottom right;
+    transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-.fish-fin-top {
-    transform-box: fill-box;
-    transform-origin: 50% 100%;
-    animation: finSway 3.6s ease-in-out infinite;
+.pet-speech.show {
+    opacity: 1;
+    transform: translateY(0) scale(1);
 }
 
-.fish-fin-bottom {
-    transform-box: fill-box;
-    transform-origin: 50% 0%;
-    animation: finSway 3.6s ease-in-out infinite reverse;
+.pet-speech::after {
+    content: '';
+    position: absolute;
+    right: -7px;
+    bottom: 18px;
+    width: 12px;
+    height: 12px;
+    background: rgba(255, 255, 255, 0.97);
+    border-right: 1.5px solid rgba(79, 124, 255, 0.45);
+    border-bottom: 1.5px solid rgba(79, 124, 255, 0.45);
+    transform: rotate(45deg);
 }
 
-.fish-fin-side {
-    transform-box: fill-box;
-    transform-origin: 50% 0%;
-    animation: finFlap 2.4s ease-in-out infinite;
+.assistant-character.pet-bounce {
+    animation: petBounce 0.5s ease;
 }
 
-.fish-eye {
-    transform-box: fill-box;
-    transform-origin: 50% 50%;
-    animation: fishBlink 5.2s ease-in-out infinite;
-}
-
-.fish-eye-right {
-    animation-delay: 0.04s;
-}
-
-.fish-bubbles circle {
-    transform-box: fill-box;
-    transform-origin: 50% 50%;
-    animation: bubbleRise 3.4s ease-in-out infinite;
-}
-
-.fish-bubbles circle:nth-child(2) {
-    animation-delay: 0.6s;
-}
-
-.fish-bubbles circle:nth-child(3) {
-    animation-delay: 1.2s;
-}
-
-@keyframes tailSway {
-    0%, 100% { transform: rotate(0deg); }
-    50% { transform: rotate(-6deg); }
-}
-
-@keyframes finSway {
-    0%, 100% { transform: rotate(0deg); }
-    50% { transform: rotate(4deg); }
-}
-
-@keyframes finFlap {
-    0%, 100% { transform: rotate(0deg); }
-    50% { transform: rotate(-5deg); }
-}
-
-@keyframes fishBlink {
-    0%, 90%, 100% { transform: scaleY(1); }
-    94% { transform: scaleY(0.08); }
-}
-
-@keyframes bubbleRise {
-    0%, 100% { transform: translateY(0); opacity: 0.85; }
-    50% { transform: translateY(-6px); opacity: 0.45; }
+@keyframes petBounce {
+    0%, 100% { transform: translateY(0) scale(1); }
+    35% { transform: translateY(-10px) scale(1.04, 0.96); }
+    65% { transform: translateY(0) scale(0.98, 1.02); }
 }
 
 /* ===== 对话框 ===== */
@@ -616,12 +606,20 @@ body:has(.auth-container:not(.hidden)) .exp-bar-container {
 
     .assistant-character {
         width: 92px;
-        height: 106px;
+        height: 132px;
     }
 
-    .fish-name {
+    .pet-name {
         padding: 1px 9px 2px;
         font-size: 0.62rem;
+    }
+
+    .pet-speech {
+        right: calc(100% + 10px);
+        bottom: 58px;
+        max-width: 190px;
+        padding: 6px 10px;
+        font-size: 0.68rem;
     }
 
     .assistant-dialog {

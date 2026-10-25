@@ -199,11 +199,12 @@ class GamificationManager {
 }
 
 // ==================== 大肥鱼拖拽功能 ====================
-function initDraggableFish() {
+function initDraggablePet() {
     const container = document.querySelector('.game-container');
     if (!container) return;
 
     let isDragging = false;
+    let hasMoved = false;
     let startX, startY;
     let startRight, startBottom;
 
@@ -213,6 +214,7 @@ function initDraggableFish() {
         if (!e.target.closest('.assistant-character') && !e.target.closest('.exp-bar-container')) return;
         e.preventDefault();
         isDragging = true;
+        hasMoved = false;
         container.classList.add('dragging');
 
         startX = e.clientX;
@@ -231,6 +233,7 @@ function initDraggableFish() {
     container.addEventListener('touchstart', (e) => {
         if (!e.target.closest('.assistant-character') && !e.target.closest('.exp-bar-container')) return;
         isDragging = true;
+        hasMoved = false;
         container.classList.add('dragging');
 
         const touch = e.touches[0];
@@ -254,13 +257,13 @@ function initDraggableFish() {
     function onTouchMove(e) {
         if (!isDragging) return;
         e.preventDefault();
-        const touch = e.touches[0];
-        moveTo(touch.clientX, touch.clientY);
+        moveTo(e.touches[0].clientX, e.touches[0].clientY);
     }
 
     function moveTo(clientX, clientY) {
         const deltaX = startX - clientX;
         const deltaY = startY - clientY;
+        if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) hasMoved = true;
 
         let newRight = startRight + deltaX;
         let newBottom = startBottom + deltaY;
@@ -295,7 +298,57 @@ function initDraggableFish() {
     function endDrag() {
         isDragging = false;
         container.classList.remove('dragging');
+        if (hasMoved) {
+            container.dataset.justDragged = '1';
+            setTimeout(() => {
+                if (container.dataset.justDragged === '1') delete container.dataset.justDragged;
+            }, 400);
+        }
     }
+}
+
+// ==================== 点击助手说话 ====================
+function initPetSpeech() {
+    const container = document.querySelector('.game-container');
+    const pet = document.getElementById('assistantChar');
+    const bubble = document.getElementById('petSpeech');
+    if (!container || !pet || !bubble) return;
+
+    const lines = [
+        '才不是大肥鱼呢！',
+        '今天也要好好工作哦～',
+        '摸鱼一下，马上回来！',
+        '吃白饭真好吃～',
+        '需要我帮忙吗？',
+        '别戳啦，会痒的！'
+    ];
+    let lastIndex = -1;
+    let hideTimer;
+
+    pet.addEventListener('click', () => {
+        // 拖拽结束后的 click 不触发台词
+        if (container.dataset.justDragged === '1') {
+            delete container.dataset.justDragged;
+            return;
+        }
+
+        let index = Math.floor(Math.random() * lines.length);
+        if (index === lastIndex) index = (index + 1) % lines.length;
+        lastIndex = index;
+
+        bubble.textContent = lines[index];
+        bubble.classList.add('show');
+        pet.classList.remove('pet-bounce');
+        void pet.offsetWidth;
+        pet.classList.add('pet-bounce');
+
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => bubble.classList.remove('show'), 3200);
+    });
+
+    pet.addEventListener('animationend', (e) => {
+        if (e.animationName === 'petBounce') pet.classList.remove('pet-bounce');
+    });
 }
 
 // ==================== 全局实例 ====================
@@ -303,7 +356,8 @@ let gameManager;
 
 document.addEventListener('DOMContentLoaded', () => {
     gameManager = new GamificationManager();
-    initDraggableFish();
+    initDraggablePet();
+    initPetSpeech();
     initGameToggle();
 });
 
@@ -313,13 +367,16 @@ function initGameToggle() {
     const toggleBtn = document.getElementById('gameToggleBtn');
     const restoreBtn = document.getElementById('gameRestoreBtn');
     if (!container || !toggleBtn || !restoreBtn) return;
+    const video = container.querySelector('.pet-video');
     toggleBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         container.classList.add('game-hidden');
         restoreBtn.style.display = 'flex';
+        if (video) video.pause();
     });
     restoreBtn.addEventListener('click', () => {
         container.classList.remove('game-hidden');
         restoreBtn.style.display = 'none';
+        if (video) video.play().catch(() => {});
     });
 }
