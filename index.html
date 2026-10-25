@@ -15,6 +15,8 @@
     <link rel="stylesheet" href="style-portfolio.css">
     <!-- 想想工作台样式（后加载，覆盖 body/:root） -->
     <link rel="stylesheet" href="workbench.css">
+    <!-- 作品集样式 -->
+    <link rel="stylesheet" href="portfolio.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
@@ -124,6 +126,9 @@
             <div class="app-header-right">
                 <span class="user-display" id="wbUsername" style="margin-right:8px;font-size:0.85rem;color:var(--gold);"></span>
                 <span class="status-dot" id="syncStatus" title="同步状态"></span>
+                <button class="icon-btn" id="portfolioBtn" title="打开作品集" aria-label="打开作品集">
+                    <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>
+                </button>
                 <button class="icon-btn" id="settingsBtn" title="设置">
                     <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
                 </button>
@@ -867,6 +872,164 @@
         <div class="toast" id="toast"></div>
     </div><!-- end wbContainer -->
 
+    <!-- ========== 作品集（登录后默认展示） ========== -->
+    <div class="pf-page" id="pfPage" aria-hidden="true">
+        <header class="pf-top">
+            <div class="pf-brand" data-pf-key="brand">a.cre®</div>
+            <nav class="pf-nav" aria-label="作品集导航">
+                <a href="#pfHero" data-pf-key="nav.home">Home</a>
+                <a href="#pfWork" data-pf-key="nav.explore">Explore</a>
+                <a href="#pfIntro" data-pf-key="nav.services">Services</a>
+            </nav>
+            <div class="pf-actions">
+                <button class="pf-btn pf-btn--ghost" id="pfWorkbenchBtn" type="button">工作台</button>
+                <a class="pf-btn" id="pfContactBtn" href="#pfFooter" data-pf-key="nav.contact">Contact</a>
+                <button class="pf-btn pf-btn--lime" id="pfEditBtn" type="button">编辑</button>
+            </div>
+        </header>
+
+        <main>
+            <section class="pf-hero" id="pfHero">
+                <div class="pf-hero-copy">
+                    <p class="pf-kicker" data-pf-key="hero.kicker">Independent creative studio · 2026</p>
+                    <h1 class="pf-hero-title">
+                        <span data-pf-key="hero.title1">CYBER</span>
+                        <span class="pf-outline" data-pf-key="hero.title2">SECURITY</span>
+                    </h1>
+                    <div class="pf-hero-bottom">
+                        <div>
+                            <p class="pf-hero-lead" data-pf-key="hero.lead">Empowering Your
+Digital Defense</p>
+                            <a class="pf-cta" href="#pfWork" data-pf-key="hero.cta">View selected work ↗</a>
+                        </div>
+                        <p class="pf-hero-desc" data-pf-key="hero.desc">A living portfolio for graphic design, 3D motion and editorial direction. Every word and image on this page is editable — click 编辑 and make it yours.</p>
+                    </div>
+                </div>
+                <div class="pf-hero-media pf-media" data-pf-media>
+                    <img data-pf-img="hero.image" src="assets/portfolio/hero.jpg" alt="Portfolio hero">
+                    <div class="pf-hero-shade"></div>
+                    <button class="pf-replace" type="button">更换图片</button>
+                    <div class="pf-orbit">
+                        <span data-pf-key="hero.badge">Our
+service</span>
+                        <span class="pf-orbit-arrow">↗</span>
+                    </div>
+                </div>
+            </section>
+
+            <div class="pf-marquee" aria-hidden="true">
+                <div class="pf-marquee-track">
+                    <span>Graphic design</span><span>Editorial portfolio</span><span>3D & motion</span><span>Art direction</span>
+                    <span>Graphic design</span><span>Editorial portfolio</span><span>3D & motion</span><span>Art direction</span>
+                </div>
+            </div>
+
+            <section class="pf-intro" id="pfIntro">
+                <div class="pf-intro-head">
+                    <h2 class="pf-display">
+                        <span data-pf-key="intro.title1">GRAPHICS</span>
+                        <span data-pf-key="intro.title2">DESIGN —</span>
+                    </h2>
+                    <div class="pf-intro-side">
+                        <p class="pf-side-title" data-pf-key="intro.side">EDITORIAL
+PORTFOLIO</p>
+                        <p class="pf-side-desc" data-pf-key="intro.sideDesc">Selected work 2022—2026.
+Images · Objects · Type</p>
+                    </div>
+                </div>
+
+                <div class="pf-filters">
+                    <span class="pf-pill is-active" data-pf-key="intro.filter1">ACTUALIZACIONES</span>
+                    <span class="pf-pill" data-pf-key="intro.filter2">CÁMARAS</span>
+                    <span class="pf-pill" data-pf-key="intro.filter3">CUEST</span>
+                    <span class="pf-pill" data-pf-key="intro.filter4">MORE UPDATES</span>
+                </div>
+
+                <div class="pf-profile">
+                    <div class="pf-avatar pf-media" data-pf-media>
+                        <img data-pf-img="profile.avatar" src="assets/portfolio/avatar.jpg" alt="Profile avatar">
+                        <button class="pf-replace" type="button">更换头像</button>
+                    </div>
+                    <div>
+                        <h3 class="pf-profile-name" data-pf-key="profile.name">GESTOREIM</h3>
+                        <p class="pf-profile-meta" data-pf-key="profile.meta">INSTAGRAM ACCOUNT UPDATE
+COLLECTION GRAPHICS DESIGN | 3D</p>
+                    </div>
+                    <p class="pf-profile-desc" data-pf-key="profile.desc">This package includes: over 300 Photoshop mockups, over 1800 assets and a growing library of visual references. Replace this copy with your own story.</p>
+                    <div class="pf-social">
+                        <span data-pf-key="profile.social1">IG</span>
+                        <span data-pf-key="profile.social2">BE</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="pf-work" id="pfWork">
+                <article class="pf-card pf-card--fashion">
+                    <div class="pf-media" data-pf-media>
+                        <img data-pf-img="work.fashion" src="assets/portfolio/fashion.jpg" alt="Fashion editorial">
+                        <button class="pf-replace" type="button">更换图片</button>
+                    </div>
+                    <div class="pf-card-meta">
+                        <span data-pf-key="work.fashionTag">01 / MOTION</span>
+                        <h3 data-pf-key="work.fashionTitle">Flugmodus 3D Poster Design in Cinema 4D</h3>
+                    </div>
+                </article>
+
+                <article class="pf-card pf-card--object">
+                    <div class="pf-media" data-pf-media>
+                        <img data-pf-img="work.object" src="assets/portfolio/object.jpg" alt="Chrome object study">
+                        <button class="pf-replace" type="button">更换图片</button>
+                    </div>
+                    <div class="pf-card-meta">
+                        <span data-pf-key="work.objectTag">02 / OBJECT</span>
+                        <h3 data-pf-key="work.objectTitle">Chrome form study — light, reflection, weight</h3>
+                    </div>
+                </article>
+
+                <article class="pf-card pf-card--statement">
+                    <p class="pf-statement-text" data-pf-key="work.statement">OUR DESIGNERS COLLABORATE WITH THE WORLD'S MOST PIONEERING BRANDS AND COMPANIES TO CREATE ORIGINAL CONTENT AND INTERACTIVE EXPERIENCES.</p>
+                </article>
+
+                <article class="pf-card pf-card--type">
+                    <div class="pf-type-bg" aria-hidden="true">
+                        <span>TYPE 3D</span>
+                        <span>TYPE 3D</span>
+                        <span>TYPE 3D</span>
+                        <span>TYPE 3D</span>
+                    </div>
+                    <div class="pf-type-content">
+                        <span class="pf-type-tag" data-pf-key="work.typeTag">03 / TYPE IN MOTION</span>
+                        <h3 class="pf-type-title" data-pf-key="work.typeTitle">3d poster design in motion</h3>
+                        <p class="pf-type-desc" data-pf-key="work.typeDesc">Made in Cinema 4D and Redshift. By Wendelin Jacob</p>
+                    </div>
+                </article>
+            </section>
+        </main>
+
+        <footer class="pf-footer" id="pfFooter">
+            <p class="pf-footer-kicker" data-pf-key="footer.kicker">AVAILABLE FOR SELECT PROJECTS · 2026</p>
+            <h2 class="pf-footer-title">
+                <span data-pf-key="footer.title1">LET'S</span>
+                <span class="pf-outline" data-pf-key="footer.title2">CREATE</span>
+            </h2>
+            <div class="pf-footer-row">
+                <a class="pf-footer-email" href="mailto:hello@a.cre" data-pf-key="footer.email">hello@a.cre</a>
+                <div class="pf-footer-small">
+                    <span data-pf-key="footer.city">SHANGHAI / CN</span>
+                    <span data-pf-key="footer.year">© 2026</span>
+                    <span data-pf-key="footer.note">EDIT ANYTHING</span>
+                </div>
+            </div>
+        </footer>
+
+        <div class="pf-editbar" id="pfEditbar">
+            <span class="pf-status" id="pfStatus">已保存</span>
+            <button class="pf-reset" id="pfResetBtn" type="button">重置内容</button>
+        </div>
+
+        <input type="file" id="pfFileInput" accept="image/*" hidden>
+    </div>
+
     <!-- 游戏化系统（保留） -->
     <div class="game-container" id="gameContainer">
         <button class="game-toggle-btn" id="gameToggleBtn" title="隐藏大肥鱼" aria-label="隐藏大肥鱼">✕</button>
@@ -900,5 +1063,6 @@
     <script src="script-game.js"></script>
     <script src="script.js"></script>
     <script src="workbench.js"></script>
+    <script src="portfolio.js"></script>
 </body>
 </html>

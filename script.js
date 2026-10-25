@@ -631,6 +631,7 @@ class TodoManager {
             canvas.style.display = 'block';
         }
         this.initDynamicBackground();
+        document.dispatchEvent(new CustomEvent('wb:auth'));
     }
 
     showMainApp() {
@@ -680,6 +681,7 @@ class TodoManager {
         };
         if (logoutHeader) logoutHeader.addEventListener('click', handleLogout);
         if (logoutSettings) logoutSettings.addEventListener('click', handleLogout);
+        document.dispatchEvent(new CustomEvent('wb:main-app', { detail: { username: this.auth.username } }));
     }
 
     // ==================== 工具面板 ====================
