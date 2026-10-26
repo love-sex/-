@@ -279,6 +279,52 @@ body:has(.auth-container:not(.hidden)) .game-restore-btn {
     animation: none;
 }
 
+/* 注册 / 找回密码时，左上角 A. 徽标换成返回登录箭头（尺寸位置与徽标完全一致，切换不跳版） */
+.auth-container .auth-back {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    margin: 0 0 16px;
+    padding: 0;
+    border: 1px solid #1a1a1f;
+    border-radius: 50%;
+    background: transparent;
+    color: #1a1a1f;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.22s ease, color 0.22s ease, transform 0.22s ease;
+}
+
+.auth-container .auth-back svg {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.auth-container .auth-back:hover {
+    background: #1a1a1f;
+    color: #fff;
+    transform: translateX(-2px);
+}
+
+.auth-container .auth-back:active {
+    transform: translateX(-2px) scale(0.94);
+}
+
+.auth-container .auth-back:focus-visible {
+    outline: 2px solid #1a1a1f;
+    outline-offset: 3px;
+}
+
+.auth-container .auth-box.is-sub .auth-logo { display: none; }
+.auth-container .auth-box.is-sub .auth-back { display: flex; }
+
 .auth-container .auth-header h1 {
     margin: 0 0 6px;
     color: #17171c;

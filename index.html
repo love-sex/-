@@ -18,7 +18,7 @@
     <!-- 作品集样式 -->
     <link rel="stylesheet" href="portfolio.css?v=20261029">
     <!-- 登录界面动效 -->
-    <link rel="stylesheet" href="login.css?v=8b416c7">
+    <link rel="stylesheet" href="login.css?v=20261030">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
@@ -105,8 +105,13 @@
             </footer>
         </div>
 
-        <div class="auth-box">
+        <div class="auth-box" id="authBox">
             <div class="auth-header">
+                <button class="auth-back" id="authBack" type="button" aria-label="返回登录" title="返回登录">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M14.5 5.5 8 12l6.5 6.5" />
+                    </svg>
+                </button>
                 <div class="auth-logo">A.</div>
                 <h1 id="authTitle">SIGN IN</h1>
                 <p id="authSubtitle">登录想想工作台 · 继续你的工作</p>
@@ -1228,9 +1233,9 @@ PORTFOLIO</p>
     <div class="notification" id="notification"></div>
 
     <script src="script-game.js"></script>
-    <script src="script.js"></script>
+    <script src="script.js?v=20261030"></script>
     <script src="workbench.js"></script>
     <script src="portfolio.js?v=20261029"></script>
-    <script src="login-cards.js?v=8b416c7"></script>
+    <script src="login-cards.js?v=20261030"></script>
 </body>
 </html>

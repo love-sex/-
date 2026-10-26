@@ -491,42 +491,35 @@ class TodoManager {
     }
 
     // ==================== 认证UI ====================
+    /**
+     * 统一切换登录面板：login / register / forgot
+     * 只有登录面板保留左上角 A. 徽标，注册与找回密码时换成返回箭头。
+     */
+    setAuthView(view = 'login') {
+        const forms = { login: 'loginForm', register: 'registerForm', forgot: 'forgotForm' };
+        const active = forms[view] ? view : 'login';
+        Object.entries(forms).forEach(([name, id]) => {
+            document.getElementById(id)?.classList.toggle('hidden', name !== active);
+        });
+        document.getElementById('authBox')?.classList.toggle('is-sub', active !== 'login');
+        this.clearAuthError();
+        // 通知登录页脚本（标题/副标题跟随切换），避免各处各写一份显隐逻辑
+        document.dispatchEvent(new CustomEvent('wb:authview', { detail: active }));
+        return active;
+    }
+
     setupAuthUI() {
-        // 切换到注册
-        document.getElementById('showRegister')?.addEventListener('click', (e) => {
+        const bind = (id, view) => document.getElementById(id)?.addEventListener('click', (e) => {
             e.preventDefault();
-            document.getElementById('loginForm').classList.add('hidden');
-            document.getElementById('registerForm').classList.remove('hidden');
-            document.getElementById('forgotForm').classList.add('hidden');
-            this.clearAuthError();
+            this.setAuthView(view);
         });
 
-        // 切换到登录
-        document.getElementById('showLogin')?.addEventListener('click', (e) => {
-            e.preventDefault();
-            document.getElementById('registerForm').classList.add('hidden');
-            document.getElementById('forgotForm').classList.add('hidden');
-            document.getElementById('loginForm').classList.remove('hidden');
-            this.clearAuthError();
-        });
-
-        // 切换到忘记密码
-        document.getElementById('showForgot')?.addEventListener('click', (e) => {
-            e.preventDefault();
-            document.getElementById('loginForm').classList.add('hidden');
-            document.getElementById('registerForm').classList.add('hidden');
-            document.getElementById('forgotForm').classList.remove('hidden');
-            this.clearAuthError();
-        });
-
-        // 从忘记密码返回登录
-        document.getElementById('showLoginFromForgot')?.addEventListener('click', (e) => {
-            e.preventDefault();
-            document.getElementById('forgotForm').classList.add('hidden');
-            document.getElementById('registerForm').classList.add('hidden');
-            document.getElementById('loginForm').classList.remove('hidden');
-            this.clearAuthError();
-        });
+        bind('showRegister', 'register');
+        bind('showLogin', 'login');
+        bind('showForgot', 'forgot');
+        bind('showLoginFromForgot', 'login');
+        // 左上角返回箭头：注册 / 找回密码 → 回到登录
+        bind('authBack', 'login');
 
         document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -602,11 +595,8 @@ class TodoManager {
                 document.getElementById('forgotUsername').value = '';
                 document.getElementById('forgotEmail').value = '';
                 document.getElementById('forgotNewPassword').value = '';
-                // 2秒后返回登录
-                setTimeout(() => {
-                    document.getElementById('forgotForm').classList.add('hidden');
-                    document.getElementById('loginForm').classList.remove('hidden');
-                }, 2000);
+                // 2秒后返回登录（走统一入口，返回箭头随之收起）
+                setTimeout(() => this.setAuthView('login'), 2000);
             } catch (err) {
                 this.showAuthError(err.message);
             } finally {
@@ -631,6 +621,8 @@ class TodoManager {
             canvas.style.display = 'block';
         }
         this.initDynamicBackground();
+        // 退出登录 / 重新进入登录页时回到登录面板，避免停在注册或找回密码
+        this.setAuthView('login');
         document.dispatchEvent(new CustomEvent('wb:auth'));
     }
 

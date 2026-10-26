@@ -273,6 +273,8 @@
     document.getElementById('showLogin')?.addEventListener('click', () => setAuthMode('login'));
     document.getElementById('showForgot')?.addEventListener('click', () => setAuthMode('forgot'));
     document.getElementById('showLoginFromForgot')?.addEventListener('click', () => setAuthMode('login'));
+    // 左上角返回箭头也走同一套标题切换
+    document.addEventListener('wb:authview', (e) => setAuthMode(e.detail));
     document.addEventListener('wb:auth', () => {
         setAuthMode('login');
         setEditing(false);
