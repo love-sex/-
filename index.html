@@ -16,7 +16,7 @@
     <!-- 想想工作台样式（后加载，覆盖 body/:root） -->
     <link rel="stylesheet" href="workbench.css">
     <!-- 作品集样式 -->
-    <link rel="stylesheet" href="portfolio.css">
+    <link rel="stylesheet" href="portfolio.css?v=20261026">
     <!-- 登录界面动效 -->
     <link rel="stylesheet" href="login.css?v=8b416c7">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -943,32 +943,140 @@
             </div>
         </header>
 
+        <div class="pf-shell">
         <main>
-            <section class="pf-hero" id="pfHero">
-                <div class="pf-hero-copy">
-                    <p class="pf-kicker" data-pf-key="hero.kicker">Independent creative studio · 2026</p>
-                    <h1 class="pf-hero-title">
-                        <span data-pf-key="hero.title1">CYBER</span>
-                        <span class="pf-outline" data-pf-key="hero.title2">SECURITY</span>
-                    </h1>
-                    <div class="pf-hero-bottom">
-                        <div>
-                            <p class="pf-hero-lead" data-pf-key="hero.lead">Empowering Your
+            <section class="pf-stage" id="pfHero">
+                <div class="pf-stage-frame">
+                    <div class="pf-stage-viewport" id="pfSlides">
+
+                        <article class="pf-slide pf-slide--cyber is-active" data-pf-slide="0">
+                            <div class="pf-slide-bg pf-media" data-pf-media>
+                                <img data-pf-img="slide1.image" src="assets/portfolio/hero.jpg" alt="Cyber security key visual">
+                                <button class="pf-replace" type="button">更换图片</button>
+                            </div>
+                            <div class="pf-slide-scrim" aria-hidden="true"></div>
+
+                            <div class="pf-slide-bar" aria-hidden="true">
+                                <nav class="pf-slide-links"><span>Home</span><span>Explore</span><span>Service</span></nav>
+                                <span class="pf-slide-ticks"><i></i><i></i></span>
+                            </div>
+
+                            <div class="pf-slide-body">
+                                <div class="pf-slide-copy">
+                                    <p class="pf-kicker" data-pf-key="hero.kicker">Independent creative studio · 2026</p>
+                                    <p class="pf-hero-lead" data-pf-key="hero.lead">Empowering Your
 Digital Defense</p>
-                            <a class="pf-cta" href="#pfWork" data-pf-key="hero.cta">View selected work ↗</a>
-                        </div>
-                        <p class="pf-hero-desc" data-pf-key="hero.desc">A living portfolio for graphic design, 3D motion and editorial direction. Every word and image on this page is editable — click 编辑 and make it yours.</p>
-                    </div>
-                </div>
-                <div class="pf-hero-media pf-media" data-pf-media>
-                    <img data-pf-img="hero.image" src="assets/portfolio/hero.jpg" alt="Portfolio hero">
-                    <div class="pf-hero-shade"></div>
-                    <button class="pf-replace" type="button">更换图片</button>
-                    <div class="pf-orbit">
-                        <span data-pf-key="hero.badge">Our
+                                    <p class="pf-hero-desc" data-pf-key="hero.desc">A living portfolio for graphic design, 3D motion and editorial direction. Every word and image on this page is editable — click 编辑 and make it yours.</p>
+                                    <a class="pf-cta" href="#pfWork" data-pf-key="hero.cta">View selected work ↗</a>
+                                </div>
+                                <h1 class="pf-hero-title">
+                                    <span data-pf-key="hero.title1">CYBER</span>
+                                    <span class="pf-outline" data-pf-key="hero.title2">SECURITY</span>
+                                </h1>
+                            </div>
+
+                            <span class="pf-slide-pill" data-pf-key="hero.pill">Creating</span>
+
+                            <div class="pf-mini pf-media" data-pf-media>
+                                <img data-pf-img="hero.card" src="assets/portfolio/avatar.jpg" alt="Featured card">
+                                <button class="pf-replace" type="button">更换图片</button>
+                            </div>
+
+                            <div class="pf-orbit">
+                                <span class="pf-orbit-ring" aria-hidden="true"></span>
+                                <span class="pf-orbit-text" data-pf-key="hero.badge">Our
 service</span>
-                        <span class="pf-orbit-arrow">↗</span>
+                                <span class="pf-orbit-arrow" aria-hidden="true">↗</span>
+                            </div>
+                        </article>
+
+                        <article class="pf-slide pf-slide--vigil" data-pf-slide="1">
+                            <div class="pf-vigil-nav" aria-hidden="true">
+                                <span>Security Consulting</span><span>Security Awareness Training</span><span>Endpoint Security Solutions</span><span>Cloud Security Services</span><span>Vulnerability Assessment</span>
+                            </div>
+
+                            <div class="pf-vigil-grid">
+                                <div class="pf-vigil-left">
+                                    <h2 class="pf-vigil-title" data-pf-key="slide2.title">VigilByte</h2>
+                                    <span class="pf-vigil-chip" aria-hidden="true">Drag →</span>
+                                    <p class="pf-vigil-desc" data-pf-key="slide2.desc">In the interconnected world, safeguarding your data and protecting your assets is not just an option; it's an imperative. We are your unwavering shield and your digital guardians.</p>
+                                    <span class="pf-vigil-index" data-pf-key="slide2.index">02 / 03 — Services</span>
+                                </div>
+
+                                <div class="pf-vigil-card pf-media" data-pf-media>
+                                    <img data-pf-img="slide2.card1" src="assets/portfolio/fashion.jpg" alt="Case 01">
+                                    <button class="pf-replace" type="button">更换图片</button>
+                                    <span class="pf-vigil-num" aria-hidden="true">01</span>
+                                    <span class="pf-vigil-tag" data-pf-key="slide2.tag1">Security Awareness Training</span>
+                                </div>
+
+                                <div class="pf-vigil-card pf-media" data-pf-media>
+                                    <img data-pf-img="slide2.card2" src="assets/portfolio/object.jpg" alt="Case 02">
+                                    <button class="pf-replace" type="button">更换图片</button>
+                                    <span class="pf-vigil-num" aria-hidden="true">02</span>
+                                    <span class="pf-vigil-tag" data-pf-key="slide2.tag2">Endpoint Security Solutions</span>
+                                </div>
+                            </div>
+                        </article>
+
+                        <article class="pf-slide pf-slide--guard" data-pf-slide="2">
+                            <div class="pf-guard-grid">
+                                <h2 class="pf-guard-title" data-pf-key="slide3.title">Safeguarding Your
+Digital Frontier</h2>
+
+                                <div class="pf-guard-orb pf-media" data-pf-media>
+                                    <img data-pf-img="slide3.orb" src="assets/portfolio/object.jpg" alt="Frontier visual">
+                                    <button class="pf-replace" type="button">更换图片</button>
+                                </div>
+
+                                <div class="pf-guard-team">
+                                    <span class="pf-guard-label" data-pf-key="slide3.label">Meet Our Team</span>
+                                    <div class="pf-guard-people">
+                                        <figure class="pf-person">
+                                            <div class="pf-person-avatar pf-media" data-pf-media>
+                                                <img data-pf-img="slide3.avatar1" src="assets/portfolio/avatar.jpg" alt="Team member">
+                                                <button class="pf-replace" type="button">更换</button>
+                                            </div>
+                                            <figcaption>
+                                                <b data-pf-key="slide3.name1">Michael Patel</b>
+                                                <em data-pf-key="slide3.role1">Security Analyst</em>
+                                            </figcaption>
+                                        </figure>
+                                        <figure class="pf-person">
+                                            <div class="pf-person-avatar pf-media" data-pf-media>
+                                                <img data-pf-img="slide3.avatar2" src="assets/login/card-1.jpg" alt="Team member">
+                                                <button class="pf-replace" type="button">更换</button>
+                                            </div>
+                                            <figcaption>
+                                                <b data-pf-key="slide3.name2">Emir Johnson</b>
+                                                <em data-pf-key="slide3.role2">Security Consultant</em>
+                                            </figcaption>
+                                        </figure>
+                                        <figure class="pf-person">
+                                            <div class="pf-person-avatar pf-media" data-pf-media>
+                                                <img data-pf-img="slide3.avatar3" src="assets/login/card-5.jpg" alt="Team member">
+                                                <button class="pf-replace" type="button">更换</button>
+                                            </div>
+                                            <figcaption>
+                                                <b data-pf-key="slide3.name3">Olivia Harris</b>
+                                                <em data-pf-key="slide3.role3">Security Engineer</em>
+                                            </figcaption>
+                                        </figure>
+                                    </div>
+                                </div>
+
+                                <p class="pf-guard-desc" data-pf-key="slide3.desc">Our team of seasoned experts brings a wealth of experience and cutting-edge knowledge to the table, providing tailored solutions to meet your unique needs.</p>
+                            </div>
+                        </article>
+
                     </div>
+
+                    <div class="pf-dots" role="tablist" aria-label="展示切换">
+                        <button type="button" class="pf-dot is-active" data-pf-goto="0" aria-label="展示 1" role="tab"></button>
+                        <button type="button" class="pf-dot" data-pf-goto="1" aria-label="展示 2" role="tab"></button>
+                        <button type="button" class="pf-dot" data-pf-goto="2" aria-label="展示 3" role="tab"></button>
+                    </div>
+
                 </div>
             </section>
 
@@ -981,39 +1089,40 @@ service</span>
 
             <section class="pf-intro" id="pfIntro">
                 <div class="pf-intro-head">
-                    <h2 class="pf-display">
-                        <span data-pf-key="intro.title1">GRAPHICS</span>
-                        <span data-pf-key="intro.title2">DESIGN —</span>
-                    </h2>
+                    <div class="pf-intro-left">
+                        <h2 class="pf-display">
+                            <span data-pf-key="intro.title1">GRAPHICS</span>
+                            <span data-pf-key="intro.title2">DESIGN —</span>
+                        </h2>
+
+                        <div class="pf-profile">
+                            <div class="pf-avatar pf-media" data-pf-media>
+                                <img data-pf-img="profile.avatar" src="assets/portfolio/avatar.jpg" alt="Profile avatar">
+                                <button class="pf-replace" type="button">更换头像</button>
+                            </div>
+                            <div class="pf-profile-id">
+                                <h3 class="pf-profile-name" data-pf-key="profile.name">GESTOREIM</h3>
+                                <p class="pf-profile-meta" data-pf-key="profile.meta">INSTAGRAM ACCOUNT UPDATE
+COLLECTION GRAPHICS DESIGN | 3D</p>
+                            </div>
+                            <p class="pf-profile-desc" data-pf-key="profile.desc">This package includes: over 300 Photoshop mockups, over 1800 assets and a growing library of visual references. Replace this copy with your own story.</p>
+                            <div class="pf-social">
+                                <span data-pf-key="profile.social1">IG</span>
+                                <span data-pf-key="profile.social2">BE</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="pf-intro-side">
+                        <div class="pf-filters">
+                            <span class="pf-pill is-active" data-pf-key="intro.filter1">ACTUALIZACIONES</span>
+                            <span class="pf-pill" data-pf-key="intro.filter2">CÁMARAS</span>
+                            <span class="pf-pill" data-pf-key="intro.filter3">CUEST</span>
+                            <span class="pf-pill" data-pf-key="intro.filter4">MORE UPDATES</span>
+                        </div>
                         <p class="pf-side-title" data-pf-key="intro.side">EDITORIAL
 PORTFOLIO</p>
-                        <p class="pf-side-desc" data-pf-key="intro.sideDesc">Selected work 2022—2026.
-Images · Objects · Type</p>
-                    </div>
-                </div>
-
-                <div class="pf-filters">
-                    <span class="pf-pill is-active" data-pf-key="intro.filter1">ACTUALIZACIONES</span>
-                    <span class="pf-pill" data-pf-key="intro.filter2">CÁMARAS</span>
-                    <span class="pf-pill" data-pf-key="intro.filter3">CUEST</span>
-                    <span class="pf-pill" data-pf-key="intro.filter4">MORE UPDATES</span>
-                </div>
-
-                <div class="pf-profile">
-                    <div class="pf-avatar pf-media" data-pf-media>
-                        <img data-pf-img="profile.avatar" src="assets/portfolio/avatar.jpg" alt="Profile avatar">
-                        <button class="pf-replace" type="button">更换头像</button>
-                    </div>
-                    <div>
-                        <h3 class="pf-profile-name" data-pf-key="profile.name">GESTOREIM</h3>
-                        <p class="pf-profile-meta" data-pf-key="profile.meta">INSTAGRAM ACCOUNT UPDATE
-COLLECTION GRAPHICS DESIGN | 3D</p>
-                    </div>
-                    <p class="pf-profile-desc" data-pf-key="profile.desc">This package includes: over 300 Photoshop mockups, over 1800 assets and a growing library of visual references. Replace this copy with your own story.</p>
-                    <div class="pf-social">
-                        <span data-pf-key="profile.social1">IG</span>
-                        <span data-pf-key="profile.social2">BE</span>
+                        <p class="pf-side-desc" data-pf-key="intro.sideDesc">Available for freelance or long-term, or report. Selected work 2022—2026 · Images · Objects · Type</p>
                     </div>
                 </div>
             </section>
@@ -1030,34 +1139,36 @@ COLLECTION GRAPHICS DESIGN | 3D</p>
                     </div>
                 </article>
 
-                <article class="pf-card pf-card--object">
-                    <div class="pf-media" data-pf-media>
-                        <img data-pf-img="work.object" src="assets/portfolio/object.jpg" alt="Chrome object study">
-                        <button class="pf-replace" type="button">更换图片</button>
-                    </div>
-                    <div class="pf-card-meta">
-                        <span data-pf-key="work.objectTag">02 / OBJECT</span>
-                        <h3 data-pf-key="work.objectTitle">Chrome form study — light, reflection, weight</h3>
-                    </div>
-                </article>
+                <div class="pf-work-col">
+                    <article class="pf-card pf-card--object">
+                        <div class="pf-media" data-pf-media>
+                            <img data-pf-img="work.object" src="assets/portfolio/object.jpg" alt="Chrome object study">
+                            <button class="pf-replace" type="button">更换图片</button>
+                        </div>
+                        <div class="pf-card-meta">
+                            <span data-pf-key="work.objectTag">02 / OBJECT</span>
+                            <h3 data-pf-key="work.objectTitle">Chrome form study — light, reflection, weight</h3>
+                        </div>
+                    </article>
 
-                <article class="pf-card pf-card--statement">
-                    <p class="pf-statement-text" data-pf-key="work.statement">OUR DESIGNERS COLLABORATE WITH THE WORLD'S MOST PIONEERING BRANDS AND COMPANIES TO CREATE ORIGINAL CONTENT AND INTERACTIVE EXPERIENCES.</p>
-                </article>
+                    <article class="pf-card pf-card--statement">
+                        <p class="pf-statement-text" data-pf-key="work.statement">OUR DESIGNERS COLLABORATE WITH THE WORLD'S MOST PIONEERING BRANDS AND COMPANIES TO CREATE ORIGINAL CONTENT AND INTERACTIVE EXPERIENCES.</p>
+                    </article>
 
-                <article class="pf-card pf-card--type">
-                    <div class="pf-type-bg" aria-hidden="true">
-                        <span>TYPE 3D</span>
-                        <span>TYPE 3D</span>
-                        <span>TYPE 3D</span>
-                        <span>TYPE 3D</span>
-                    </div>
-                    <div class="pf-type-content">
-                        <span class="pf-type-tag" data-pf-key="work.typeTag">03 / TYPE IN MOTION</span>
-                        <h3 class="pf-type-title" data-pf-key="work.typeTitle">3d poster design in motion</h3>
-                        <p class="pf-type-desc" data-pf-key="work.typeDesc">Made in Cinema 4D and Redshift. By Wendelin Jacob</p>
-                    </div>
-                </article>
+                    <article class="pf-card pf-card--type">
+                        <div class="pf-type-bg" aria-hidden="true">
+                            <span>TYPE 3D TYPE 3D TYPE 3D TYPE 3D TYPE 3D</span>
+                            <span>TYPE 3D TYPE 3D TYPE 3D TYPE 3D TYPE 3D</span>
+                            <span>TYPE 3D TYPE 3D TYPE 3D TYPE 3D TYPE 3D</span>
+                            <span>TYPE 3D TYPE 3D TYPE 3D TYPE 3D TYPE 3D</span>
+                        </div>
+                        <div class="pf-type-content">
+                            <span class="pf-type-tag" data-pf-key="work.typeTag">03 / TYPE IN MOTION</span>
+                            <h3 class="pf-type-title" data-pf-key="work.typeTitle">3d poster design in motion</h3>
+                            <p class="pf-type-desc" data-pf-key="work.typeDesc">Made in Cinema 4D and Redshift. By Wendelin Jacob</p>
+                        </div>
+                    </article>
+                </div>
             </section>
         </main>
 
@@ -1076,6 +1187,7 @@ COLLECTION GRAPHICS DESIGN | 3D</p>
                 </div>
             </div>
         </footer>
+        </div><!-- end pf-shell -->
 
         <div class="pf-editbar" id="pfEditbar">
             <span class="pf-status" id="pfStatus">已保存</span>
@@ -1118,7 +1230,7 @@ COLLECTION GRAPHICS DESIGN | 3D</p>
     <script src="script-game.js"></script>
     <script src="script.js"></script>
     <script src="workbench.js"></script>
-    <script src="portfolio.js"></script>
+    <script src="portfolio.js?v=20261026"></script>
     <script src="login-cards.js?v=8b416c7"></script>
 </body>
 </html>
