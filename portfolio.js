@@ -110,6 +110,10 @@
                 text: parsed && typeof parsed.text === 'object' ? parsed.text : {},
                 images: parsed && typeof parsed.images === 'object' ? parsed.images : {}
             };
+            // 兼容旧版字段：主视觉从 hero.image 迁移到展台首屏 slide1.image
+            if (state.images['hero.image'] && !state.images['slide1.image']) {
+                state.images['slide1.image'] = state.images['hero.image'];
+            }
         } catch (e) {
             console.warn('Portfolio load:', e);
         }
