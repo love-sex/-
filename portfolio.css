@@ -338,7 +338,12 @@ body.pf-lock { overflow: hidden; }
     gap: 24px;
     padding: clamp(22px, 3vw, 46px);
     padding-bottom: clamp(44px, 4vw, 58px);
+    /* 铺满整屏的布局层不能吃掉点击，否则首屏大图永远点不到 */
+    pointer-events: none;
 }
+
+/* 只有真正可编辑的文字 / 链接重新接管鼠标 */
+.pf-slide-body [data-pf-key] { pointer-events: auto; }
 
 .pf-slide-copy {
     align-self: end;
@@ -1295,8 +1300,9 @@ body.pf-lock { overflow: hidden; }
     background: rgba(200, 255, 77, 0.08);
 }
 
+/* 编辑态下链接类文字仍需可编辑，跳转由脚本拦截 */
 .pf-page.pf-editing .pf-cta,
-.pf-page.pf-editing .pf-footer-email { pointer-events: none; }
+.pf-page.pf-editing .pf-footer-email { cursor: text; }
 
 .pf-replace {
     position: absolute;

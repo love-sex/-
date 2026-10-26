@@ -269,6 +269,13 @@
         document.getElementById('pfFooter')?.scrollIntoView({ behavior: 'smooth' });
     });
 
+    // 编辑态下所有锚点跳转都拦住，保证文字可以正常点选编辑
+    page.addEventListener('click', (e) => {
+        if (!editing) return;
+        const link = e.target.closest?.('a[href]');
+        if (link && link.getAttribute('href').startsWith('#')) e.preventDefault();
+    });
+
     textEls.forEach((el) => {
         el.addEventListener('input', scheduleSave);
         el.addEventListener('blur', () => {
@@ -281,7 +288,10 @@
             if (!editing) return;
             const img = media.querySelector('[data-pf-img]');
             if (!img) return;
-            if (e.target.tagName === 'IMG' || e.target.closest('.pf-replace')) {
+            // 容器本身、容器内的图片、以及「更换图片」按钮都算有效点击
+            const onImage = e.target === img || e.target.tagName === 'IMG';
+            const onReplace = !!e.target.closest?.('.pf-replace');
+            if (onImage || onReplace || e.target === media) {
                 e.preventDefault();
                 activeImage = img;
                 fileInput.value = '';
