@@ -741,16 +741,28 @@ body.pf-lock { overflow: hidden; }
     position: absolute;
     top: 50%;
     right: clamp(108px, 8.6vw, 138px);
-    z-index: 8;
+    /* 必须高于圆形徽标(z:8)与底部胶囊(z:5)，否则点击会被邻居截走 */
+    z-index: 10;
     width: clamp(62px, 5.6vw, 82px);
     aspect-ratio: 3 / 4;
     border-radius: 10px;
-    overflow: hidden;
+    overflow: visible;
     border: 1px solid rgba(255, 255, 255, 0.14);
     background: #101010;
     box-shadow: 0 16px 44px rgba(0, 0, 0, 0.65);
     transform: translateY(-50%) rotate(-3.5deg);
     transition: transform 0.5s var(--pf-ease), box-shadow 0.5s var(--pf-ease);
+}
+
+/* 图片自己裁圆角，容器不再 overflow:hidden，好把点击热区放大 */
+.pf-mini img { border-radius: 10px; }
+
+/* 卡片只有 60~80px 宽，四周再补 10px 透明热区，避免点偏落到首屏大图上 */
+.pf-mini::after {
+    content: "";
+    position: absolute;
+    inset: -10px;
+    border-radius: 16px;
 }
 
 .pf-mini:hover {
@@ -796,6 +808,9 @@ body.pf-lock { overflow: hidden; }
     transform: translateY(-50%);
     pointer-events: none;
 }
+
+/* 徽标整体只做装饰，但里面的文字仍然可编辑 */
+.pf-orbit [data-pf-key] { pointer-events: auto; }
 
 .pf-orbit-ring {
     position: absolute;
@@ -1335,6 +1350,15 @@ body.pf-lock { overflow: hidden; }
 .pf-page.pf-editing .pf-media:focus-within .pf-replace {
     opacity: 1;
     pointer-events: auto;
+}
+
+/* 小卡片只有 60~80px，编辑态直接把按钮常驻，避免用户找不到可点的地方 */
+.pf-page.pf-editing .pf-mini .pf-replace {
+    opacity: 1;
+    pointer-events: auto;
+    right: 3px;
+    bottom: 3px;
+    padding: 4px 6px;
 }
 
 .pf-editbar {

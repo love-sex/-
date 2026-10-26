@@ -19,6 +19,7 @@
     let state = { text: {}, images: {} };
     let editing = false;
     let activeImage = null;
+    let pendingMedia = null;
     let saveTimer = 0;
     let suppressSave = false;
 
@@ -294,6 +295,7 @@
             if (onImage || onReplace || e.target === media) {
                 e.preventDefault();
                 activeImage = img;
+                pendingMedia = media;
                 fileInput.value = '';
                 fileInput.click();
             }
@@ -317,12 +319,19 @@
 
     fileInput?.addEventListener('change', () => {
         const file = fileInput.files?.[0];
-        if (file && activeImage) {
-            replaceImage(activeImage, file).finally(() => {
-                activeImage = null;
-                fileInput.value = '';
-            });
+        if (!file) return;
+        // 兜底：万一 activeImage 丢了，用最后一次点击的图片，不能「选了文件却没反应」
+        const target = activeImage || pendingMedia?.querySelector('[data-pf-img]');
+        if (!target) {
+            setStatus('请先点击要更换的图片');
+            fileInput.value = '';
+            return;
         }
+        replaceImage(target, file).finally(() => {
+            activeImage = null;
+            pendingMedia = null;
+            fileInput.value = '';
+        });
     });
 
     resetBtn?.addEventListener('click', () => {
