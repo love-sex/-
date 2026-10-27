@@ -13,9 +13,10 @@
     overflow: hidden;
     border: 1px solid rgba(var(--primary-rgb), 0.14);
     border-radius: var(--radius-sm);
+    /* 透明背景用中性灰棋盘格（不跟主题色走，方便判断是否真的透明） */
     background-image:
-        linear-gradient(45deg, rgba(var(--primary-rgb), 0.07) 25%, transparent 25%, transparent 75%, rgba(var(--primary-rgb), 0.07) 75%),
-        linear-gradient(45deg, rgba(var(--primary-rgb), 0.07) 25%, transparent 25%, transparent 75%, rgba(var(--primary-rgb), 0.07) 75%);
+        linear-gradient(45deg, #e6e6e6 25%, transparent 25%, transparent 75%, #e6e6e6 75%),
+        linear-gradient(45deg, #e6e6e6 25%, transparent 25%, transparent 75%, #e6e6e6 75%);
     background-size: 20px 20px;
     background-position: 0 0, 10px 10px;
     background-color: #fff;
@@ -142,9 +143,10 @@
 
 .matting-preview {
     border-radius: var(--radius-sm);
+    /* 透明背景用中性灰棋盘格（不跟主题色走，方便判断是否真的透明） */
     background-image:
-        linear-gradient(45deg, rgba(var(--primary-rgb), 0.07) 25%, transparent 25%, transparent 75%, rgba(var(--primary-rgb), 0.07) 75%),
-        linear-gradient(45deg, rgba(var(--primary-rgb), 0.07) 25%, transparent 25%, transparent 75%, rgba(var(--primary-rgb), 0.07) 75%);
+        linear-gradient(45deg, #e6e6e6 25%, transparent 25%, transparent 75%, #e6e6e6 75%),
+        linear-gradient(45deg, #e6e6e6 25%, transparent 25%, transparent 75%, #e6e6e6 75%);
     background-size: 20px 20px;
     background-position: 0 0, 10px 10px;
     background-color: #fff;

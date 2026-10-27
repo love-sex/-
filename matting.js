@@ -73,7 +73,7 @@
         hardness: 0.6,
         feather: 1,
         contrast: 0,
-        showCut: true,
+        showCut: false,
         tracer: null
     };
 
