@@ -72,7 +72,7 @@
         brush: 40,
         hardness: 0.6,
         feather: 1,
-        contrast: 0,
+        contrast: 0.4,
         showCut: false,
         tracer: null
     };
@@ -316,7 +316,11 @@
         const out = S.mctx.createImageData(w, h);
         const d = out.data;
         let m = new Float32Array(n);
-        for (let i = 0, j = 0; j < n; i += 4, j++) m[j] = src[i + 3] / 255;
+        for (let i = 0, j = 0; j < n; i += 4, j++) {
+            const v = src[i + 3] / 255;
+            // 极低透明度基本是残留噪点，直接抹掉，避免换底色后浮出淡淡残影
+            m[j] = v < 0.08 ? 0 : v;
+        }
 
         if (opts.refine && S.rgb) m = guidedFilter(m, S.rgb.data, w, h, 3, 1e-4);
         if (opts.feather > 0) m = boxBlurGray(m, w, h, Math.round(opts.feather), 2);
