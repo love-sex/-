@@ -608,6 +608,12 @@
         x.globalCompositeOperation = 'destination-in';
         x.drawImage(S.mask, 0, 0, tw, th);
         const imgd = x.getImageData(0, 0, tw, th);
+        // alpha 二值化：合并半透明边缘，避免追踪出散落的小色块/白点
+        const dd = imgd.data;
+        for (let i = 0; i < dd.length; i += 4) {
+            if (dd[i + 3] < 128) { dd[i] = dd[i + 1] = dd[i + 2] = 0; dd[i + 3] = 0; }
+            else dd[i + 3] = 255;
+        }
         const colors = Number(($('#mattingVecColors') || {}).value || 24);
         const detail = Number(($('#mattingVecDetail') || {}).value || 60);
         const lt = Math.max(0.2, 2.4 - detail / 60);
