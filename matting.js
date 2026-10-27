@@ -19,12 +19,24 @@
         el._t = setTimeout(() => el.classList.remove('show'), 2200);
     };
 
-    const MODEL = {
-        url: 'assets/matting/models/isnet_quint8.onnx',
-        size: 1024,
-        mean: [0.485, 0.456, 0.406],
-        std: [0.229, 0.224, 0.225]
+    // 两档模型：标准（4.7MB，秒开）/ 精细（42MB，边缘更准，首次下载较慢）
+    const MODELS = {
+        fast: {
+            key: 'u2netp', label: '标准', bytes: 4574861, size: 320,
+            mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225],
+            files: ['u2netp.onnx']
+        },
+        pro: {
+            key: 'isnet', label: '精细', bytes: 44348940, size: 1024,
+            mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225],
+            files: ['isnet_quint8.onnx.part1', 'isnet_quint8.onnx.part2', 'isnet_quint8.onnx.part3']
+        }
     };
+    // 先走国内通常更快的 CDN，失败/超时自动回落到站点自身，保证一定能用
+    const SOURCES = [
+        (f) => 'https://fastly.jsdelivr.net/gh/love-sex/-@main/assets/matting/models/' + f,
+        (f) => new URL('assets/matting/models/' + f, location.href).href
+    ];
     const ORT_BASE = new URL('assets/matting/ort/', location.href).href;
     const TRACER_URL = new URL('assets/matting/imagetracer.js', location.href).href;
     const MAX_SIDE = 1400;
@@ -41,6 +53,8 @@
         hasMask: false,
         busy: false,
         session: null,
+        sessionKey: null,
+        model: 'fast',
         ort: null,
         undo: [], redo: [],
         last: null,
@@ -314,39 +328,90 @@
     };
 
     /* ---------------- 模型加载 + 推理 ---------------- */
-    const fetchWithProgress = async (url) => {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('模型下载失败（' + res.status + '）');
-        const total = Number(res.headers.get('content-length') || 0);
-        if (!res.body || !res.body.getReader) return await res.blob();
-        const reader = res.body.getReader();
-        const chunks = [];
+    // 单分片下载：带进度，45 秒收不到新数据就放弃（方便自动换源重试）
+    const fetchPart = async (url, onBytes) => {
+        const ctrl = new AbortController();
+        let last = Date.now();
+        const wd = setInterval(() => { if (Date.now() - last > 45000) ctrl.abort(); }, 3000);
+        try {
+            const res = await fetch(url, { signal: ctrl.signal });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            if (!res.body || !res.body.getReader) return new Uint8Array(await res.arrayBuffer());
+            const reader = res.body.getReader();
+            const parts = [];
+            for (; ;) {
+                const r = await reader.read();
+                if (r.done) break;
+                last = Date.now();
+                parts.push(r.value);
+                onBytes(r.value.length);
+            }
+            const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+            let off = 0;
+            parts.forEach(p => { out.set(p, off); off += p.length; });
+            return out;
+        } finally { clearInterval(wd); }
+    };
+
+    // 按清单依次下载全部分片；任一源失败/超时就换下一个源，并校验总字节数
+    const downloadModel = async (spec) => {
         let got = 0;
-        for (; ;) {
-            const r = await reader.read();
-            if (r.done) break;
-            chunks.push(r.value);
-            got += r.value.length;
-            if (total) setProgress(got / total);
-            setStatus('正在下载抠图模型 ' + (got / 1048576).toFixed(1) + ' / ' + (total / 1048576).toFixed(1) + ' MB');
+        const t0 = Date.now();
+        const onBytes = (n) => {
+            got += n;
+            const sec = Math.max(0.5, (Date.now() - t0) / 1000);
+            setProgress(Math.min(0.99, got / spec.bytes));
+            setStatus('正在下载' + spec.label + '模型 ' + (got / 1048576).toFixed(1) + ' / ' + (spec.bytes / 1048576).toFixed(1) + ' MB（' + (got / 1048576 / sec).toFixed(1) + ' MB/s）');
+        };
+        let lastErr = null;
+        for (let s = 0; s < SOURCES.length; s++) {
+            try {
+                const parts = [];
+                for (const f of spec.files) parts.push(await fetchPart(SOURCES[s](f), onBytes));
+                const total = parts.reduce((n, p) => n + p.length, 0);
+                if (total !== spec.bytes) throw new Error('文件不完整（' + total + '/' + spec.bytes + ' 字节）');
+                const out = new Uint8Array(total);
+                let off = 0;
+                parts.forEach(p => { out.set(p, off); off += p.length; });
+                return out.buffer;
+            } catch (e) {
+                lastErr = e;
+                got = 0;
+                setStatus('当前下载源较慢或不通，正在换一个继续...');
+            }
         }
-        return new Blob(chunks);
+        throw new Error(lastErr ? lastErr.message : '模型下载失败');
+    };
+
+    // 面板一打开就在后台把模型备好，用户选完图基本就能直接开跑
+    let prefetching = false;
+    const prefetch = () => {
+        if (prefetching || S.session || S.busy) return;
+        const sec = $('section[data-view="matting"]');
+        if (!sec || !sec.offsetParent) return;
+        prefetching = true;
+        setStatus('正在后台准备抠图模型，先传图也不影响...');
+        setProgress(0.01);
+        ensureSession()
+            .then(() => { if (!S.hasMask) { setStatus('模型已就绪，上传图片后点「一键去背景」'); setProgress(null); } })
+            .catch((e) => { if (!S.hasMask) { setStatus('模型准备失败：' + e.message + '，点「一键去背景」可重试'); setProgress(null); } })
+            .finally(() => { prefetching = false; });
     };
 
     const ensureSession = async () => {
-        if (S.session) return S.session;
-        setProgress(0.01);
-        setStatus('正在准备抠图模型...');
-        let buf = await idbGet('isnet');
-        if (!buf) {
-            const blob = await fetchWithProgress(new URL(MODEL.url, location.href).href);
-            buf = await blob.arrayBuffer();
-            await idbPut('isnet', buf);
-            setStatus('模型已缓存，下次使用秒开');
+        const spec = MODELS[S.model] || MODELS.fast;
+        if (S.session && S.sessionKey === spec.key) return S.session;
+        setProgress(0.02);
+        let buf = await idbGet('model:' + spec.key);
+        if (buf && buf.byteLength !== spec.bytes) buf = null;
+        if (buf) {
+            setStatus('使用已缓存的' + spec.label + '模型');
         } else {
-            setStatus('使用已缓存的抠图模型');
+            buf = await downloadModel(spec);
+            await idbPut('model:' + spec.key, buf);
+            setStatus(spec.label + '模型已缓存，下次使用秒开');
         }
-        setProgress(0.98);
+        setProgress(0.99);
         setStatus('正在加载推理引擎...');
         if (!S.ort) S.ort = await import(ORT_BASE + 'ort.wasm.min.mjs');
         S.ort.env.wasm.wasmPaths = ORT_BASE;
@@ -354,13 +419,15 @@
             executionProviders: ['wasm'],
             graphOptimizationLevel: 'all'
         });
+        S.sessionKey = spec.key;
         setProgress(null);
         return S.session;
     };
 
     const infer = async () => {
         const session = await ensureSession();
-        const N = MODEL.size;
+        const spec = MODELS[S.model] || MODELS.fast;
+        const N = spec.size;
         setStatus('正在识别主体区域...');
         const t = document.createElement('canvas');
         t.width = N; t.height = N;
@@ -372,9 +439,9 @@
         const input = new Float32Array(N * N * 3);
         const plane = N * N;
         for (let i = 0, o = 0; o < plane; i += 4, o++) {
-            input[o] = (px[i] / 255 - MODEL.mean[0]) / MODEL.std[0];
-            input[plane + o] = (px[i + 1] / 255 - MODEL.mean[1]) / MODEL.std[1];
-            input[plane * 2 + o] = (px[i + 2] / 255 - MODEL.mean[2]) / MODEL.std[2];
+            input[o] = (px[i] / 255 - spec.mean[0]) / spec.std[0];
+            input[plane + o] = (px[i + 1] / 255 - spec.mean[1]) / spec.std[1];
+            input[plane * 2 + o] = (px[i + 2] / 255 - spec.mean[2]) / spec.std[2];
         }
         const feeds = {};
         feeds[session.inputNames[0]] = new S.ort.Tensor('float32', input, [1, 3, N, N]);
@@ -562,7 +629,8 @@
             pushHistory();
             render();
             const sec = ((performance.now() - t0) / 1000).toFixed(1);
-            setStatus('去背景完成 · 用时 ' + sec + ' 秒，可用画笔继续修补');
+            setStatus('去背景完成 · 用时 ' + sec + ' 秒，可用画笔继续修补'
+                + (S.model === 'fast' ? '；想要更干净的细节边缘，可切到「精细模型」再跑一次' : ''));
             toast('背景已去除');
         } catch (e) {
             console.error(e);
@@ -668,6 +736,7 @@
             });
         };
         seg('#mattingMode', (v) => { S.mode = v; });
+        seg('#mattingModel', (v) => { S.model = v; });
         seg('#mattingBg', (v) => {
             const st = $('#mattingStage');
             if (!st) return;
@@ -730,6 +799,10 @@
         });
 
         $$('.matting-need-img').forEach(el => el.style.display = 'none');
+
+        // 打开面板就在后台备模型（42MB 只下一次，之后走 IndexedDB 缓存）
+        prefetch();
+        setInterval(prefetch, 1500);
     };
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);

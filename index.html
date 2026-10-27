@@ -20,7 +20,7 @@
     <!-- 登录界面动效 -->
     <link rel="stylesheet" href="login.css?v=20261030">
     <!-- 抠图工具样式 -->
-    <link rel="stylesheet" href="matting.css?v=20261030">
+    <link rel="stylesheet" href="matting.css?v=20261031">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
@@ -717,7 +717,13 @@
 
                     <div class="card matting-need-img">
                         <div class="card-title">🎯 一键去背景</div>
-                        <p class="muted" style="margin:-4px 0 12px;">自动识别画面主体，一键删除背景。首次使用需要下载抠图模型（约 42MB），下载后会自动缓存，之后秒开。</p>
+                        <p class="muted" style="margin:-4px 0 12px;">自动识别画面主体，一键删除背景。模型只下载一次并缓存在本机，之后秒开；图片不会上传到任何服务器。</p>
+                        <div class="matting-bar" style="margin-bottom:12px;">
+                            <div class="matting-seg" id="mattingModel">
+                                <button type="button" data-val="fast" class="on">⚡ 标准模型（4.7MB）</button>
+                                <button type="button" data-val="pro">🎯 精细模型（42MB，边缘更准）</button>
+                            </div>
+                        </div>
                         <div class="opt-row">
                             <label for="mattingRefine" style="display:flex;align-items:center;gap:6px;">
                                 <input type="checkbox" id="mattingRefine" checked> 边缘精修（让边缘贴着图像轮廓，减少锯齿毛边）
@@ -1352,7 +1358,7 @@ PORTFOLIO</p>
     <script src="script-game.js"></script>
     <script src="script.js?v=20261030"></script>
     <script src="workbench.js"></script>
-    <script src="matting.js?v=20261030"></script>
+    <script src="matting.js?v=20261031"></script>
     <script src="portfolio.js?v=20261029"></script>
     <script src="login-cards.js?v=20261030"></script>
 </body>
