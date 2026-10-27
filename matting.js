@@ -675,25 +675,23 @@
             if (v !== 'checker') st.classList.add('tp-' + v);
         });
 
-        const rng = (id, key, fmt) => {
+        const rng = (id, key, fmt, map) => {
             const el = $(id);
             const out = $(id + 'Val');
             if (!el) return;
             const sync = () => {
-                S[key] = Number(el.value);
-                if (out) out.textContent = fmt(S[key]);
+                const raw = Number(el.value);
+                S[key] = map ? map(raw) : raw;
+                if (out) out.textContent = fmt(raw);
             };
             el.oninput = sync;
             el.onchange = () => { sync(); if (S.hasMask) refresh(); };
             sync();
         };
         rng('#mattingBrush', 'brush', v => v + ' px');
-        rng('#mattingHard', 'hardness', v => v + '%');
+        rng('#mattingHard', 'hardness', v => v + '%', v => v / 100);     // 0-100 → 0-1
         rng('#mattingFeather', 'feather', v => v + ' px');
-        rng('#mattingContrast', 'contrast', v => v + '%');
-        // 硬度是 0-100，转成 0-1
-        const fixHard = () => { S.hardness = Number(($('#mattingHard') || {}).value || 60) / 100; };
-        if ($('#mattingHard')) $('#mattingHard').addEventListener('input', fixHard);
+        rng('#mattingContrast', 'contrast', v => v + '%', v => v / 100); // 0-100 → 0-1
 
         const on = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
         on('#mattingAutoBtn', autoRemove);
