@@ -336,6 +336,24 @@
         S.mctx.putImageData(out, 0, 0);
     };
 
+    // 把「边缘精修」结果写回权威蒙版：后续画笔/撤销都基于同一份数据，画面不会突然变样
+    const bakeRefine = () => {
+        if (!S.hasMask || !S.rgb) return;
+        const w = S.w, h = S.h, n = w * h;
+        const src = S.rctx.getImageData(0, 0, w, h).data;
+        const m = new Float32Array(n);
+        for (let i = 0, j = 0; j < n; i += 4, j++) m[j] = src[i + 3] / 255;
+        const r = guidedFilter(m, S.rgb.data, w, h, 3, 1e-4);
+        const im = S.rctx.createImageData(w, h);
+        const d = im.data;
+        for (let i = 0, j = 0; j < n; i += 4, j++) {
+            const v = r[j] * 255;
+            d[i] = d[i + 1] = d[i + 2] = 255;
+            d[i + 3] = v < 0 ? 0 : v > 255 ? 255 : v;
+        }
+        S.rctx.putImageData(im, 0, 0);
+    };
+
     /* ---------------- 模型加载 + 推理 ---------------- */
     // 单分片下载：带进度；20 秒收不到新数据、或整体速度过慢，都放弃（方便自动换源重试）
     const fetchPart = async (url, onBytes, checkSpeed) => {
@@ -669,11 +687,8 @@
         try {
             render();
             await infer();
-            postProcess({
-                refine: !$('#mattingRefine') || $('#mattingRefine').checked,
-                feather: S.feather,
-                contrast: S.contrast
-            });
+            if (!$('#mattingRefine') || $('#mattingRefine').checked) bakeRefine();
+            postProcess({ refine: false, feather: S.feather, contrast: S.contrast });
             pushHistory();
             render();
             const sec = ((performance.now() - t0) / 1000).toFixed(1);
@@ -836,7 +851,8 @@
         on('#mattingRefineApply', () => {
             if (!S.hasMask) return toast('请先完成去背景');
             pushHistory();
-            postProcess({ refine: true, feather: S.feather, contrast: S.contrast });
+            bakeRefine();
+            postProcess({ refine: false, feather: S.feather, contrast: S.contrast });
             render();
             toast('边缘已精修');
         });
