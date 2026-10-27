@@ -19,6 +19,8 @@
     <link rel="stylesheet" href="portfolio.css?v=20261029">
     <!-- 登录界面动效 -->
     <link rel="stylesheet" href="login.css?v=20261030">
+    <!-- 抠图工具样式 -->
+    <link rel="stylesheet" href="matting.css?v=20261030">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
@@ -271,6 +273,11 @@
                                 <div class="module-icon">📚</div>
                                 <div class="module-name">学习工作</div>
                                 <div class="module-stat">课程 · 项目</div>
+                            </button>
+                            <button class="module-card" data-target="matting">
+                                <div class="module-icon">✂️</div>
+                                <div class="module-name">抠图</div>
+                                <div class="module-stat">自动去背 · 矢量</div>
                             </button>
                         </div>
                     </div>
@@ -688,6 +695,116 @@
                             <button class="btn btn-primary btn-block" id="studyNoteSave">保存笔记</button>
                         </div>
                         <div class="ex-list" id="studyNoteList"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ 抠图 ============ -->
+            <section class="view" data-view="matting" style="display:none;">
+                <div class="view-content">
+                    <div class="page-head">
+                        <button class="back-btn" data-back>← 返回首页</button>
+                        <h2 class="page-title">✂️ 抠图</h2>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title">📤 上传图片</div>
+                        <p class="muted" style="margin:-4px 0 12px;">支持 JPG / PNG / WebP，可以直接拖拽进来，也可以 Ctrl+V 粘贴。图片只在你自己的浏览器里处理，不会上传到任何服务器。</p>
+                        <input type="file" id="mattingFile" accept="image/*" hidden>
+                        <button class="btn btn-primary btn-block" id="mattingUploadBtn" style="margin-bottom:12px;">📤 选择图片</button>
+                        <div class="matting-drop" id="mattingDrop">把图片拖到这里，或点击选择</div>
+                    </div>
+
+                    <div class="card matting-need-img">
+                        <div class="card-title">🎯 一键去背景</div>
+                        <p class="muted" style="margin:-4px 0 12px;">自动识别画面主体，一键删除背景。首次使用需要下载抠图模型（约 42MB），下载后会自动缓存，之后秒开。</p>
+                        <div class="opt-row">
+                            <label for="mattingRefine" style="display:flex;align-items:center;gap:6px;">
+                                <input type="checkbox" id="mattingRefine" checked> 边缘精修（让边缘贴着图像轮廓，减少锯齿毛边）
+                            </label>
+                        </div>
+                        <button class="btn btn-gold btn-block" id="mattingAutoBtn">✨ 一键去背景</button>
+                        <div class="matting-progress" id="mattingProgress" style="display:none;"><i id="mattingProgressBar"></i></div>
+                        <div class="muted" id="mattingStatus" style="margin-top:10px;"></div>
+                    </div>
+
+                    <div class="card matting-need-img">
+                        <div class="card-title">🖌 画笔修补</div>
+                        <p class="muted" style="margin:-4px 0 12px;">擦除：抹掉多余的背景；恢复：把误删的主体补回来。先选模式，再在图上拖动，松手后可以撤销。</p>
+                        <div class="matting-seg" id="mattingMode">
+                            <button type="button" data-val="erase" class="on">🧽 擦除背景</button>
+                            <button type="button" data-val="restore">🖌 恢复主体</button>
+                        </div>
+                        <div style="height:12px;"></div>
+                        <div class="matting-range">
+                            <label for="mattingBrush">画笔大小</label>
+                            <input type="range" id="mattingBrush" min="1" max="300" value="40">
+                            <span class="val" id="mattingBrushVal">40 px</span>
+                        </div>
+                        <div class="matting-range">
+                            <label for="mattingHard">画笔硬度</label>
+                            <input type="range" id="mattingHard" min="0" max="100" value="60">
+                            <span class="val" id="mattingHardVal">60%</span>
+                        </div>
+                        <div class="matting-bar">
+                            <button class="btn btn-ghost btn-sm" id="mattingUndo" disabled>↩ 撤销</button>
+                            <button class="btn btn-ghost btn-sm" id="mattingRedo" disabled>↪ 重做</button>
+                            <button class="btn btn-ghost btn-sm" id="mattingKeepAll">全部保留</button>
+                            <button class="btn btn-ghost btn-sm" id="mattingCutAll">全部删除</button>
+                            <button class="btn btn-ghost btn-sm" id="mattingRefineApply">✨ 边缘精修</button>
+                        </div>
+                    </div>
+
+                    <div class="card matting-need-img">
+                        <div class="card-title">🖼 边缘与预览</div>
+                        <div class="matting-range">
+                            <label for="mattingFeather">边缘羽化</label>
+                            <input type="range" id="mattingFeather" min="0" max="6" value="1">
+                            <span class="val" id="mattingFeatherVal">1 px</span>
+                        </div>
+                        <div class="matting-range">
+                            <label for="mattingContrast">边缘净化</label>
+                            <input type="range" id="mattingContrast" min="0" max="100" value="0">
+                            <span class="val" id="mattingContrastVal">0%</span>
+                        </div>
+                        <div class="matting-bar">
+                            <div class="matting-seg" id="mattingBg">
+                                <button type="button" data-val="checker" class="on">透明</button>
+                                <button type="button" data-val="white">白底</button>
+                                <button type="button" data-val="black">黑底</button>
+                                <button type="button" data-val="gray">灰底</button>
+                            </div>
+                            <button class="btn btn-ghost btn-sm" id="mattingShowCut">👁 隐藏删除区</button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title">🎨 画布</div>
+                        <div class="matting-stage is-empty" id="mattingStage">
+                            <div class="matting-empty" id="mattingEmpty">还没有图片，先上传一张吧</div>
+                            <canvas id="mattingCanvas"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="card matting-need-img">
+                        <div class="card-title">📦 导出</div>
+                        <div class="matting-bar">
+                            <button class="btn btn-primary" id="mattingExportPng">💾 透明 PNG</button>
+                            <button class="btn btn-gold" id="mattingExportSvg">🧩 SVG 矢量图</button>
+                            <button class="btn btn-ghost" id="mattingReset">🔄 重新上传</button>
+                        </div>
+                        <div class="matting-range" style="margin-top:12px;">
+                            <label for="mattingVecColors">矢量颜色数</label>
+                            <input type="range" id="mattingVecColors" min="2" max="64" value="24">
+                            <span class="val" id="mattingVecColorsVal">24</span>
+                        </div>
+                        <div class="matting-range">
+                            <label for="mattingVecDetail">矢量精细度</label>
+                            <input type="range" id="mattingVecDetail" min="10" max="100" value="60">
+                            <span class="val" id="mattingVecDetailVal">60</span>
+                        </div>
+                        <div class="matting-preview" id="mattingVecPreview" style="display:none;"></div>
+                        <p class="matting-hint" style="margin-top:10px;">PNG 保留完整透明通道，适合继续排版使用；SVG 是矢量路径，放大不会模糊，适合做 logo、插画、贴纸。</p>
                     </div>
                 </div>
             </section>
@@ -1235,6 +1352,7 @@ PORTFOLIO</p>
     <script src="script-game.js"></script>
     <script src="script.js?v=20261030"></script>
     <script src="workbench.js"></script>
+    <script src="matting.js?v=20261030"></script>
     <script src="portfolio.js?v=20261029"></script>
     <script src="login-cards.js?v=20261030"></script>
 </body>

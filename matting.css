@@ -1,0 +1,169 @@
+/* ========== 抠图（一键去背景 + 画笔修补 + 矢量导出） ========== */
+
+/* 工作台有全局规则 canvas{width:100%;height:auto;margin:10px 0}，会把画布拉伸、让画笔坐标错位，这里必须覆盖 */
+#mattingCanvas,
+#mattingCanvas * {
+    width: auto;
+    height: auto;
+    margin: 0;
+}
+
+.matting-stage {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(var(--primary-rgb), 0.14);
+    border-radius: var(--radius-sm);
+    background-image:
+        linear-gradient(45deg, rgba(var(--primary-rgb), 0.07) 25%, transparent 25%, transparent 75%, rgba(var(--primary-rgb), 0.07) 75%),
+        linear-gradient(45deg, rgba(var(--primary-rgb), 0.07) 25%, transparent 25%, transparent 75%, rgba(var(--primary-rgb), 0.07) 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 10px 10px;
+    background-color: #fff;
+}
+
+.matting-stage.is-empty {
+    min-height: 210px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface-2);
+}
+
+/* 还没上传图片时，canvas 默认 300x150 会占位，先藏起来 */
+.matting-stage.is-empty #mattingCanvas { display: none; }
+
+.matting-stage.tp-white { background-image: none; background-color: #fff; }
+.matting-stage.tp-black { background-image: none; background-color: #111; }
+.matting-stage.tp-gray { background-image: none; background-color: #d9d9d9; }
+
+#mattingCanvas {
+    display: block;
+    max-width: 100%;
+    touch-action: none;
+    cursor: crosshair;
+}
+
+.matting-empty {
+    padding: 26px 16px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.matting-drop {
+    border: 1px dashed rgba(var(--primary-rgb), 0.28);
+    border-radius: var(--radius-sm);
+    padding: 18px 14px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 13px;
+    background: var(--surface-2);
+    transition: border-color .2s, background .2s;
+}
+
+.matting-drop.is-over {
+    border-color: var(--accent);
+    background: rgba(201, 163, 90, 0.12);
+}
+
+.matting-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.matting-seg {
+    display: inline-flex;
+    border: 1px solid rgba(var(--primary-rgb), 0.15);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.matting-seg button {
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    background: transparent;
+    border: 0;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.matting-seg button + button { border-left: 1px solid rgba(var(--primary-rgb), 0.12); }
+
+.matting-seg button.on {
+    background: var(--accent);
+    color: #fff;
+}
+
+.matting-range {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.matting-range > label {
+    flex: 0 0 74px;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.matting-range input[type="range"] {
+    flex: 1;
+    min-width: 0;
+    accent-color: var(--accent);
+    height: 22px;
+}
+
+.matting-range .val {
+    flex: 0 0 54px;
+    text-align: right;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.matting-progress {
+    margin-top: 10px;
+    height: 6px;
+    border-radius: 6px;
+    background: rgba(var(--primary-rgb), 0.12);
+    overflow: hidden;
+}
+
+.matting-progress > i {
+    display: block;
+    width: 0;
+    height: 100%;
+    background: var(--accent);
+    transition: width .25s ease;
+}
+
+.matting-preview {
+    border-radius: var(--radius-sm);
+    background-image:
+        linear-gradient(45deg, rgba(var(--primary-rgb), 0.07) 25%, transparent 25%, transparent 75%, rgba(var(--primary-rgb), 0.07) 75%),
+        linear-gradient(45deg, rgba(var(--primary-rgb), 0.07) 25%, transparent 25%, transparent 75%, rgba(var(--primary-rgb), 0.07) 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 10px 10px;
+    background-color: #fff;
+    padding: 8px;
+}
+
+.matting-preview img {
+    display: block;
+    max-width: 100%;
+    border-radius: 6px;
+}
+
+.matting-hint {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+@media (max-width: 520px) {
+    .matting-range > label { flex-basis: 64px; font-size: 12px; }
+    .matting-seg button { padding: 6px 10px; font-size: 12px; }
+}
