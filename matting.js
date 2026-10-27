@@ -32,11 +32,15 @@
             files: ['isnet_quint8.onnx.part1', 'isnet_quint8.onnx.part2', 'isnet_quint8.onnx.part3']
         }
     };
-    // 先走国内通常更快的 CDN，失败/超时自动回落到站点自身，保证一定能用
+    // 多源兜底：jsDelivr 官方 → fastly 镜像 → gcore 镜像 → 站点自身，慢/失败都自动换下一个
     const SOURCES = [
+        (f) => 'https://cdn.jsdelivr.net/gh/love-sex/-@main/assets/matting/models/' + f,
         (f) => 'https://fastly.jsdelivr.net/gh/love-sex/-@main/assets/matting/models/' + f,
+        (f) => 'https://gcore.jsdelivr.net/gh/love-sex/-@main/assets/matting/models/' + f,
         (f) => new URL('assets/matting/models/' + f, location.href).href
     ];
+    // 低于这个速度（字节/秒）就判定该源不可用，立刻换源，避免干等
+    const MIN_SPEED = 40 * 1024;
     const ORT_BASE = new URL('assets/matting/ort/', location.href).href;
     const TRACER_URL = new URL('assets/matting/imagetracer.js', location.href).href;
     const MAX_SIDE = 1400;
@@ -328,11 +332,18 @@
     };
 
     /* ---------------- 模型加载 + 推理 ---------------- */
-    // 单分片下载：带进度，45 秒收不到新数据就放弃（方便自动换源重试）
-    const fetchPart = async (url, onBytes) => {
+    // 单分片下载：带进度；20 秒收不到新数据、或整体速度过慢，都放弃（方便自动换源重试）
+    const fetchPart = async (url, onBytes, checkSpeed) => {
         const ctrl = new AbortController();
         let last = Date.now();
-        const wd = setInterval(() => { if (Date.now() - last > 45000) ctrl.abort(); }, 3000);
+        const t0 = Date.now();
+        let got = 0;
+        const wd = setInterval(() => {
+            const el = Date.now() - t0;
+            if (Date.now() - last > 20000) ctrl.abort();
+            // 后面还有备选源时才做慢速熔断；最后一个源再慢也得下完
+            else if (checkSpeed && el > 8000 && got / (el / 1000) < MIN_SPEED) ctrl.abort();
+        }, 2000);
         try {
             const res = await fetch(url, { signal: ctrl.signal });
             if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -343,6 +354,7 @@
                 const r = await reader.read();
                 if (r.done) break;
                 last = Date.now();
+                got += r.value.length;
                 parts.push(r.value);
                 onBytes(r.value.length);
             }
@@ -356,7 +368,7 @@
     // 按清单依次下载全部分片；任一源失败/超时就换下一个源，并校验总字节数
     const downloadModel = async (spec) => {
         let got = 0;
-        const t0 = Date.now();
+        let t0 = Date.now();
         const onBytes = (n) => {
             got += n;
             const sec = Math.max(0.5, (Date.now() - t0) / 1000);
@@ -367,7 +379,8 @@
         for (let s = 0; s < SOURCES.length; s++) {
             try {
                 const parts = [];
-                for (const f of spec.files) parts.push(await fetchPart(SOURCES[s](f), onBytes));
+                const hasFallback = s < SOURCES.length - 1;
+                for (const f of spec.files) parts.push(await fetchPart(SOURCES[s](f), onBytes, hasFallback));
                 const total = parts.reduce((n, p) => n + p.length, 0);
                 if (total !== spec.bytes) throw new Error('文件不完整（' + total + '/' + spec.bytes + ' 字节）');
                 const out = new Uint8Array(total);
