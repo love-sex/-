@@ -595,13 +595,19 @@
         setStatus('正在生成矢量图...');
         let tracer;
         try { tracer = await loadTracer(); } catch (e) { return toast(e.message); }
+        // 大图先降采样再追踪（矢量坐标按倍数还原），否则上千像素的图要等很久
+        const cap = 900;
+        const k = Math.max(1, Math.max(S.w, S.h) / cap);
+        const tw = Math.max(1, Math.round(S.w / k)), th = Math.max(1, Math.round(S.h / k));
         const c = document.createElement('canvas');
-        c.width = S.w; c.height = S.h;
+        c.width = tw; c.height = th;
         const x = c.getContext('2d', { willReadFrequently: true });
-        x.drawImage(S.src, 0, 0, S.w, S.h);
+        x.imageSmoothingEnabled = true;
+        x.imageSmoothingQuality = 'high';
+        x.drawImage(S.src, 0, 0, tw, th);
         x.globalCompositeOperation = 'destination-in';
-        x.drawImage(S.mask, 0, 0, S.w, S.h);
-        const imgd = x.getImageData(0, 0, S.w, S.h);
+        x.drawImage(S.mask, 0, 0, tw, th);
+        const imgd = x.getImageData(0, 0, tw, th);
         const colors = Number(($('#mattingVecColors') || {}).value || 24);
         const detail = Number(($('#mattingVecDetail') || {}).value || 60);
         const lt = Math.max(0.2, 2.4 - detail / 60);
@@ -611,10 +617,10 @@
                 numberofcolors: colors,
                 ltres: lt,
                 qtres: Math.max(0.2, lt * 0.9),
-                pathomit: 6,
+                pathomit: Math.max(1, 6 / k),
                 strokewidth: 0,
                 linefilter: false,
-                scale: 1,
+                scale: k,
                 roundcoords: 1,
                 viewbox: true,
                 desc: false,
@@ -668,6 +674,7 @@
             setStatus('去背景完成 · 用时 ' + sec + ' 秒，可用画笔继续修补'
                 + (S.model === 'fast' ? '；想要更干净的细节边缘，可切到「精细模型」再跑一次' : ''));
             toast('背景已去除');
+            loadTracer().catch(() => { });   // 提前备好矢量模块，导出时不用等
         } catch (e) {
             console.error(e);
             setStatus('处理失败：' + e.message);
