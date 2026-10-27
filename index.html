@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="style-game.css">
     <link rel="stylesheet" href="style-portfolio.css">
     <!-- 想想工作台样式（后加载，覆盖 body/:root） -->
-    <link rel="stylesheet" href="workbench.css?v=20261110">
+    <link rel="stylesheet" href="workbench.css?v=20261111">
     <!-- 作品集样式 -->
     <link rel="stylesheet" href="portfolio.css?v=20261029">
     <!-- 登录界面动效 -->
@@ -484,7 +484,15 @@
                         </div>
                     </div>
                     <div class="card">
-                        <div class="card-title">本月流水 <span class="muted" id="recordMonthLabel" style="font-size:12px;font-weight:400;"></span></div>
+                        <div class="card-title record-head">
+                            <span>本月流水 <span class="muted" id="recordMonthLabel" style="font-size:12px;font-weight:400;"></span></span>
+                            <button class="fsel-toggle" id="recordSelectToggle" type="button">多选</button>
+                        </div>
+                        <div class="record-bulk" id="recordBulk" style="display:none;">
+                            <label class="rb-all"><input type="checkbox" id="recordSelectAll"> 全选</label>
+                            <span class="rb-count" id="recordSelCount">已选 0 笔</span>
+                            <button class="btn btn-danger btn-sm" id="recordBulkDelete" type="button">删除所选</button>
+                        </div>
                         <div class="record-list" id="recordList"></div>
                     </div>
                 </div>
@@ -1357,7 +1365,7 @@ PORTFOLIO</p>
 
     <script src="script-game.js"></script>
     <script src="script.js?v=20261030"></script>
-    <script src="workbench.js?v=20261110"></script>
+    <script src="workbench.js?v=20261111"></script>
     <script src="matting.js?v=20261108"></script>
     <script src="portfolio.js?v=20261029"></script>
     <script src="login-cards.js?v=20261030"></script>

@@ -633,9 +633,49 @@ body {
 .record-edit-form .ref-line { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .record-edit-form .ref-line input { flex: 1; min-width: 90px; padding: 8px 10px; border-radius: var(--radius-sm); }
 .record-edit-form .seg-btn { flex: 0 0 72px; padding: 7px 10px; font-size: 13px; }
-/* 按钮居中：右侧常驻游戏挂件/眼睛浮标，靠右会被挡住 */
-.record-edit-form .ref-actions { justify-content: center; }
+/* 操作行：删除靠左，保存/取消靠右；窄屏整体靠左，避开右下角常驻挂件 */
+.record-edit-form .ref-actions { flex-wrap: nowrap; }
 .record-edit-form .ref-actions .btn { min-width: 82px; }
+.record-edit-form .ref-actions .ref-save { margin-left: auto; }
+.record-edit-form .ref-actions .ref-del {
+  padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  color: var(--danger); background: rgba(220,80,80,0.10); transition: background .15s, transform .15s;
+}
+.record-edit-form .ref-actions .ref-del:hover { background: rgba(220,80,80,0.20); }
+.record-edit-form .ref-actions .ref-del:active { transform: scale(0.96); }
+@media (max-width: 560px) {
+  .record-edit-form .ref-actions .ref-save { margin-left: 0; }
+  .record-edit-form .ref-actions .btn,
+  .record-edit-form .ref-actions .ref-del { min-width: 0; padding: 6px 14px; }
+}
+
+/* 多选 */
+.record-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.fsel-toggle {
+  padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  background: rgba(var(--primary-rgb),0.08); color: var(--text);
+  border: 1px solid rgba(var(--primary-rgb),0.16);
+  transition: background .15s, color .15s, border-color .15s;
+}
+.fsel-toggle:hover { background: rgba(var(--primary-rgb),0.16); }
+.fsel-toggle.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+.record-bulk {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: rgba(var(--primary-rgb),0.05); border-radius: var(--radius-sm);
+  padding: 8px 10px; margin-bottom: 8px;
+}
+.record-bulk .rb-all { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); cursor: pointer; }
+.record-bulk .rb-all input { width: 16px; height: 16px; accent-color: var(--primary); }
+.record-bulk .rb-count { flex: 1; font-size: 12px; color: var(--muted); }
+.record-bulk .btn { padding: 4px 12px; font-size: 12px; }
+.record-bulk .btn[disabled] { opacity: .45; cursor: not-allowed; }
+.record-item.is-pickable { cursor: pointer; }
+.record-item.is-pickable:hover { background: rgba(var(--primary-rgb),0.07); }
+.record-item.is-picked { background: rgba(var(--primary-rgb),0.12); box-shadow: inset 0 0 0 1.5px rgba(var(--primary-rgb),0.3); }
+.record-item .r-check {
+  width: 18px; height: 18px; flex: 0 0 auto; margin-right: 10px;
+  accent-color: var(--primary); pointer-events: none;
+}
 
 /* 账号 */
 .kb-list { display: flex; flex-direction: column; gap: 8px; }

@@ -842,6 +842,8 @@ const App = (() => {
   };
 
   /* ---------- 记账 ---------- */
+  let finSelect = false;          // 是否处于多选模式
+  const finPicked = new Set();    // 已选中的流水（date:idx）
   const renderFinance = () => {
     const day = getDay();
     const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth()+1).padStart(2,'0')}`;
@@ -869,26 +871,76 @@ const App = (() => {
       (d.finance.records || []).forEach((r, idx) => all.push({ ...r, date: k, idx }));
     });
     all.sort((a, b) => b.date.localeCompare(a.date) || b.time - a.time);
+    // 多选：换月/删记录后清掉已不存在的选中项
+    const valid = new Set(all.map(r => finKey(r)));
+    Array.from(finPicked).forEach(k => { if (!valid.has(k)) finPicked.delete(k); });
     if (!all.length) {
+      finSelect = false;
+      finPicked.clear();
       list.innerHTML = '<p class="muted" style="text-align:center;">本月还没有流水，先记一笔吧</p>';
     }
+    syncSelectBar(all.length);
     all.forEach(r => {
       const row = document.createElement('div');
-      row.className = 'record-item';
+      const key = finKey(r);
+      row.className = 'record-item' + (finSelect ? ' is-pickable' : '') + (finPicked.has(key) ? ' is-picked' : '');
       row.innerHTML = `
+        ${finSelect ? `<input type="checkbox" class="r-check"${finPicked.has(key) ? ' checked' : ''} aria-label="选择这笔">` : ''}
         <div class="record-main">
           <div class="r-title">${escapeHtml(r.purpose)}</div>
           <div class="r-date">${r.date}${r.edited ? ' · 已修改' : ''}</div>
         </div>
         <div class="record-side">
           <div class="record-amount ${r.type}">${r.type === 'income' ? '+' : '-'}¥${r.amount}</div>
-          <button class="record-edit" type="button" title="编辑这笔" aria-label="编辑这笔">✏️</button>
+          ${finSelect ? '' : '<button class="record-edit" type="button" title="编辑这笔" aria-label="编辑这笔">✏️</button>'}
         </div>
       `;
-      const btn = row.querySelector('.record-edit');
-      if (btn) btn.onclick = (e) => { e.stopPropagation(); editRecord(row, r); };
+      if (finSelect) {
+        row.onclick = () => { if (finPicked.has(key)) finPicked.delete(key); else finPicked.add(key); renderFinance(); };
+      } else {
+        const btn = row.querySelector('.record-edit');
+        if (btn) btn.onclick = (e) => { e.stopPropagation(); editRecord(row, r); };
+      }
       list.appendChild(row);
     });
+  };
+
+  // 流水的唯一键（同一天内用数组下标）
+  const finKey = (r) => r.date + ':' + r.idx;
+  const finDay = (dateKey) => (data.dates[dateKey] && data.dates[dateKey].finance && data.dates[dateKey].finance.records) || [];
+
+  // 多选栏：只有进入多选模式时才出现
+  const syncSelectBar = (total) => {
+    const bar = $('#recordBulk');
+    const toggle = $('#recordSelectToggle');
+    if (toggle) {
+      toggle.textContent = finSelect ? '取消多选' : '多选';
+      toggle.classList.toggle('on', finSelect);
+    }
+    if (!bar) return;
+    bar.style.display = finSelect && total ? 'flex' : 'none';
+    const cnt = $('#recordSelCount');
+    if (cnt) cnt.textContent = finPicked.size ? '已选 ' + finPicked.size + ' 笔' : '点击流水可多选';
+    const allBox = $('#recordSelectAll');
+    if (allBox) allBox.checked = total > 0 && finPicked.size === total;
+    const delBtn = $('#recordBulkDelete');
+    if (delBtn) delBtn.disabled = !finPicked.size;
+  };
+
+  // 删除若干条（单条删除 / 批量删除共用）
+  const removeRecords = (items) => {
+    const byDate = {};
+    items.forEach(it => { (byDate[it.date] = byDate[it.date] || []).push(it.idx); });
+    Object.entries(byDate).forEach(([k, list]) => {
+      const recs = finDay(k);
+      const del = new Set(list);
+      const keep = recs.filter((_, i) => !del.has(i));
+      recs.length = 0;
+      keep.forEach(r => recs.push(r));
+    });
+    save.now();
+    renderFinance();
+    renderHome();
   };
 
   // 行内编辑：直接在这条流水上改类型 / 金额 / 用途
@@ -909,6 +961,7 @@ const App = (() => {
           <input type="text" class="ref-purpose" placeholder="用途" value="${escapeHtml(rec.purpose)}">
         </div>
         <div class="ref-line ref-actions">
+          <button class="ref-del" type="button" title="删除这笔">删除</button>
           <button class="btn btn-primary btn-sm ref-save" type="button">保存</button>
           <button class="btn btn-ghost btn-sm ref-cancel" type="button">取消</button>
         </div>
@@ -939,6 +992,12 @@ const App = (() => {
     const cancel = () => renderFinance();
     row.querySelector('.ref-save').onclick = commit;
     row.querySelector('.ref-cancel').onclick = cancel;
+    const delBtn = row.querySelector('.ref-del');
+    if (delBtn) delBtn.onclick = () => {
+      if (!confirm('确定删除「' + rec.purpose + ' ' + (rec.type === 'income' ? '+' : '-') + '¥' + rec.amount + '」这笔记录？')) return;
+      removeRecords([item]);
+      toast('已删除');
+    };
     [amountEl, purposeEl].forEach(el => {
       el.onkeydown = (ev) => {
         if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
@@ -969,6 +1028,42 @@ const App = (() => {
       $('#recordPurpose').value = '';
       save.now(); renderFinance(); renderHome();
       toast('已记录');
+    };
+
+    // 多选开关
+    const toggle = $('#recordSelectToggle');
+    if (toggle) toggle.onclick = () => {
+      finSelect = !finSelect;
+      finPicked.clear();
+      renderFinance();
+      if (finSelect) toast('点流水可多选，再点「删除所选」');
+    };
+    // 全选 / 取消全选
+    const allBox = $('#recordSelectAll');
+    if (allBox) allBox.onchange = () => {
+      const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth()+1).padStart(2,'0')}`;
+      finPicked.clear();
+      if (allBox.checked) {
+        Object.entries(data.dates).forEach(([k, d]) => {
+          if (!k.startsWith(monthKey)) return;
+          (d.finance.records || []).forEach((r, idx) => finPicked.add(k + ':' + idx));
+        });
+      }
+      renderFinance();
+    };
+    // 批量删除
+    const bulkDel = $('#recordBulkDelete');
+    if (bulkDel) bulkDel.onclick = () => {
+      const items = Array.from(finPicked).map(k => {
+        const [date, idx] = [k.slice(0, k.lastIndexOf(':')), Number(k.slice(k.lastIndexOf(':') + 1))];
+        return { date, idx };
+      });
+      if (!items.length) return toast('请先选择要删除的流水');
+      if (!confirm('确定删除选中的 ' + items.length + ' 笔流水？删除后不可恢复')) return;
+      finPicked.clear();
+      finSelect = false;
+      removeRecords(items);
+      toast('已删除 ' + items.length + ' 笔');
     };
   };
 
