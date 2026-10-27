@@ -41,7 +41,12 @@
     ];
     // 低于这个速度（字节/秒）就判定该源不可用，立刻换源，避免干等
     const MIN_SPEED = 40 * 1024;
-    const ORT_BASE = new URL('assets/matting/ort/', location.href).href;
+    // 推理引擎（onnxruntime-web 1.31.1）优先走 CDN，站点本地副本作为兜底
+    const ORT_SOURCES = [
+        'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/',
+        'https://fastly.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/',
+        new URL('assets/matting/ort/', location.href).href
+    ];
     const TRACER_URL = new URL('assets/matting/imagetracer.js', location.href).href;
     const MAX_SIDE = 1400;
 
@@ -411,24 +416,42 @@
             .finally(() => { prefetching = false; });
     };
 
+    // 推理引擎：按源依次尝试，任一源可用即可
+    const loadORT = async () => {
+        if (S.ort) return S.ort;
+        let lastErr = null;
+        for (const base of ORT_SOURCES) {
+            try {
+                const ort = await import(base + 'ort.wasm.min.mjs');
+                ort.env.wasm.wasmPaths = base;
+                S.ort = ort;
+                return ort;
+            } catch (e) { lastErr = e; }
+        }
+        throw new Error('推理引擎加载失败：' + (lastErr ? lastErr.message : '无可用来源'));
+    };
+
     const ensureSession = async () => {
         const spec = MODELS[S.model] || MODELS.fast;
         if (S.session && S.sessionKey === spec.key) return S.session;
         setProgress(0.02);
-        let buf = await idbGet('model:' + spec.key);
-        if (buf && buf.byteLength !== spec.bytes) buf = null;
-        if (buf) {
-            setStatus('使用已缓存的' + spec.label + '模型');
-        } else {
+        // 引擎和模型同时准备，少等一轮
+        const bufP = (async () => {
+            let buf = await idbGet('model:' + spec.key);
+            if (buf && buf.byteLength !== spec.bytes) buf = null;
+            if (buf) {
+                setStatus('使用已缓存的' + spec.label + '模型');
+                return buf;
+            }
             buf = await downloadModel(spec);
             await idbPut('model:' + spec.key, buf);
             setStatus(spec.label + '模型已缓存，下次使用秒开');
-        }
+            return buf;
+        })();
+        const [ort, buf] = await Promise.all([loadORT(), bufP]);
         setProgress(0.99);
-        setStatus('正在加载推理引擎...');
-        if (!S.ort) S.ort = await import(ORT_BASE + 'ort.wasm.min.mjs');
-        S.ort.env.wasm.wasmPaths = ORT_BASE;
-        S.session = await S.ort.InferenceSession.create(new Uint8Array(buf), {
+        setStatus('正在初始化推理引擎...');
+        S.session = await ort.InferenceSession.create(new Uint8Array(buf), {
             executionProviders: ['wasm'],
             graphOptimizationLevel: 'all'
         });
