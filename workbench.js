@@ -280,13 +280,17 @@ const App = (() => {
   };
   const save = (() => {
     let t;
-    return () => {
+    const write = () => {
       clearTimeout(t);
-      t = setTimeout(() => {
-        localStorage.setItem(getKey(), JSON.stringify(data));
-        updateSyncStatus(true);
-      }, 350);
+      localStorage.setItem(getKey(), JSON.stringify(data));
+      updateSyncStatus(true);
     };
+    const fn = () => {
+      clearTimeout(t);
+      t = setTimeout(write, 350);
+    };
+    fn.now = write;   // 需要立刻落盘的场景（如记账编辑后马上刷新）用 save.now()
+    return fn;
   })();
   const updateSyncStatus = (ok) => {
     const el = $('#syncStatus');
@@ -397,7 +401,7 @@ const App = (() => {
     let income = 0, expense = 0;
     Object.entries(data.dates).forEach(([k, d]) => {
       if (k.startsWith(monthKey) && d.finance) {
-        d.finance.records.forEach(r => r.type === 'income' ? income += r.amount : expense += r.amount);
+        (d.finance.records || []).forEach(r => r.type === 'income' ? income += r.amount : expense += r.amount);
       }
     });
     $('#homeIncome').textContent = '¥' + income.toLocaleString();
@@ -844,12 +848,14 @@ const App = (() => {
     let income = 0, expense = 0;
     Object.entries(data.dates).forEach(([k, d]) => {
       if (k.startsWith(monthKey) && d.finance) {
-        d.finance.records.forEach(r => r.type === 'income' ? income += r.amount : expense += r.amount);
+        (d.finance.records || []).forEach(r => r.type === 'income' ? income += r.amount : expense += r.amount);
       }
     });
     $('#monthIncome').textContent = '¥' + income.toLocaleString();
     $('#monthExpense').textContent = '¥' + expense.toLocaleString();
     $('#monthBalance').textContent = '¥' + (income - expense).toLocaleString();
+    const monthLabel = $('#recordMonthLabel');
+    if (monthLabel) monthLabel.textContent = '（' + fmtYM(currentDate) + '）';
     const totalIncome = Object.values(data.dates).reduce((sum, d) => sum + (d.finance.records || []).reduce((a, r) => a + (r.type === 'income' ? r.amount : 0), 0), 0);
     const totalExpense = Object.values(data.dates).reduce((sum, d) => sum + (d.finance.records || []).reduce((a, r) => a + (r.type === 'expense' ? r.amount : 0), 0), 0);
     $('#totalSaving').textContent = '¥' + (totalIncome - totalExpense).toLocaleString();
@@ -858,22 +864,95 @@ const App = (() => {
     list.innerHTML = '';
     const all = [];
     Object.entries(data.dates).forEach(([k, d]) => {
-      (d.finance.records || []).forEach(r => all.push({ ...r, date: k }));
+      // 只列本月流水，与卡片标题一致
+      if (!k.startsWith(monthKey)) return;
+      (d.finance.records || []).forEach((r, idx) => all.push({ ...r, date: k, idx }));
     });
     all.sort((a, b) => b.date.localeCompare(a.date) || b.time - a.time);
+    if (!all.length) {
+      list.innerHTML = '<p class="muted" style="text-align:center;">本月还没有流水，先记一笔吧</p>';
+    }
     all.forEach(r => {
       const row = document.createElement('div');
       row.className = 'record-item';
       row.innerHTML = `
         <div class="record-main">
-          <div class="r-title">${r.purpose}</div>
-          <div class="r-date">${r.date}</div>
+          <div class="r-title">${escapeHtml(r.purpose)}</div>
+          <div class="r-date">${r.date}${r.edited ? ' · 已修改' : ''}</div>
         </div>
-        <div class="record-amount ${r.type}">${r.type === 'income' ? '+' : '-'}¥${r.amount}</div>
+        <div class="record-side">
+          <div class="record-amount ${r.type}">${r.type === 'income' ? '+' : '-'}¥${r.amount}</div>
+          <button class="record-edit" type="button" title="编辑这笔" aria-label="编辑这笔">✏️</button>
+        </div>
       `;
+      const btn = row.querySelector('.record-edit');
+      if (btn) btn.onclick = (e) => { e.stopPropagation(); editRecord(row, r); };
       list.appendChild(row);
     });
   };
+
+  // 行内编辑：直接在这条流水上改类型 / 金额 / 用途
+  const editRecord = (row, item) => {
+    const day = data.dates[item.date];
+    const rec = day && day.finance && day.finance.records && day.finance.records[item.idx];
+    if (!rec) return toast('这笔记录已不存在');
+    let etype = rec.type;
+    row.classList.add('is-editing');
+    row.innerHTML = `
+      <div class="record-edit-form">
+        <div class="ref-line">
+          <button class="seg-btn${rec.type === 'expense' ? ' seg-active' : ''}" type="button" data-et="expense">支出</button>
+          <button class="seg-btn${rec.type === 'income' ? ' seg-active' : ''}" type="button" data-et="income">收入</button>
+        </div>
+        <div class="ref-line">
+          <input type="number" class="ref-amount" inputmode="decimal" min="0" step="0.01" placeholder="金额" value="${Number(rec.amount)}">
+          <input type="text" class="ref-purpose" placeholder="用途" value="${escapeHtml(rec.purpose)}">
+        </div>
+        <div class="ref-line ref-actions">
+          <button class="btn btn-primary btn-sm ref-save" type="button">保存</button>
+          <button class="btn btn-ghost btn-sm ref-cancel" type="button">取消</button>
+        </div>
+      </div>
+    `;
+    const amountEl = row.querySelector('.ref-amount');
+    const purposeEl = row.querySelector('.ref-purpose');
+    row.querySelectorAll('[data-et]').forEach(b => {
+      b.onclick = () => {
+        etype = b.dataset.et;
+        row.querySelectorAll('[data-et]').forEach(x => x.classList.toggle('seg-active', x === b));
+      };
+    });
+    const commit = () => {
+      const amount = parseFloat(amountEl.value);
+      const purpose = purposeEl.value.trim();
+      if (!amount || amount <= 0 || isNaN(amount)) { toast('请输入正确的金额'); amountEl.focus(); return; }
+      if (!purpose) { toast('请输入用途'); purposeEl.focus(); return; }
+      rec.type = etype;
+      rec.amount = amount;
+      rec.purpose = purpose;
+      rec.edited = Date.now();
+      save.now();
+      renderFinance();
+      renderHome();
+      toast('已修改');
+    };
+    const cancel = () => renderFinance();
+    row.querySelector('.ref-save').onclick = commit;
+    row.querySelector('.ref-cancel').onclick = cancel;
+    [amountEl, purposeEl].forEach(el => {
+      el.onkeydown = (ev) => {
+        if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+        else if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
+      };
+    });
+    // 让用户直接看到编辑框；桌面端顺手聚焦选中金额，手机端不抢焦点（避免键盘弹起把页面顶走）
+    row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (!('ontouchstart' in window)) {
+      amountEl.focus({ preventScroll: true });
+      amountEl.select();
+    }
+  };
+
   const bindFinance = () => {
     let rtype = 'expense';
     $$('.rf-type').forEach(b => b.onclick = () => {
@@ -888,7 +967,7 @@ const App = (() => {
       getDay().finance.records.push({ type: rtype, amount, purpose, time: Date.now() });
       $('#recordAmount').value = '';
       $('#recordPurpose').value = '';
-      save(); renderFinance(); renderHome();
+      save.now(); renderFinance(); renderHome();
       toast('已记录');
     };
   };
