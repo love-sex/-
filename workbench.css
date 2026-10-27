@@ -633,7 +633,9 @@ body {
 .record-edit-form .ref-line { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .record-edit-form .ref-line input { flex: 1; min-width: 90px; padding: 8px 10px; border-radius: var(--radius-sm); }
 .record-edit-form .seg-btn { flex: 0 0 72px; padding: 7px 10px; font-size: 13px; }
-.record-edit-form .ref-actions { justify-content: flex-end; }
+/* 按钮居中：右侧常驻游戏挂件/眼睛浮标，靠右会被挡住 */
+.record-edit-form .ref-actions { justify-content: center; }
+.record-edit-form .ref-actions .btn { min-width: 82px; }
 
 /* 账号 */
 .kb-list { display: flex; flex-direction: column; gap: 8px; }

@@ -946,7 +946,7 @@ const App = (() => {
       };
     });
     // 让用户直接看到编辑框；桌面端顺手聚焦选中金额，手机端不抢焦点（避免键盘弹起把页面顶走）
-    row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    row.scrollIntoView({ block: 'center', behavior: 'smooth' });
     if (!('ontouchstart' in window)) {
       amountEl.focus({ preventScroll: true });
       amountEl.select();
