@@ -18,6 +18,7 @@
         clearTimeout(el._t);
         el._t = setTimeout(() => el.classList.remove('show'), 2200);
     };
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
     // 两档模型：标准（4.7MB，秒开）/ 精细（42MB，边缘更准，首次下载较慢）
     const MODELS = {
@@ -42,11 +43,14 @@
     // 低于这个速度（字节/秒）就判定该源不可用，立刻换源，避免干等
     const MIN_SPEED = 40 * 1024;
     // 推理引擎（onnxruntime-web 1.31.1）优先走 CDN，站点本地副本作为兜底
+    const ORT_VER = '1.31.1';
     const ORT_SOURCES = [
-        'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/',
-        'https://fastly.jsdelivr.net/npm/onnxruntime-web@1.31.1/dist/',
+        'https://cdn.jsdelivr.net/npm/onnxruntime-web@' + ORT_VER + '/dist/',
+        'https://fastly.jsdelivr.net/npm/onnxruntime-web@' + ORT_VER + '/dist/',
+        'https://gcore.jsdelivr.net/npm/onnxruntime-web@' + ORT_VER + '/dist/',
         new URL('assets/matting/ort/', location.href).href
     ];
+    const ORT_WASM = { key: 'ort-wasm-simd-threaded.wasm', bytes: 14848852, min: 8 * 1024 * 1024 };
     const TRACER_URL = new URL('assets/matting/imagetracer.js', location.href).href;
     const MAX_SIDE = 1400;
 
@@ -392,7 +396,55 @@
         } finally { clearInterval(wd); }
     };
 
-    // 按清单依次下载全部分片；任一源失败/超时就换下一个源，并校验总字节数
+    // 同时向多个源请求同一个文件，几秒后只留下最快的那个：避免撞上一个被限流到几十 KB/s 的源
+    const fetchRaced = async (urls, onBytes) => {
+        const ctrls = urls.map(() => new AbortController());
+        const st = urls.map(() => ({ got: 0, buf: null, err: null, done: false }));
+        urls.map(async (u, i) => {
+            try {
+                const res = await fetch(u, { signal: ctrls[i].signal });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                if (!res.body || !res.body.getReader) {
+                    const b = new Uint8Array(await res.arrayBuffer());
+                    st[i].got = b.length; st[i].buf = b; st[i].done = true;
+                    return;
+                }
+                const rd = res.body.getReader();
+                const parts = [];
+                for (; ;) {
+                    const c = await rd.read();
+                    if (c.done) break;
+                    st[i].got += c.value.length;
+                    parts.push(c.value);
+                }
+                const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+                let off = 0;
+                parts.forEach(p => { out.set(p, off); off += p.length; });
+                st[i].buf = out; st[i].done = true;
+            } catch (e) { st[i].err = (e && e.message) || 'failed'; }
+        });
+        let waited = 0;
+        while (waited < 4000) {
+            if (st.some(s => s.done)) break;
+            await sleep(250); waited += 250;
+        }
+        let best = -1;
+        st.forEach((s, i) => { if (!s.err && (best < 0 || s.got > st[best].got)) best = i; });
+        if (best >= 0) urls.forEach((_, i) => { if (i !== best) { try { ctrls[i].abort(); } catch (e) { } } });
+        // 领先者继续跑；它若中途挂了，其余还在跑的源会自动顶上
+        let reported = 0;
+        while (!st.some(s => s.done && s.buf) && st.some(s => !s.err)) {
+            let lead = -1;
+            st.forEach((s, i) => { if (!s.err && s.got && (lead < 0 || s.got > st[lead].got)) lead = i; });
+            if (lead >= 0 && st[lead].got > reported) { if (onBytes) onBytes(st[lead].got - reported); reported = st[lead].got; }
+            await sleep(250);
+        }
+        const win = st.find(s => s.done && s.buf);
+        if (win) { if (onBytes && win.buf.length > reported) onBytes(win.buf.length - reported); return win.buf; }
+        throw new Error(st.map(s => s.err).filter(Boolean)[0] || '下载失败');
+    };
+
+    // 按清单下载全部分片：优先多源赛马下载，整体失败再逐个源重试，并校验总字节数
     const downloadModel = async (spec) => {
         let got = 0;
         let t0 = Date.now();
@@ -403,17 +455,17 @@
             setStatus('正在下载' + spec.label + '模型 ' + (got / 1048576).toFixed(1) + ' / ' + (spec.bytes / 1048576).toFixed(1) + ' MB（' + (got / 1048576 / sec).toFixed(1) + ' MB/s）');
         };
         let lastErr = null;
+        try {
+            const parts = [];
+            for (const f of spec.files) parts.push(await fetchRaced(SOURCES.map(mk => mk(f)), onBytes));
+            return assemble(parts, spec);
+        } catch (e) { lastErr = e; }
         for (let s = 0; s < SOURCES.length; s++) {
             try {
                 const parts = [];
                 const hasFallback = s < SOURCES.length - 1;
                 for (const f of spec.files) parts.push(await fetchPart(SOURCES[s](f), onBytes, hasFallback));
-                const total = parts.reduce((n, p) => n + p.length, 0);
-                if (total !== spec.bytes) throw new Error('文件不完整（' + total + '/' + spec.bytes + ' 字节）');
-                const out = new Uint8Array(total);
-                let off = 0;
-                parts.forEach(p => { out.set(p, off); off += p.length; });
-                return out.buffer;
+                return assemble(parts, spec);
             } catch (e) {
                 lastErr = e;
                 got = 0;
@@ -421,6 +473,15 @@
             }
         }
         throw new Error(lastErr ? lastErr.message : '模型下载失败');
+    };
+
+    const assemble = (parts, spec) => {
+        const total = parts.reduce((n, p) => n + p.length, 0);
+        if (total !== spec.bytes) throw new Error('文件不完整（' + total + '/' + spec.bytes + ' 字节）');
+        const out = new Uint8Array(total);
+        let off = 0;
+        parts.forEach(p => { out.set(p, off); off += p.length; });
+        return out.buffer;
     };
 
     // 面板一打开就在后台把模型备好，用户选完图基本就能直接开跑
@@ -438,13 +499,20 @@
             .finally(() => { prefetching = false; });
     };
 
-    // 推理引擎：按源依次尝试，任一源可用即可
+    // 给任意 promise 加超时，避免某个 CDN 卡住导致一直转圈
+    const withTimeout = (p, ms, msg) => new Promise((res, rej) => {
+        const t = setTimeout(() => rej(new Error(msg || '网络超时')), ms);
+        p.then((v) => { clearTimeout(t); res(v); }, (e) => { clearTimeout(t); rej(e); });
+    });
+
+    // 推理引擎：按源依次尝试；单个源 20 秒没动静就换下一个
     const loadORT = async () => {
         if (S.ort) return S.ort;
         let lastErr = null;
         for (const base of ORT_SOURCES) {
             try {
-                const ort = await import(base + 'ort.wasm.min.mjs');
+                const ort = await withTimeout(import(base + 'ort.wasm.min.mjs'), 20000, '引擎加载超时');
+                ort.env.wasm.numThreads = 1;      // 不走多线程，省掉 worker 依赖
                 ort.env.wasm.wasmPaths = base;
                 S.ort = ort;
                 return ort;
@@ -453,11 +521,43 @@
         throw new Error('推理引擎加载失败：' + (lastErr ? lastErr.message : '无可用来源'));
     };
 
+    // wasm 体积大（约 15MB）：自己下载好并缓存，带进度/换源，最后直接喂给引擎
+    const loadWasmBinary = async () => {
+        let buf = await idbGet('wasm:' + ORT_VER);
+        if (buf && buf.byteLength >= ORT_WASM.min) return buf;
+        setStatus('首次使用需准备推理引擎，之后就秒开...');
+        let got = 0;
+        const onBytes = (n) => {
+            got += n;
+            setStatus('正在准备推理引擎 ' + (got / 1048576).toFixed(1) + ' / ' + (ORT_WASM.bytes / 1048576).toFixed(1) + ' MB');
+        };
+        const pack = (b) => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+        try {
+            got = 0;
+            const b = await fetchRaced(ORT_SOURCES.map(x => x + ORT_WASM.key), onBytes);
+            if (b.byteLength < ORT_WASM.min) throw new Error('引擎文件不完整');
+            const out = pack(b);
+            await idbPut('wasm:' + ORT_VER, out);
+            return out;
+        } catch (e) { got = 0; }
+        for (let s = 0; s < ORT_SOURCES.length; s++) {
+            try {
+                got = 0;
+                const b = await fetchPart(ORT_SOURCES[s] + ORT_WASM.key, onBytes, false);
+                if (b.byteLength < ORT_WASM.min) throw new Error('引擎文件不完整');
+                const out = pack(b);
+                await idbPut('wasm:' + ORT_VER, out);
+                return out;
+            } catch (e) { /* 换下一个源 */ }
+        }
+        throw new Error('推理引擎文件下载失败，请检查网络后重试');
+    };
+
     const ensureSession = async () => {
         const spec = MODELS[S.model] || MODELS.fast;
         if (S.session && S.sessionKey === spec.key) return S.session;
         setProgress(0.02);
-        // 引擎和模型同时准备，少等一轮
+        // 引擎、wasm、模型三件事同时准备，少等几轮
         const bufP = (async () => {
             let buf = await idbGet('model:' + spec.key);
             if (buf && buf.byteLength !== spec.bytes) buf = null;
@@ -470,13 +570,15 @@
             setStatus(spec.label + '模型已缓存，下次使用秒开');
             return buf;
         })();
-        const [ort, buf] = await Promise.all([loadORT(), bufP]);
+        const wasmP = loadWasmBinary();
+        const [ort, buf, wasmBuf] = await Promise.all([loadORT(), bufP, wasmP]);
         setProgress(0.99);
         setStatus('正在初始化推理引擎...');
-        S.session = await ort.InferenceSession.create(new Uint8Array(buf), {
+        if (wasmBuf) ort.env.wasm.wasmBinary = wasmBuf;   // 跳过引擎内部的二次下载
+        S.session = await withTimeout(ort.InferenceSession.create(new Uint8Array(buf), {
             executionProviders: ['wasm'],
             graphOptimizationLevel: 'all'
-        });
+        }), 120000, '推理引擎初始化超时，请刷新页面重试');
         S.sessionKey = spec.key;
         setProgress(null);
         return S.session;
@@ -690,7 +792,7 @@
         const t0 = performance.now();
         try {
             render();
-            await infer();
+            await withTimeout(infer(), 240000, '模型准备超时（网络较慢），请检查网络后再试');
             if (!$('#mattingRefine') || $('#mattingRefine').checked) bakeRefine();
             postProcess({ refine: false, feather: S.feather, contrast: S.contrast });
             pushHistory();
