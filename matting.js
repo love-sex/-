@@ -65,6 +65,8 @@
         raw: null, rctx: null,    // 权威蒙版：模型结果 + 画笔修补
         mask: null, mctx: null,   // 派生蒙版：raw 经过羽化/净化后用于显示与导出
         rgb: null,                // 原图 RGB（引导滤波用）
+        fg: null,                 // 去过底色污染的前景图（边缘不再挂背景色）
+        bgColor: undefined,       // 估计出来的背景色，null 表示背景太花不做去色
         hasMask: false,
         busy: false,
         session: null,
@@ -157,7 +159,8 @@
         const ctx = S.vctx;
         ctx.clearRect(0, 0, S.w, S.h);
         ctx.globalCompositeOperation = 'source-over';
-        ctx.drawImage(S.src, 0, 0, S.w, S.h);
+        // 正常预览用「去过底色」的前景图，避免边缘挂一圈背景色；显示删除区时用原图，方便对着改
+        ctx.drawImage((S.hasMask && S.fg) ? S.fg : S.src, 0, 0, S.w, S.h);
         if (!S.hasMask) return;
         if (S.showCut) {
             // 显示删除区：不抠掉原图，只在「会被删掉」的区域蒙一层洋红，
@@ -319,6 +322,61 @@
     };
 
     // 从权威蒙版 raw 派生出用于显示/导出的 mask
+    // 估一下背景色（取画面四边像素的中位数）：只在边框颜色足够统一时才用
+    const estimateBg = () => {
+        if (S.bgColor !== undefined) return S.bgColor;
+        if (!S.rgb) { S.bgColor = null; return null; }
+        const w = S.w, h = S.h, px = S.rgb.data;
+        const ring = Math.max(1, Math.round(Math.min(w, h) * 0.015));
+        const rs = [], gs = [], bs = [];
+        const take = (x, y) => {
+            const i = (y * w + x) * 4;
+            rs.push(px[i]); gs.push(px[i + 1]); bs.push(px[i + 2]);
+        };
+        for (let x = 0; x < w; x += 2) for (let y = 0; y < ring; y++) { take(x, y); take(x, h - 1 - y); }
+        for (let y = 0; y < h; y += 2) for (let x = 0; x < ring; x++) { take(x, y); take(w - 1 - x, y); }
+        if (!rs.length) { S.bgColor = null; return null; }
+        const med = (a) => { a.sort((p, q) => p - q); return a[a.length >> 1]; };
+        const c = [med(rs), med(gs), med(bs)];
+        let near = 0;
+        for (let k = 0; k < rs.length; k++) {
+            if (Math.abs(rs[k] - c[0]) + Math.abs(gs[k] - c[1]) + Math.abs(bs[k] - c[2]) < 60) near++;
+        }
+        S.bgColor = (near / rs.length > 0.55) ? c : null;   // 背景太花就不做去色
+        return S.bgColor;
+    };
+
+    // 边缘去底色污染：抠图边缘那圈像素是「主体 + 背景」的混合色，
+    // 直接贴到白底/棋盘格上会看到一圈背景色描边。这里按 C = a·F + (1-a)·B 反解出 F
+    const buildFg = () => {
+        S.fg = null;
+        if (!S.hasMask || !S.rgb || !S.mctx) return;
+        const B = estimateBg();
+        if (!B) return;
+        const w = S.w, h = S.h, n = w * h;
+        const src = S.rgb.data;
+        // 用「原始蒙版」的 alpha 来反解颜色：它才是真实的混合比例
+        // （派生蒙版被边缘净化推到 0/1 了，用它会把边缘按实心处理，颜色里的底色就留在图上）
+        const rd = S.rctx.getImageData(0, 0, w, h).data;
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const cx = c.getContext('2d');
+        const out = cx.createImageData(w, h);
+        const o = out.data;
+        for (let i = 0; i < n * 4; i += 4) {
+            o[i] = src[i]; o[i + 1] = src[i + 1]; o[i + 2] = src[i + 2]; o[i + 3] = 255;
+            const a = rd[i + 3] / 255;
+            if (a <= 0.2 || a >= 0.97) continue;      // 只动半透明边缘，实心主体保持原色
+            const inv = 1 - a;
+            for (let k = 0; k < 3; k++) {
+                const v = (src[i + k] - inv * B[k]) / a;
+                o[i + k] = v < 0 ? 0 : v > 255 ? 255 : v;
+            }
+        }
+        cx.putImageData(out, 0, 0);
+        S.fg = c;
+    };
+
     const postProcess = (opts) => {
         const w = S.w, h = S.h, n = w * h;
         // 蒙版以 alpha 通道存储（destination-in 只认 alpha，不认灰度）
@@ -348,6 +406,7 @@
             d[i + 3] = g;
         }
         S.mctx.putImageData(out, 0, 0);
+        buildFg();      // 蒙版一变就重算边缘颜色
     };
 
     // 把「边缘精修」结果写回权威蒙版：后续画笔/撤销都基于同一份数据，画面不会突然变样
@@ -806,6 +865,8 @@
         S.natural = [bmp.width, bmp.height];
         const scale = Math.min(1, MAX_SIDE / Math.max(bmp.width, bmp.height));
         S.src = bmp;
+        S.fg = null;
+        S.bgColor = undefined;      // 换图要重新估背景色
         S.name = file.name || '图片';
         setupCanvases(Math.max(1, Math.round(bmp.width * scale)), Math.max(1, Math.round(bmp.height * scale)));
         S.hasMask = false;
@@ -837,7 +898,7 @@
         const c = document.createElement('canvas');
         c.width = S.w; c.height = S.h;
         const x = c.getContext('2d');
-        x.drawImage(S.src, 0, 0, S.w, S.h);
+        x.drawImage(S.fg || S.src, 0, 0, S.w, S.h);
         x.globalCompositeOperation = 'destination-in';
         x.drawImage(S.mask, 0, 0, S.w, S.h);
         c.toBlob((blob) => {
@@ -876,7 +937,7 @@
         const x = c.getContext('2d', { willReadFrequently: true });
         x.imageSmoothingEnabled = true;
         x.imageSmoothingQuality = 'high';
-        x.drawImage(S.src, 0, 0, tw, th);
+        x.drawImage(S.fg || S.src, 0, 0, tw, th);
         x.globalCompositeOperation = 'destination-in';
         x.drawImage(S.mask, 0, 0, tw, th);
         const imgd = x.getImageData(0, 0, tw, th);
@@ -970,6 +1031,7 @@
     const restoreOriginal = () => {
         if (!S.src) return toast('请先上传图片');
         S.hasMask = false;
+        S.fg = null;
         S.undo = []; S.redo = [];
         if (S.rctx) { S.rctx.globalCompositeOperation = 'source-over'; S.rctx.clearRect(0, 0, S.w, S.h); }
         if (S.mctx) S.mctx.clearRect(0, 0, S.w, S.h);
@@ -980,7 +1042,7 @@
     };
 
     const reset = () => {
-        S.src = null; S.hasMask = false; S.undo = []; S.redo = [];
+        S.src = null; S.hasMask = false; S.fg = null; S.bgColor = undefined; S.undo = []; S.redo = [];
         const stage = $('#mattingStage');
         if (stage) stage.classList.add('is-empty');
         const empty = $('#mattingEmpty');
