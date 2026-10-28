@@ -76,7 +76,10 @@
         undo: [], redo: [],
         last: null,
         painting: false,
-        mode: 'erase',    // erase | restore
+        mode: 'erase',    // erase | restore | pan
+        spaceDown: false, // 按住空格 = 临时抓手
+        // 画布视图：布局尺寸 = 图片像素 * baseScale，再乘 zoom 得到实际显示大小
+        zoom: 1, tx: 0, ty: 0, baseScale: 1, userZoomed: false,
         brush: 40,
         hardness: 0.6,
         feather: 1,
@@ -179,6 +182,110 @@
         ctx.drawImage(S.mask, 0, 0, S.w, S.h);
         ctx.globalCompositeOperation = 'source-over';
     };
+
+    /* ---------------- 画布视图：缩放 / 平移 ----------------
+       思路：画布用 CSS transform 变换（左上角为原点），图片仍是原始像素分辨率。
+       好处是画笔坐标用 getBoundingClientRect 换算天然正确，不需要额外补偿。 */
+    const ZOOM_MIN = 0.2, ZOOM_MAX = 16;
+
+    const sizeStage = () => {
+        const st = $('#mattingStage');
+        if (!st || !S.w || !S.h) return;
+        const vw = st.clientWidth;
+        if (!vw) return;
+        const h = Math.round(vw * S.h / S.w);
+        st.style.height = Math.max(220, Math.min(640, h)) + 'px';
+    };
+
+    const clampView = () => {
+        const st = $('#mattingStage');
+        if (!st || !S.w) return;
+        const vw = st.clientWidth, vh = st.clientHeight;
+        const dw = S.w * S.baseScale * S.zoom, dh = S.h * S.baseScale * S.zoom;
+        // 图比视口小：至少留 80% 在里头；图比视口大：保证不露出空白边
+        if (dw <= vw) S.tx = Math.min(Math.max(S.tx, -dw * 0.2), vw - dw * 0.8);
+        else S.tx = Math.min(0, Math.max(vw - dw, S.tx));
+        if (dh <= vh) S.ty = Math.min(Math.max(S.ty, -dh * 0.2), vh - dh * 0.8);
+        else S.ty = Math.min(0, Math.max(vh - dh, S.ty));
+    };
+
+    const applyView = () => {
+        const cv = $('#mattingCanvas');
+        if (!cv) return;
+        clampView();
+        cv.style.transform = 'translate(' + S.tx + 'px,' + S.ty + 'px) scale(' + S.zoom + ')';
+        const lab = $('#mattingZoomVal');
+        if (lab) lab.textContent = Math.round(S.baseScale * S.zoom * 100) + '%';
+    };
+
+    // 按容器大小重新算出「刚好铺满」的布局，居中显示
+    const fitView = (keepZoom) => {
+        const st = $('#mattingStage'), cv = $('#mattingCanvas');
+        if (!st || !cv || !S.w || !S.h) return;
+        sizeStage();
+        const vw = st.clientWidth, vh = st.clientHeight;
+        if (!vw || !vh) return;
+        S.baseScale = Math.min(vw / S.w, vh / S.h, 1);
+        cv.style.width = Math.round(S.w * S.baseScale) + 'px';
+        cv.style.height = Math.round(S.h * S.baseScale) + 'px';
+        if (!keepZoom) S.zoom = 1;
+        S.tx = (vw - S.w * S.baseScale * S.zoom) / 2;
+        S.ty = (vh - S.h * S.baseScale * S.zoom) / 2;
+        applyView();
+    };
+
+    // 以视口内的 (cx,cy) 为锚点缩放：该点下方的图片内容保持不动
+    const zoomAt = (cx, cy, factor) => {
+        if (!S.src) return;
+        const z0 = S.zoom;
+        const z1 = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z0 * factor));
+        if (Math.abs(z1 - z0) < 1e-6) return;
+        const k = z1 / z0;
+        S.tx = cx - (cx - S.tx) * k;
+        S.ty = cy - (cy - S.ty) * k;
+        S.zoom = z1;
+        S.userZoomed = true;
+        applyView();
+    };
+
+    const zoomCenter = (factor) => {
+        const st = $('#mattingStage');
+        if (!st) return;
+        zoomAt(st.clientWidth / 2, st.clientHeight / 2, factor);
+    };
+
+    // 让某个图片坐标出现在视口中心（推理/重置后对准主体用）
+    const centerOn = (px, py) => {
+        const st = $('#mattingStage');
+        if (!st || !S.w) return;
+        const s = S.baseScale * S.zoom;
+        S.tx = st.clientWidth / 2 - px * s;
+        S.ty = st.clientHeight / 2 - py * s;
+        applyView();
+    };
+
+    // 尺寸变化但用户已手动缩放：重排布局的同时保持「看到的大小」不变
+    const relayout = () => {
+        const st = $('#mattingStage'), cv = $('#mattingCanvas');
+        if (!st || !cv || !S.w || !S.h) return;
+        const oldBase = S.baseScale;
+        sizeStage();
+        const vw = st.clientWidth, vh = st.clientHeight;
+        if (!vw || !vh) return;
+        const nb = Math.min(vw / S.w, vh / S.h, 1);
+        S.baseScale = nb;
+        cv.style.width = Math.round(S.w * nb) + 'px';
+        cv.style.height = Math.round(S.h * nb) + 'px';
+        if (oldBase) S.zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, S.zoom * oldBase / nb));
+        applyView();
+    };
+
+    const updateCursor = () => {
+        const cv = $('#mattingCanvas');
+        if (!cv) return;
+        cv.style.cursor = wantPan() ? 'grab' : 'crosshair';
+    };
+    const wantPan = () => S.mode === 'pan' || S.spaceDown;
 
     /* ---------------- 蒙版历史（只存单通道灰度，省内存） ---------------- */
     const snapshot = () => {
@@ -885,6 +992,8 @@
         if (empty) empty.style.display = 'none';
         $$('.matting-need-img').forEach(el => el.style.display = '');
         render();
+        S.userZoomed = false;      // 换图回到「适应窗口」
+        fitView(false);
         setStatus('已载入 ' + S.name + ' · ' + S.natural[0] + '×' + S.natural[1] + '，点「一键去背景」开始');
         toast('图片已载入');
     };
@@ -1050,8 +1159,13 @@
 
     const reset = () => {
         S.src = null; S.hasMask = false; S.fg = null; S.bgColor = undefined; S.undo = []; S.redo = [];
+        S.userZoomed = false; S.zoom = 1; S.tx = 0; S.ty = 0;
         const stage = $('#mattingStage');
-        if (stage) stage.classList.add('is-empty');
+        if (stage) { stage.classList.add('is-empty'); stage.style.height = ''; }
+        const cv = $('#mattingCanvas');
+        if (cv) { cv.style.transform = ''; cv.style.width = ''; cv.style.height = ''; }
+        const lab = $('#mattingZoomVal');
+        if (lab) lab.textContent = '100%';
         const empty = $('#mattingEmpty');
         if (empty) empty.style.display = '';
         $$('.matting-need-img').forEach(el => el.style.display = 'none');
@@ -1108,12 +1222,59 @@
             sync();
         });
 
-        // 画笔
+        // 画笔 + 平移 + 缩放
         const cv = $('#mattingCanvas');
-        if (cv) {
-            cv.addEventListener('pointerdown', (e) => {
+        const stage = $('#mattingStage');
+        if (cv && stage) {
+            const fingers = new Map();     // 多指 → 捏合缩放
+            let panFrom = null;            // 平移起点（屏幕坐标）
+            let pinchPrev = null;          // 上一帧双指距离与中心
+
+            const stageXY = (e) => {
+                const r = stage.getBoundingClientRect();
+                return { x: e.clientX - r.left, y: e.clientY - r.top };
+            };
+            const pinchInfo = () => {
+                const pts = Array.from(fingers.values());
+                if (pts.length < 2) return null;
+                const c = stage.getBoundingClientRect();
+                const a = pts[0], b = pts[1];
+                return {
+                    dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+                    cx: (a.x + b.x) / 2 - c.left,
+                    cy: (a.y + b.y) / 2 - c.top
+                };
+            };
+            const endPaint = () => {
+                if (!S.painting) return;
+                S.painting = false; S.last = null; scheduleFg();
+            };
+
+            // 事件挂在画布区（stage）而不是图片本身：手指/鼠标落到外面一圈也能拖动
+            stage.addEventListener('pointerdown', (e) => {
+                if (!S.src) return;
+                fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+                try { stage.setPointerCapture(e.pointerId); } catch (err) { }
+                const pinchId = pinchInfo();
+                // 两指 → 捏合缩放/平移，不再画笔
+                if (pinchId) { endPaint(); pinchPrev = pinchId; return; }
+                // 抓手模式 / 按住空格 / 中键 → 拖动画面
+                if (wantPan() || e.button === 1) {
+                    endPaint();
+                    panFrom = { x: e.clientX, y: e.clientY };
+                    cv.style.cursor = 'grabbing';
+                    e.preventDefault();
+                    return;
+                }
+                if (e.target !== cv && !wantPan()) {          // 点在图片外面：直接当拖动
+                    endPaint();
+                    panFrom = { x: e.clientX, y: e.clientY };
+                    cv.style.cursor = 'grabbing';
+                    e.preventDefault();
+                    return;
+                }
                 if (!S.hasMask) return toast('请先点「一键去背景」，再用画笔修补');
-                cv.setPointerCapture(e.pointerId);
+                if (e.button !== 0) { fingers.delete(e.pointerId); return; }
                 S.painting = true;
                 pushHistory();
                 const p = toCanvasXY(e);
@@ -1121,15 +1282,83 @@
                 paintDot(p.x, p.y);
                 refresh();
             });
-            cv.addEventListener('pointermove', (e) => {
+
+            stage.addEventListener('pointermove', (e) => {
+                if (fingers.has(e.pointerId)) fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+                const pin = pinchInfo();
+                if (pin && pinchPrev) {
+                    // 增量式：按两指距离比缩放，按中点位移平移
+                    const k = pin.dist / pinchPrev.dist;
+                    if (Math.abs(k - 1) > 0.0005) zoomAt(pin.cx, pin.cy, k);
+                    else { S.tx += pin.cx - pinchPrev.cx; S.ty += pin.cy - pinchPrev.cy; applyView(); }
+                    pinchPrev = pin;
+                    return;
+                }
+                if (panFrom) {
+                    S.tx += e.clientX - panFrom.x;
+                    S.ty += e.clientY - panFrom.y;
+                    panFrom = { x: e.clientX, y: e.clientY };
+                    S.userZoomed = true;
+                    applyView();
+                    return;
+                }
                 if (!S.painting) return;
                 paintTo(toCanvasXY(e).x, toCanvasXY(e).y);
                 refresh();
             });
-            const stop = () => { if (S.painting) { S.painting = false; S.last = null; scheduleFg(); } };
-            cv.addEventListener('pointerup', stop);
-            cv.addEventListener('pointercancel', stop);
-            cv.addEventListener('pointerleave', stop);
+
+            const release = (e) => {
+                if (e) fingers.delete(e.pointerId);
+                if (fingers.size < 2) pinchPrev = null;
+                if (panFrom) { panFrom = null; updateCursor(); }
+                endPaint();
+            };
+            stage.addEventListener('pointerup', release);
+            stage.addEventListener('pointercancel', release);
+            stage.addEventListener('pointerleave', release);
+
+            // 滚轮缩放（触控板捏合表现为 ctrl+wheel，同一套处理）
+            stage.addEventListener('wheel', (e) => {
+                if (!S.src) return;
+                e.preventDefault();
+                const unit = e.deltaMode === 1 ? 16 : (e.deltaMode === 2 ? 400 : 1);
+                const dy = e.deltaY * unit;
+                if (!dy) return;
+                const p = stageXY(e);
+                zoomAt(p.x, p.y, Math.exp(-dy * (e.ctrlKey ? 0.008 : 0.0016)));
+            }, { passive: false });
+
+            // 空格 = 临时抓手（在输入框里打字、或已经切到别的模块时不要抢）
+            const isTyping = (t) => t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+            const viewVisible = () => {
+                const sec = document.querySelector('section[data-view="matting"]');
+                return !!sec && sec.offsetParent !== null;
+            };
+            window.addEventListener('keydown', (e) => {
+                if (e.code !== 'Space' || isTyping(e.target) || !S.src || !viewVisible()) return;
+                if (!S.spaceDown) { S.spaceDown = true; updateCursor(); }
+                e.preventDefault();
+            });
+            window.addEventListener('keyup', (e) => {
+                if (e.code !== 'Space') return;
+                if (S.spaceDown) { S.spaceDown = false; updateCursor(); }
+            });
+            window.addEventListener('blur', () => { S.spaceDown = false; updateCursor(); });
+
+            // 画布尺寸变了（窗口缩放、面板刚显示出来）就重新布局：
+            // 没手动缩放过就保持「适应窗口」，缩放过则保持倍率、只把画面收回可视范围
+            if (window.ResizeObserver) {
+                let prevW = 0;
+                new ResizeObserver(() => {
+                    if (!S.src) return;
+                    const w = stage.clientWidth;
+                    if (!w || Math.abs(w - prevW) < 0.5) return;
+                    const first = !prevW;
+                    prevW = w;
+                    if (S.userZoomed && !first) relayout();
+                    else fitView(false);
+                }).observe(stage);
+            }
         }
 
         // 工具条
@@ -1140,7 +1369,11 @@
                 onPick(b.dataset.val);
             });
         };
-        seg('#mattingMode', (v) => { S.mode = v; });
+        seg('#mattingMode', (v) => {
+            S.mode = v;
+            updateCursor();
+            if (v === 'pan') setStatus('可拖动画面：把要修的地方移到眼前；滚轮或 ➕➖ 可缩放');
+        });
         seg('#mattingModel', (v) => {
             S.model = v;
             try { localStorage.setItem('mattingModel', v); } catch (e) { }
@@ -1195,6 +1428,14 @@
         on('#mattingRedo', redo);
         on('#mattingRestore', restoreOriginal);
         on('#mattingReset', reset);
+        on('#mattingZoomIn', () => zoomCenter(1.25));
+        on('#mattingZoomOut', () => zoomCenter(0.8));
+        on('#mattingZoomFit', () => { S.userZoomed = false; fitView(false); });
+        on('#mattingZoom100', () => {
+            if (!S.src || !S.baseScale) return;
+            S.userZoomed = true;
+            zoomCenter((1 / S.baseScale) / S.zoom);
+        });
         on('#mattingExportPng', exportPNG);
         on('#mattingExportSvg', exportSVG);
         on('#mattingKeepAll', () => {
@@ -1246,5 +1487,9 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
     else bind();
 
-    window.__matting = { state: S, autoRemove, exportPNG, exportSVG };
+    window.__matting = {
+        state: S, autoRemove, exportPNG, exportSVG,
+        fitView, zoomCenter, zoomAt, centerOn,
+        view: () => ({ zoom: S.zoom, tx: S.tx, ty: S.ty, baseScale: S.baseScale, mode: S.mode })
+    };
 })();

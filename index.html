@@ -20,7 +20,7 @@
     <!-- 登录界面动效 -->
     <link rel="stylesheet" href="login.css?v=20261030">
     <!-- 抠图工具样式 -->
-    <link rel="stylesheet" href="matting.css?v=20261105">
+    <link rel="stylesheet" href="matting.css?v=20261112">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
@@ -749,10 +749,11 @@
 
                     <div class="card matting-need-img">
                         <div class="card-title">🖌 画笔修补</div>
-                        <p class="muted" style="margin:-4px 0 12px;">擦除：抹掉多余的背景；恢复：把误删的主体补回来。先选模式，再在图上拖动，松手后可以撤销。</p>
+                        <p class="muted" style="margin:-4px 0 12px;">擦除：抹掉多余的背景；恢复：把误删的主体补回来。先选模式，再在图上拖动，松手后可以撤销。选「移动画布」可拖动画面；任何模式下按住空格也能临时平移。</p>
                         <div class="matting-seg" id="mattingMode">
                             <button type="button" data-val="erase" class="on">🧽 擦除背景</button>
                             <button type="button" data-val="restore">🖌 恢复主体</button>
+                            <button type="button" data-val="pan">✋ 移动画布</button>
                         </div>
                         <div style="height:12px;"></div>
                         <div class="matting-range">
@@ -798,11 +799,21 @@
                     </div>
 
                     <div class="card">
-                        <div class="card-title">🎨 画布</div>
+                        <div class="card-title zoom-head">
+                            <span>🎨 画布</span>
+                            <div class="zoom-bar">
+                                <button class="zbtn" id="mattingZoomOut" type="button" title="缩小">➖</button>
+                                <span class="zval" id="mattingZoomVal">100%</span>
+                                <button class="zbtn" id="mattingZoomIn" type="button" title="放大">➕</button>
+                                <button class="btn btn-ghost btn-sm" id="mattingZoomFit" type="button">适应窗口</button>
+                                <button class="btn btn-ghost btn-sm" id="mattingZoom100" type="button">1:1</button>
+                            </div>
+                        </div>
                         <div class="matting-stage is-empty" id="mattingStage">
                             <div class="matting-empty" id="mattingEmpty">还没有图片，先上传一张吧</div>
                             <canvas id="mattingCanvas"></canvas>
                         </div>
+                        <p class="muted zoom-tip">滚轮缩放 · 空格/中键拖动 · 双指捏合（手机）· 放大后用画笔精细修补</p>
                     </div>
 
                     <div class="card matting-need-img">
@@ -1372,7 +1383,7 @@ PORTFOLIO</p>
     <script src="script-game.js"></script>
     <script src="script.js?v=20261030"></script>
     <script src="workbench.js?v=20261111"></script>
-    <script src="matting.js?v=20261111"></script>
+    <script src="matting.js?v=20261112"></script>
     <script src="portfolio.js?v=20261029"></script>
     <script src="login-cards.js?v=20261030"></script>
 </body>

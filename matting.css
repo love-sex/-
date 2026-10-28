@@ -13,6 +13,9 @@
     overflow: hidden;
     border: 1px solid rgba(var(--primary-rgb), 0.14);
     border-radius: var(--radius-sm);
+    /* 画布上要能用滚轮/双指缩放，别让浏览器抢去做页面滚动 */
+    touch-action: none;
+    overscroll-behavior: contain;
     /* 透明背景用中性灰棋盘格（不跟主题色走，方便判断是否真的透明） */
     background-image:
         linear-gradient(45deg, #e6e6e6 25%, transparent 25%, transparent 75%, #e6e6e6 75%),
@@ -39,9 +42,72 @@
 
 #mattingCanvas {
     display: block;
-    max-width: 100%;
+    max-width: none;
     touch-action: none;
     cursor: crosshair;
+    /* 缩放/平移靠 transform：左上角为原点，配合 JS 里的锚点换算 */
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-origin: 0 0;
+    will-change: transform;
+    image-rendering: auto;
+}
+
+/* 缩放工具条 */
+.zoom-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.zoom-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.zoom-bar .zbtn {
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-size: 13px;
+    background: rgba(var(--primary-rgb), 0.08);
+    transition: background .15s;
+}
+
+.zoom-bar .zbtn:hover {
+    background: rgba(var(--primary-rgb), 0.16);
+}
+
+.zoom-bar .zbtn:active {
+    transform: scale(0.94);
+}
+
+.zoom-bar .zval {
+    min-width: 52px;
+    text-align: center;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-secondary);
+}
+
+.zoom-tip {
+    margin: 8px 0 0;
+    font-size: 12px;
+}
+
+@media (max-width: 560px) {
+    .zoom-bar .btn {
+        padding: 5px 10px;
+        font-size: 12px;
+    }
 }
 
 .matting-empty {
