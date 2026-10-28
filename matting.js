@@ -85,6 +85,7 @@
         feather: 1,
         contrast: 0.4,
         deepClean: true,  // 清理与背景同色的残留（反光、投影）
+        pickKey: null,    // 这张图上「复核后更干净」的模型，换图要清掉
         showCut: false,
         tracer: null
     };
@@ -686,8 +687,10 @@
     let prefetching = false;
     const prefetch = () => {
         if (prefetching || S.busy) return;
-        // 已经是当前档位的会话就不用再准备；切档后（sessionKey 不匹配）要重新来
-        if (S.session && S.sessionKey === (MODELS[S.model] || MODELS.fast).key) return;
+        // 当前档位的会话已经在内存里就不用再准备
+        const wantKey = (MODELS[S.model] || MODELS.fast).key;
+        if (S.session && S.sessionKey === wantKey) return;
+        if (S.sessions && S.sessions[wantKey]) return;
         const sec = $('section[data-view="matting"]');
         if (!sec || !sec.offsetParent) return;
         prefetching = true;
@@ -753,8 +756,12 @@
         throw new Error('推理引擎文件下载失败，请检查网络后重试');
     };
 
-    const ensureSession = async () => {
-        const spec = MODELS[S.model] || MODELS.fast;
+    // 两档模型的会话都留在内存里：出图后可能要拿另一个模型复核，
+    // 每次都重建 session 要 3~5 秒，留着切换就是瞬时的
+    const ensureSession = async (specArg) => {
+        const spec = specArg || MODELS[S.model] || MODELS.fast;
+        S.sessions = S.sessions || {};
+        if (S.sessions[spec.key]) { S.session = S.sessions[spec.key]; S.sessionKey = spec.key; return S.session; }
         if (S.session && S.sessionKey === spec.key) return S.session;
         setProgress(0.02);
         // 引擎、wasm、模型三件事同时准备，少等几轮
@@ -780,6 +787,7 @@
             graphOptimizationLevel: 'all'
         }), 120000, '推理引擎初始化超时，请刷新页面重试');
         S.sessionKey = spec.key;
+        S.sessions[spec.key] = S.session;
         setProgress(null);
         return S.session;
     };
@@ -881,9 +889,54 @@
         return cleared;
     };
 
-    const infer = async () => {
-        const session = await ensureSession();
-        const spec = MODELS[S.model] || MODELS.fast;
+    // 蒙版形状统计：最大连通块占多少、其余碎块占多少、一共几块
+    const maskShape = () => {
+        const w = S.w, h = S.h, n = w * h;
+        const d = S.rctx.getImageData(0, 0, w, h).data;
+        const lab = new Int32Array(n).fill(-1);
+        const stack = new Int32Array(n);
+        let comps = 0, best = 0, total = 0;
+        for (let j0 = 0; j0 < n; j0++) {
+            if (d[j0 * 4 + 3] <= 128 || lab[j0] >= 0) continue;
+            const id = comps++;
+            let sp = 0, area = 0;
+            stack[sp++] = j0; lab[j0] = id;
+            while (sp) {
+                const c = stack[--sp];
+                const x = c % w, y = (c - x) / w;
+                area++;
+                if (x > 0 && lab[c - 1] < 0 && d[(c - 1) * 4 + 3] > 128) { lab[c - 1] = id; stack[sp++] = c - 1; }
+                if (x < w - 1 && lab[c + 1] < 0 && d[(c + 1) * 4 + 3] > 128) { lab[c + 1] = id; stack[sp++] = c + 1; }
+                if (y > 0 && lab[c - w] < 0 && d[(c - w) * 4 + 3] > 128) { lab[c - w] = id; stack[sp++] = c - w; }
+                if (y < h - 1 && lab[c + w] < 0 && d[(c + w) * 4 + 3] > 128) { lab[c + w] = id; stack[sp++] = c + w; }
+            }
+            total += area;
+            if (area > best) best = area;
+        }
+        const mainPct = best / n * 100, restPct = (total - best) / n * 100;
+        return { comps, mainPct: +mainPct.toFixed(2), restPct: +restPct.toFixed(2) };
+    };
+    const snapMask = () => {
+        const c = document.createElement('canvas');
+        c.width = S.w; c.height = S.h;
+        c.getContext('2d').drawImage(S.raw, 0, 0);
+        return c;
+    };
+    const restoreMask = (c) => {
+        S.rctx.globalCompositeOperation = 'source-over';
+        S.rctx.clearRect(0, 0, S.w, S.h);
+        S.rctx.drawImage(c, 0, 0);
+        S.hasMask = true;
+    };
+    // 某个档位的模型是否已经在本地（别为了复核再触发一次 42MB 下载）
+    const modelCached = async (spec) => {
+        const buf = await idbGet('model:' + spec.key).catch(() => null);
+        return !!buf && buf.byteLength === spec.bytes;
+    };
+
+    const infer = async (specArg) => {
+        const spec = specArg || MODELS[S.model] || MODELS.fast;
+        const session = await ensureSession(spec);
         const N = spec.size;
         setStatus('正在识别主体区域...');
         // 保持宽高比（letterbox）：原来直接拉伸到 N×N，宽图/长图会被压扁，模型对轮廓的判断随之变差，
@@ -946,7 +999,9 @@
         // 只取 letterbox 里真正属于画面的那部分，再缩放回工作分辨率（填充区不进蒙版）
         S.rctx.drawImage(m, ox, oy, tw, th, 0, 0, S.w, S.h);
         S.hasMask = true;                      // 清理函数会读这个标志
-        S.debug = { speckles: despeckle(), bg: 0, blobs: 0, halo: 0 };
+        // 清理前的形状：碎块多/占面大 = 这次跑糊了，值得换个模型复核
+        const rawQ = maskShape();
+        S.debug = { model: spec.key, rawQ, speckles: despeckle(), bg: 0, blobs: 0, halo: 0 };
         if (S.deepClean) {
             S.debug.bg = cleanBgFlood();
             S.debug.blobs = purgeBgBlobs();
@@ -1105,6 +1160,7 @@
         S.src = bmp;
         S.fg = null;
         S.bgColor = undefined;      // 换图要重新估背景色
+        S.pickKey = null;           // 换图重新判断哪个模型更合适
         S.name = file.name || '图片';
         setupCanvases(Math.max(1, Math.round(bmp.width * scale)), Math.max(1, Math.round(bmp.height * scale)));
         S.hasMask = false;
@@ -1256,7 +1312,42 @@
         }
         try {
             render();
-            await withTimeout(infer(), 240000, '模型准备超时（网络较慢），请检查网络后再试');
+            // 同一张图上次哪个模型更干净，这次先用它
+            const primary = MODELS[S.pickKey] || MODELS[S.model] || MODELS.fast;
+            await withTimeout(infer(primary), 240000, '模型准备超时（网络较慢），请检查网络后再试');
+            const q1 = S.debug.rawQ || { comps: 0, mainPct: 0, restPct: 0 };
+            const q1c = maskShape();          // 清理后的形状，用来和复核结果比
+            // 因为「精细模型还没下完」才降级的不算选优结果，等它下完还要再比一次
+            if (!usedFast) S.pickKey = primary.key;
+            // 跑糊了（背景上冒出一堆碎块，或者碎块占面很大）：换另一个模型复核一次，
+            // 两个里挑干净的那张。量化版 isnet 在某些图（纯白底的产品渲染）上会成片乱响，
+            // 小模型反而干净 —— 只看模型大小是选不对的，得看结果。
+            if (q1.comps > 24 || q1.restPct > 2.5) {
+                const alt = primary.key === 'isnet' ? MODELS.fast : MODELS.pro;
+                if (await modelCached(alt)) {
+                    const snap = snapMask();
+                    const snapDbg = Object.assign({}, S.debug);
+                    setStatus('这一版背景有点脏，正在换模型复核...');
+                    try {
+                        await withTimeout(infer(alt), 180000, '复核超时');
+                        const dbgAlt = Object.assign({}, S.debug);
+                        const q2 = S.debug.rawQ || { comps: 0, mainPct: 0, restPct: 0 };
+                        const q2c = maskShape();
+                        // 复核版要「碎块少得多」且「主体没被明显削掉」才算赢，否则退回原来那张
+                        if (q2c.comps <= Math.max(3, q1c.comps * 0.5) && q2c.mainPct >= q1c.mainPct * 0.9) {
+                            S.pickKey = alt.key;
+                            S.debug.retry = { from: primary.key, q1, q1c, q2, q2c, kept: alt.key };
+                        } else {
+                            restoreMask(snap);
+                            S.debug = snapDbg;
+                            S.debug.retry = { from: primary.key, q1, q1c, q2, q2c, kept: primary.key };
+                        }
+                    } catch (e) {
+                        restoreMask(snap);
+                        S.debug = snapDbg;
+                    }
+                }
+            }
             if (!$('#mattingRefine') || $('#mattingRefine').checked) bakeRefine();
             postProcess({ refine: false, feather: S.feather, contrast: S.contrast });
             pushHistory();
@@ -1300,7 +1391,7 @@
     };
 
     const reset = () => {
-        S.src = null; S.hasMask = false; S.fg = null; S.bgColor = undefined; S.undo = []; S.redo = [];
+        S.src = null; S.hasMask = false; S.fg = null; S.bgColor = undefined; S.pickKey = null; S.undo = []; S.redo = [];
         S.userZoomed = false; S.zoom = 1; S.tx = 0; S.ty = 0;
         const stage = $('#mattingStage');
         if (stage) { stage.classList.add('is-empty'); stage.style.height = ''; delete stage.dataset.wheelLock; }
