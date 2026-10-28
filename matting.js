@@ -377,6 +377,12 @@
         S.fg = c;
     };
 
+    let fgTimer = 0;
+    const scheduleFg = () => {
+        clearTimeout(fgTimer);
+        fgTimer = setTimeout(() => { buildFg(); render(); }, 140);
+    };
+
     const postProcess = (opts) => {
         const w = S.w, h = S.h, n = w * h;
         // 蒙版以 alpha 通道存储（destination-in 只认 alpha，不认灰度）
@@ -406,7 +412,8 @@
             d[i + 3] = g;
         }
         S.mctx.putImageData(out, 0, 0);
-        buildFg();      // 蒙版一变就重算边缘颜色
+        // 蒙版一变就重算边缘颜色；涂画笔时先跳过（每帧都算会卡），停手后再补算
+        if (S.painting) scheduleFg(); else buildFg();
     };
 
     // 把「边缘精修」结果写回权威蒙版：后续画笔/撤销都基于同一份数据，画面不会突然变样
@@ -1119,7 +1126,7 @@
                 paintTo(toCanvasXY(e).x, toCanvasXY(e).y);
                 refresh();
             });
-            const stop = () => { if (S.painting) { S.painting = false; S.last = null; } };
+            const stop = () => { if (S.painting) { S.painting = false; S.last = null; scheduleFg(); } };
             cv.addEventListener('pointerup', stop);
             cv.addEventListener('pointercancel', stop);
             cv.addEventListener('pointerleave', stop);
