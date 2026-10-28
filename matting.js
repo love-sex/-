@@ -174,8 +174,8 @@
             const c = cut.getContext('2d');
             // 条纹按「适应窗口时的屏幕尺度」定，缩放到 100% 也不会变成粗色块
             const step = Math.max(8, Math.round(20 / (S.baseScale || 1)));
-            const lw = Math.max(1, step * 0.26);
-            c.fillStyle = 'rgba(255,0,170,0.12)';
+            const lw = Math.max(1, step * 0.22);
+            c.fillStyle = 'rgba(255,0,170,0.08)';
             c.fillRect(0, 0, S.w, S.h);
             // 洋红 + 白两色交替斜纹：背景本身是洋红/粉色时，纯洋红条纹会看不出来，
             // 加一组白色错位条纹，任何底色上都能明确分辨「这块会被删掉」
