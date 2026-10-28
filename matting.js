@@ -23,13 +23,15 @@
     // 两档模型：标准（4.7MB，秒开）/ 精细（42MB，边缘更准，首次下载较慢）
     const MODELS = {
         fast: {
-            key: 'u2netp', label: '标准', bytes: 4574861, size: 320,
+            key: 'u2netp', label: '快速', bytes: 4574861, size: 320,
             mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225],
             files: ['u2netp.onnx']
         },
+        // DIS / ISNet 的官方预处理是 mean=0.5、std=1.0（不是 ImageNet 那套），
+        // 之前套错会让输入整体被拉大到 [-2,2]，输出几乎全空 —— 精细模型"整张图抠没了"就是这个原因
         pro: {
             key: 'isnet', label: '精细', bytes: 44348940, size: 1024,
-            mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225],
+            mean: [0.5, 0.5, 0.5], std: [1.0, 1.0, 1.0],
             files: ['isnet_quint8.onnx.part1', 'isnet_quint8.onnx.part2', 'isnet_quint8.onnx.part3']
         }
     };
@@ -77,6 +79,7 @@
         hardness: 0.6,
         feather: 1,
         contrast: 0.4,
+        deepClean: true,  // 清理与背景同色的残留（反光、投影）
         showCut: false,
         tracer: null
     };
@@ -155,22 +158,23 @@
         ctx.clearRect(0, 0, S.w, S.h);
         ctx.globalCompositeOperation = 'source-over';
         ctx.drawImage(S.src, 0, 0, S.w, S.h);
-        if (S.hasMask) {
-            ctx.globalCompositeOperation = 'destination-in';
-            ctx.drawImage(S.mask, 0, 0, S.w, S.h);
-            ctx.globalCompositeOperation = 'source-over';
-            if (S.showCut) {
-                // 被删除的区域盖一层洋红，方便看清抠掉了什么（可关）
-                const cut = document.createElement('canvas');
-                cut.width = S.w; cut.height = S.h;
-                const c = cut.getContext('2d');
-                c.fillStyle = 'rgba(255,0,170,0.34)';
-                c.fillRect(0, 0, S.w, S.h);
-                c.globalCompositeOperation = 'destination-out';
-                c.drawImage(S.mask, 0, 0, S.w, S.h);
-                ctx.drawImage(cut, 0, 0, S.w, S.h);
-            }
+        if (!S.hasMask) return;
+        if (S.showCut) {
+            // 显示删除区：不抠掉原图，只在「会被删掉」的区域蒙一层洋红，
+            // 这样既能看清哪里会被删，又能看到底下的原图细节，方便对着画笔修
+            const cut = document.createElement('canvas');
+            cut.width = S.w; cut.height = S.h;
+            const c = cut.getContext('2d');
+            c.fillStyle = 'rgba(255,0,170,0.42)';
+            c.fillRect(0, 0, S.w, S.h);
+            c.globalCompositeOperation = 'destination-out';
+            c.drawImage(S.mask, 0, 0, S.w, S.h);
+            ctx.drawImage(cut, 0, 0, S.w, S.h);
+            return;
         }
+        ctx.globalCompositeOperation = 'destination-in';
+        ctx.drawImage(S.mask, 0, 0, S.w, S.h);
+        ctx.globalCompositeOperation = 'source-over';
     };
 
     /* ---------------- 蒙版历史（只存单通道灰度，省内存） ---------------- */
@@ -234,11 +238,13 @@
             g.addColorStop(1, 'rgba(0,0,0,0)');
         }
         // 恢复=叠加白色提高 alpha；擦除=destination-out 减少 alpha
-        ctx.globalCompositeOperation = keep ? 'source-over' : 'destination-out';
+        const gco = keep ? 'source-over' : 'destination-out';
+        ctx.globalCompositeOperation = gco;
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';   // 一定要还原，否则下次写入蒙版会被当成擦除
     };
     const paintTo = (x, y) => {
         const from = S.last || { x, y };
@@ -584,6 +590,96 @@
         return S.session;
     };
 
+    // 同色背景残留清理：从画面四边按颜色蔓延出背景（遇到明显轮廓就停），
+    // 再把这块从蒙版里扣掉 —— 桌面反光、投影这类"和背景同色"的残留会被一起带走
+    const cleanBgFlood = () => {
+        if (!S.hasMask || !S.rgb) return 0;
+        const w = S.w, h = S.h, n = w * h;
+        const px = S.rgb.data;
+        const img = S.rctx.getImageData(0, 0, w, h);
+        const d = img.data;
+        let opaque = 0;
+        for (let j = 0; j < n; j++) if (d[j * 4 + 3] > 128) opaque++;
+        if (opaque < n * 0.002) return 0;              // 主体太小，别乱动
+
+        // 1) 估背景色：只取边框上「模型已经判为背景」的像素
+        let sr = 0, sg = 0, sb = 0, cnt = 0;
+        const ring = Math.max(1, Math.round(Math.min(w, h) * 0.02));
+        for (let x = 0; x < w; x++) {
+            for (let y = 0; y < ring; y++) {
+                [[x, y], [x, h - 1 - y]].forEach(([xx, yy]) => {
+                    const i = (yy * w + xx) * 4;
+                    if (d[i + 3] > 40) return;
+                    sr += px[i]; sg += px[i + 1]; sb += px[i + 2]; cnt++;
+                });
+            }
+        }
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < ring; x++) {
+                [[x, y], [w - 1 - x, y]].forEach(([xx, yy]) => {
+                    const i = (yy * w + xx) * 4;
+                    if (d[i + 3] > 40) return;
+                    sr += px[i]; sg += px[i + 1]; sb += px[i + 2]; cnt++;
+                });
+            }
+        }
+        if (!cnt) return 0;
+        const br = sr / cnt, bg = sg / cnt, bb = sb / cnt;
+
+        // 2) 边缘图：真轮廓处不放行，避免蔓延进主体内部
+        const gray = new Float32Array(n);
+        for (let j = 0, i = 0; j < n; j++, i += 4) gray[j] = px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114;
+        const isEdge = new Uint8Array(n);
+        for (let y = 1; y < h - 1; y++) {
+            for (let x = 1; x < w - 1; x++) {
+                const j = y * w + x;
+                const gx = -gray[j - w - 1] - 2 * gray[j - 1] - gray[j + w - 1] + gray[j - w + 1] + 2 * gray[j + 1] + gray[j + w + 1];
+                const gy = -gray[j - w - 1] - 2 * gray[j - w] - gray[j - w + 1] + gray[j + w - 1] + 2 * gray[j + w] + gray[j + w + 1];
+                if (Math.abs(gx) + Math.abs(gy) > 32) isEdge[j] = 1;
+            }
+        }
+
+        // 3) 从四边蔓延
+        const seen = new Uint8Array(n);
+        const q = new Int32Array(n);
+        let qh = 0, qt = 0;
+        const nearBg = (j) => {
+            const i = j * 4;
+            return Math.abs(px[i] - br) + Math.abs(px[i + 1] - bg) + Math.abs(px[i + 2] - bb) < 78;
+        };
+        const seed = (x, y) => {
+            const j = y * w + x;
+            if (!seen[j] && !isEdge[j] && nearBg(j)) { seen[j] = 1; q[qt++] = j; }
+        };
+        for (let x = 0; x < w; x++) { seed(x, 0); seed(x, h - 1); }
+        for (let y = 0; y < h; y++) { seed(0, y); seed(w - 1, y); }
+        while (qh < qt) {
+            const j = q[qh++];
+            const x = j % w, y = (j - x) / w;
+            const p = j * 4;
+            const nb = [x > 0 ? j - 1 : -1, x < w - 1 ? j + 1 : -1, y > 0 ? j - w : -1, y < h - 1 ? j + w : -1];
+            for (const k of nb) {
+                if (k < 0 || seen[k] || isEdge[k]) continue;
+                const i = k * 4;
+                if (Math.abs(px[i] - px[p]) + Math.abs(px[i + 1] - px[p + 1]) + Math.abs(px[i + 2] - px[p + 2]) > 26) continue;
+                if (!nearBg(k)) continue;
+                seen[k] = 1; q[qt++] = k;
+            }
+        }
+
+        // 4) 扣掉蔓延区；万一蔓延过头（把主体也吃掉了）就整体放弃，宁可留着残留
+        let hit = 0;
+        for (let j = 0; j < qt; j++) if (d[q[j] * 4 + 3] > 128) hit++;
+        if (hit > opaque * 0.6) return 0;
+        let cleared = 0;
+        for (let j = 0; j < qt; j++) {
+            const k = q[j];
+            if (d[k * 4 + 3]) { d[k * 4 + 3] = 0; cleared++; }
+        }
+        if (cleared) S.rctx.putImageData(img, 0, 0);
+        return cleared;
+    };
+
     const infer = async () => {
         const session = await ensureSession();
         const spec = MODELS[S.model] || MODELS.fast;
@@ -615,25 +711,77 @@
             if (v < mn) mn = v;
             if (v > mx) mx = v;
         }
-        const span = mx - mn || 1;
+        // 有的模型导出时 sigmoid 已经在图里（0~1），有的还是 logits；
+        // 原来用「整幅 min-max 拉伸」会把背景那点微弱响应也拉成不透明，正是残留的来源
+        const logistic = mn < -0.02 || mx > 1.02;
         const m = document.createElement('canvas');
         m.width = N; m.height = N;
         const mc = m.getContext('2d', { willReadFrequently: true });
         const im = mc.createImageData(N, N);
         for (let i = 0, o = 0; o < plane; i += 4, o++) {
-            let v = (raw[o * stride + chOff] - mn) / span;
+            let v = raw[o * stride + chOff];
+            if (logistic) v = 1 / (1 + Math.exp(-v));
             v = v < 0 ? 0 : v > 1 ? 1 : v;
-            const g = v * 255;
             im.data[i] = im.data[i + 1] = im.data[i + 2] = 255;
-            im.data[i + 3] = g;
+            im.data[i + 3] = v * 255;
         }
         mc.putImageData(im, 0, 0);
         // 缩放回工作分辨率，写入权威蒙版
+        S.rctx.globalCompositeOperation = 'source-over';   // 防画笔残留的混合模式
         S.rctx.clearRect(0, 0, S.w, S.h);
         S.rctx.imageSmoothingEnabled = true;
         S.rctx.imageSmoothingQuality = 'high';
         S.rctx.drawImage(m, 0, 0, S.w, S.h);
-        S.hasMask = true;
+        S.hasMask = true;                      // 清理函数会读这个标志
+        S.debug = { speckles: despeckle(), bg: 0 };
+        if (S.deepClean) S.debug.bg = cleanBgFlood();
+    };
+
+    // 清掉零星碎块：模型常在背景上留下一小撮孤立的高 alpha，换底色后会非常显眼
+    const despeckle = () => {
+        const w = S.w, h = S.h, n = w * h;
+        const img = S.rctx.getImageData(0, 0, w, h);
+        const d = img.data;
+        const lab = new Int32Array(n).fill(-1);
+        const stack = new Int32Array(n);
+        const comp = [];                                   // 当前连通块的像素下标
+        const mark = new Int32Array(n);                    // 用轮次标记，避免每次清空大数组
+        let epoch = 0;
+        const minKeep = Math.max(160, Math.round(n * 0.0006));
+        let killed = 0;
+        for (let j0 = 0; j0 < n; j0++) {
+            if (d[j0 * 4 + 3] <= 128 || lab[j0] >= 0) continue;
+            let sp = 0;
+            comp.length = 0;
+            stack[sp++] = j0; lab[j0] = j0;
+            while (sp) {
+                const c = stack[--sp];
+                comp.push(c);
+                const x = c % w, y = (c - x) / w;
+                if (x > 0 && lab[c - 1] < 0 && d[(c - 1) * 4 + 3] > 128) { lab[c - 1] = j0; stack[sp++] = c - 1; }
+                if (x < w - 1 && lab[c + 1] < 0 && d[(c + 1) * 4 + 3] > 128) { lab[c + 1] = j0; stack[sp++] = c + 1; }
+                if (y > 0 && lab[c - w] < 0 && d[(c - w) * 4 + 3] > 128) { lab[c - w] = j0; stack[sp++] = c - w; }
+                if (y < h - 1 && lab[c + w] < 0 && d[(c + w) * 4 + 3] > 128) { lab[c + w] = j0; stack[sp++] = c + w; }
+            }
+            if (comp.length >= minKeep) continue;
+            epoch++;
+            comp.forEach((c) => { d[c * 4 + 3] = 0; mark[c] = epoch; killed++; });
+            // 再沿着「半透明」把碎块外围那圈雾一起擦掉，但不跨进其它实心区域
+            let sp2 = 0;
+            stack[sp2++] = j0;
+            while (sp2) {
+                const c = stack[--sp2];
+                const x = c % w, y = (c - x) / w;
+                const nb = [x > 0 ? c - 1 : -1, x < w - 1 ? c + 1 : -1, y > 0 ? c - w : -1, y < h - 1 ? c + w : -1];
+                for (const q of nb) {
+                    if (q < 0 || mark[q] === epoch) continue;
+                    const a = d[q * 4 + 3];
+                    if (a > 0 && a <= 128) { mark[q] = epoch; d[q * 4 + 3] = 0; stack[sp2++] = q; }
+                }
+            }
+        }
+        if (killed) S.rctx.putImageData(img, 0, 0);
+        return killed;
     };
 
     /* ---------------- 载入图片 ---------------- */
@@ -804,13 +952,31 @@
             loadTracer().catch(() => { });   // 提前备好矢量模块，导出时不用等
         } catch (e) {
             console.error(e);
-            setStatus('处理失败：' + e.message);
-            toast('处理失败：' + e.message);
+            const raw = String((e && e.message) || e);
+            // 引擎层的报错（维度不符、session 损坏）对用户没意义，换成能操作的提示
+            const engineErr = /invalid dimensions|OrtRun|session|deserialize|protobuf/i.test(raw);
+            if (engineErr) { S.session = null; S.sessionKey = null; }
+            const friendly = engineErr ? '模型运行出错，请刷新页面，或切到另一个模型再试一次' : raw;
+            setStatus('处理失败：' + friendly);
+            toast('处理失败：' + friendly);
         } finally {
             setProgress(null);
             S.busy = false;
             if (btn) { btn.disabled = false; btn.textContent = '✨ 一键去背景'; }
         }
+    };
+
+    // 恢复到刚上传的样子：不重新选文件，清掉蒙版与历史即可
+    const restoreOriginal = () => {
+        if (!S.src) return toast('请先上传图片');
+        S.hasMask = false;
+        S.undo = []; S.redo = [];
+        if (S.rctx) { S.rctx.globalCompositeOperation = 'source-over'; S.rctx.clearRect(0, 0, S.w, S.h); }
+        if (S.mctx) S.mctx.clearRect(0, 0, S.w, S.h);
+        syncHistoryButtons();
+        render();
+        setStatus('已恢复到刚上传的原图，可以重新点「一键去背景」，或直接用画笔涂');
+        toast('已恢复原图');
     };
 
     const reset = () => {
@@ -906,7 +1072,29 @@
             });
         };
         seg('#mattingMode', (v) => { S.mode = v; });
-        seg('#mattingModel', (v) => { S.model = v; });
+        seg('#mattingModel', (v) => {
+            S.model = v;
+            try { localStorage.setItem('mattingModel', v); } catch (e) { }
+        });
+
+        // 记住上次选的模型档位：选用过精细模型的人，下次进来默认就是精细
+        try {
+            const saved = localStorage.getItem('mattingModel');
+            if (saved && MODELS[saved]) {
+                S.model = saved;
+                $$('#mattingModel button').forEach(b => b.classList.toggle('on', b.dataset.val === saved));
+            }
+        } catch (e) { }
+
+        // 深度清理开关
+        const deep = $('#mattingDeepClean');
+        if (deep) {
+            deep.checked = S.deepClean;
+            deep.onchange = () => {
+                S.deepClean = deep.checked;
+                if (S.hasMask) setStatus('深度清理已' + (deep.checked ? '开启' : '关闭') + '，重新点「一键去背景」后生效');
+            };
+        }
         seg('#mattingBg', (v) => {
             const st = $('#mattingStage');
             if (!st) return;
@@ -936,12 +1124,14 @@
         on('#mattingAutoBtn', autoRemove);
         on('#mattingUndo', undo);
         on('#mattingRedo', redo);
+        on('#mattingRestore', restoreOriginal);
         on('#mattingReset', reset);
         on('#mattingExportPng', exportPNG);
         on('#mattingExportSvg', exportSVG);
         on('#mattingKeepAll', () => {
             if (!S.hasMask) return toast('请先完成去背景');
             pushHistory();
+            S.rctx.globalCompositeOperation = 'source-over';
             S.rctx.fillStyle = '#fff';
             S.rctx.fillRect(0, 0, S.w, S.h);
             refresh();
@@ -971,9 +1161,17 @@
 
         $$('.matting-need-img').forEach(el => el.style.display = 'none');
 
-        // 打开面板就在后台备模型（42MB 只下一次，之后走 IndexedDB 缓存）
-        prefetch();
-        setInterval(prefetch, 1500);
+        // 精细模型如果已经缓存过，就默认用它（不用再等下载，效果明显更好）
+        const boot = () => { prefetch(); setInterval(prefetch, 1500); };
+        let hasPref = false;
+        try { hasPref = !!localStorage.getItem('mattingModel'); } catch (e) { }
+        if (hasPref) { boot(); return; }
+        idbGet('model:isnet').then((buf) => {
+            if (buf && buf.byteLength === MODELS.pro.bytes) {
+                S.model = 'pro';
+                $$('#mattingModel button').forEach(b => b.classList.toggle('on', b.dataset.val === 'pro'));
+            }
+        }).catch(() => { }).finally(boot);
     };
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
