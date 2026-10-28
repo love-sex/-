@@ -685,11 +685,13 @@
     // 面板一打开就在后台把模型备好，用户选完图基本就能直接开跑
     let prefetching = false;
     const prefetch = () => {
-        if (prefetching || S.session || S.busy) return;
+        if (prefetching || S.busy) return;
+        // 已经是当前档位的会话就不用再准备；切档后（sessionKey 不匹配）要重新来
+        if (S.session && S.sessionKey === (MODELS[S.model] || MODELS.fast).key) return;
         const sec = $('section[data-view="matting"]');
         if (!sec || !sec.offsetParent) return;
         prefetching = true;
-        setStatus('正在后台准备抠图模型，先传图也不影响...');
+        setStatus('正在后台准备抠图模型（精细模型 42MB，仅首次需要下载，之后秒开）...');
         setProgress(0.01);
         ensureSession()
             .then(() => { if (!S.hasMask) { setStatus('模型已就绪，上传图片后点「一键去背景」'); setProgress(null); } })
@@ -1241,6 +1243,17 @@
         const btn = $('#mattingAutoBtn');
         if (btn) { btn.disabled = true; btn.textContent = '正在识别...'; }
         const t0 = performance.now();
+        // 精细模型首次要下 42MB：先用已经就绪的快速模型把结果出出来（1~2 秒），
+        // 42MB 交给后台继续下，下完再点一次就是精细结果。总比干等半分钟强。
+        let usedFast = false;
+        if (S.model === 'pro' && S.sessionKey !== MODELS.pro.key) {
+            const cached = await idbGet('model:' + MODELS.pro.key).catch(() => null);
+            if (!cached || cached.byteLength !== MODELS.pro.bytes) {
+                usedFast = true;
+                S.model = 'fast';
+                setStatus('精细模型还在后台下载，先用快速模型出图；下完之后再点一次会更干净。');
+            }
+        }
         try {
             render();
             await withTimeout(infer(), 240000, '模型准备超时（网络较慢），请检查网络后再试');
@@ -1250,7 +1263,8 @@
             render();
             const sec = ((performance.now() - t0) / 1000).toFixed(1);
             setStatus('去背景完成 · 用时 ' + sec + ' 秒，可用画笔继续修补'
-                + (S.model === 'fast' ? '；想要更干净的细节边缘，可切到「精细模型」再跑一次' : ''));
+                + (usedFast ? '；精细模型正在后台下载，下完再点一次会更干净'
+                    : S.model === 'fast' ? '；想要更干净的细节边缘，可切到「精细模型」再跑一次' : ''));
             toast('背景已去除');
             loadTracer().catch(() => { });   // 提前备好矢量模块，导出时不用等
         } catch (e) {
@@ -1265,6 +1279,8 @@
         } finally {
             setProgress(null);
             S.busy = false;
+            // 临时降级用完要还原档位：界面仍显示「精细模型」，后台继续把它准备好
+            if (usedFast) S.model = 'pro';
             if (btn) { btn.disabled = false; btn.textContent = '✨ 一键去背景'; }
         }
     };
@@ -1599,9 +1615,21 @@
         $$('.matting-need-img').forEach(el => el.style.display = 'none');
 
         // 精细模型如果已经缓存过，就默认用它（不用再等下载，效果明显更好）
-        const boot = () => { prefetch(); setInterval(prefetch, 1500); };
         let hasPref = false;
         try { hasPref = !!localStorage.getItem('mattingModel'); } catch (e) { }
+        const boot = async () => {
+            // 先把快速模型备好（4.7MB，基本秒下）：首次点「一键去背景」立刻能出图，
+            // 而不是干等 42MB 的精细模型；随后后台继续把精细模型准备好，第二次起就是精细结果
+            if (!hasPref) {
+                const want = S.model;
+                S.model = 'fast';
+                await ensureSession().catch(() => { });
+                S.model = want;
+                $$('#mattingModel button').forEach(b => b.classList.toggle('on', b.dataset.val === want));
+            }
+            prefetch();
+            setInterval(prefetch, 1500);
+        };
         if (hasPref) { boot(); return; }
         idbGet('model:isnet').then((buf) => {
             if (buf && buf.byteLength === MODELS.pro.bytes) {
