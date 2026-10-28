@@ -50,7 +50,8 @@
     left: 0;
     top: 0;
     transform-origin: 0 0;
-    will-change: transform;
+    /* 不用 will-change：画布可能被放得很大，长期提升合成层既占显存，
+       也会让 getBoundingClientRect 偶尔拿到滞后的 transform，影响画笔定位 */
     image-rendering: auto;
 }
 

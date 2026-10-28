@@ -1489,7 +1489,7 @@
 
     window.__matting = {
         state: S, autoRemove, exportPNG, exportSVG,
-        fitView, zoomCenter, zoomAt, centerOn,
+        fitView, zoomCenter, zoomAt, centerOn, applyView,
         view: () => ({ zoom: S.zoom, tx: S.tx, ty: S.ty, baseScale: S.baseScale, mode: S.mode })
     };
 })();
