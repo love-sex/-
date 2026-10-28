@@ -71,7 +71,7 @@
         busy: false,
         session: null,
         sessionKey: null,
-        model: 'fast',
+        model: 'pro',
         ort: null,
         undo: [], redo: [],
         last: null,
@@ -845,6 +845,13 @@
         };
         for (let x = 0; x < w; x++) { seed(x, 0); seed(x, h - 1); }
         for (let y = 0; y < h; y++) { seed(0, y); seed(w - 1, y); }
+        // 模型已经判成背景的像素也当种子：被主体围住的同色背景（两臂之间、腿缝里的白底）
+        // 不连着画框，只从四边蔓延是清不到它们的
+        for (let j = 0; j < n; j++) {
+            if (d[j * 4 + 3] > 40) continue;
+            const x = j % w, y = (j - x) / w;
+            if (!seen[j] && !isEdge[j] && nearBg(j)) { seen[j] = 1; q[qt++] = j; }
+        }
         while (qh < qt) {
             const j = q[qh++];
             const x = j % w, y = (j - x) / w;
@@ -877,12 +884,23 @@
         const spec = MODELS[S.model] || MODELS.fast;
         const N = spec.size;
         setStatus('正在识别主体区域...');
+        // 保持宽高比（letterbox）：原来直接拉伸到 N×N，宽图/长图会被压扁，模型对轮廓的判断随之变差，
+        // 表现为细边发虚、背景一块块残留。这里按长边缩放到 N，短边居中，四周用中性灰填充。
+        const fit = Math.min(N / S.w, N / S.h);
+        const tw = Math.max(1, Math.round(S.w * fit));
+        const th = Math.max(1, Math.round(S.h * fit));
+        const ox = Math.round((N - tw) / 2);
+        const oy = Math.round((N - th) / 2);
         const t = document.createElement('canvas');
         t.width = N; t.height = N;
         const tc = t.getContext('2d', { willReadFrequently: true });
         tc.imageSmoothingEnabled = true;
         tc.imageSmoothingQuality = 'high';
-        tc.drawImage(S.src, 0, 0, N, N);
+        // 填充色用估出来的背景色（纯色底图最贴），估不出来才用中性灰
+        const padB = estimateBg();
+        tc.fillStyle = padB ? 'rgb(' + padB[0] + ',' + padB[1] + ',' + padB[2] + ')' : '#808080';
+        tc.fillRect(0, 0, N, N);
+        tc.drawImage(S.src, ox, oy, tw, th);
         const px = tc.getImageData(0, 0, N, N).data;
         const input = new Float32Array(N * N * 3);
         const plane = N * N;
@@ -923,10 +941,15 @@
         S.rctx.clearRect(0, 0, S.w, S.h);
         S.rctx.imageSmoothingEnabled = true;
         S.rctx.imageSmoothingQuality = 'high';
-        S.rctx.drawImage(m, 0, 0, S.w, S.h);
+        // 只取 letterbox 里真正属于画面的那部分，再缩放回工作分辨率（填充区不进蒙版）
+        S.rctx.drawImage(m, ox, oy, tw, th, 0, 0, S.w, S.h);
         S.hasMask = true;                      // 清理函数会读这个标志
-        S.debug = { speckles: despeckle(), bg: 0 };
-        if (S.deepClean) S.debug.bg = cleanBgFlood();
+        S.debug = { speckles: despeckle(), bg: 0, blobs: 0, halo: 0 };
+        if (S.deepClean) {
+            S.debug.bg = cleanBgFlood();
+            S.debug.blobs = purgeBgBlobs();
+            S.debug.halo = shrinkBgEdge();
+        }
     };
 
     // 清掉零星碎块：模型常在背景上留下一小撮孤立的高 alpha，换底色后会非常显眼
@@ -974,6 +997,86 @@
         }
         if (killed) S.rctx.putImageData(img, 0, 0);
         return killed;
+    };
+
+    // 背景色块清理：模型偶尔会把「和背景同色」的区域整块判成主体。白底图最典型 ——
+    // 白背景上的残余块在浅色预览里几乎看不出来，换成深色底或导出透明 PNG 就是一块块白斑。
+    // 这里按连通块判断：颜色接近背景、又不是最大主体块的，整块清掉。
+    const purgeBgBlobs = () => {
+        if (!S.hasMask || !S.rgb) return 0;
+        const B = estimateBg();
+        if (!B) return 0;
+        const w = S.w, h = S.h, n = w * h;
+        const px = S.rgb.data;
+        const img = S.rctx.getImageData(0, 0, w, h);
+        const d = img.data;
+        const lab = new Int32Array(n).fill(-1);
+        const stack = new Int32Array(n);
+        const blobs = [];
+        let solid = 0;
+        for (let j0 = 0; j0 < n; j0++) {
+            if (d[j0 * 4 + 3] <= 128 || lab[j0] >= 0) continue;
+            const id = blobs.length;
+            let sp = 0, area = 0, sr = 0, sg = 0, sb = 0;
+            stack[sp++] = j0; lab[j0] = id;
+            while (sp) {
+                const c = stack[--sp];
+                const x = c % w, y = (c - x) / w;
+                const i = c * 4;
+                area++; sr += px[i]; sg += px[i + 1]; sb += px[i + 2];
+                if (x > 0 && lab[c - 1] < 0 && d[(c - 1) * 4 + 3] > 128) { lab[c - 1] = id; stack[sp++] = c - 1; }
+                if (x < w - 1 && lab[c + 1] < 0 && d[(c + 1) * 4 + 3] > 128) { lab[c + 1] = id; stack[sp++] = c + 1; }
+                if (y > 0 && lab[c - w] < 0 && d[(c - w) * 4 + 3] > 128) { lab[c - w] = id; stack[sp++] = c - w; }
+                if (y < h - 1 && lab[c + w] < 0 && d[(c + w) * 4 + 3] > 128) { lab[c + w] = id; stack[sp++] = c + w; }
+            }
+            solid += area;
+            blobs.push({ area, r: sr / area, g: sg / area, b: sb / area });
+        }
+        if (blobs.length < 2) return 0;
+        let main = 0;
+        for (let k = 1; k < blobs.length; k++) if (blobs[k].area > blobs[main].area) main = k;
+        const kill = new Uint8Array(blobs.length);
+        let killed = 0;
+        for (let k = 0; k < blobs.length; k++) {
+            if (k === main) continue;
+            const bl = blobs[k];
+            if (bl.area > blobs[main].area * 0.35) continue;         // 太大，可能是主体的另一部分
+            if (Math.abs(bl.r - B[0]) + Math.abs(bl.g - B[1]) + Math.abs(bl.b - B[2]) > 60) continue;
+            kill[k] = 1; killed += bl.area;
+        }
+        if (!killed || killed > solid * 0.5) return 0;              // 删太多说明判错了，整体放弃
+        for (let j = 0; j < n; j++) { const l = lab[j]; if (l >= 0 && kill[l]) d[j * 4 + 3] = 0; }
+        S.rctx.putImageData(img, 0, 0);
+        return killed;
+    };
+
+    // 边缘白边：外轮廓那圈像素是「主体 + 背景」的混合色，颜色已经基本是背景的，
+    // 留着贴到白底/深色底上就是一圈描边。这里把紧贴透明区的那一圈抹掉。
+    const shrinkBgEdge = () => {
+        if (!S.hasMask || !S.rgb) return 0;
+        const B = estimateBg();
+        if (!B) return 0;
+        const w = S.w, h = S.h, n = w * h;
+        const px = S.rgb.data;
+        const img = S.rctx.getImageData(0, 0, w, h);
+        const d = img.data;
+        const NBG = 18;
+        let cleared = 0;
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                const j = y * w + x, a = d[j * 4 + 3];
+                if (a === 0 || a >= 210) continue;                  // 只动半透明的边缘
+                const i = j * 4;
+                if (Math.abs(px[i] - B[0]) + Math.abs(px[i + 1] - B[1]) + Math.abs(px[i + 2] - B[2]) > NBG) continue;
+                if ((x > 0 && d[(j - 1) * 4 + 3] === 0) || (x < w - 1 && d[(j + 1) * 4 + 3] === 0) ||
+                    (y > 0 && d[(j - w) * 4 + 3] === 0) || (y < h - 1 && d[(j + w) * 4 + 3] === 0)) {
+                    d[j * 4 + 3] = 0;
+                    cleared++;
+                }
+            }
+        }
+        if (cleared) S.rctx.putImageData(img, 0, 0);
+        return cleared;
     };
 
     /* ---------------- 载入图片 ---------------- */
@@ -1514,6 +1617,7 @@
     window.__matting = {
         state: S, autoRemove, exportPNG, exportSVG,
         fitView, zoomCenter, zoomAt, centerOn, applyView,
+        purgeBgBlobs, shrinkBgEdge, despeckle, cleanBgFlood, postProcess, render,
         view: () => ({ zoom: S.zoom, tx: S.tx, ty: S.ty, baseScale: S.baseScale, mode: S.mode })
     };
 })();
