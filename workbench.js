@@ -2438,6 +2438,8 @@ const App = (() => {
 
     const handleWheel = event => {
       if (event.defaultPrevented || event.ctrlKey || !container.contains(event.target)) return;
+      // 自带滚轮行为的区域（如抠图画布缩放）不接管，否则在这里就把页面滚了
+      if (event.target.closest('[data-wheel-lock]')) return;
       if (isFormControl(event.target) || !canScroll(event.deltaY)) return;
       main.scrollTop += event.deltaY;
       event.preventDefault();

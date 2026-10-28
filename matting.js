@@ -163,16 +163,35 @@
         ctx.clearRect(0, 0, S.w, S.h);
         ctx.globalCompositeOperation = 'source-over';
         // 正常预览用「去过底色」的前景图，避免边缘挂一圈背景色；显示删除区时用原图，方便对着改
-        ctx.drawImage((S.hasMask && S.fg) ? S.fg : S.src, 0, 0, S.w, S.h);
+        ctx.drawImage((S.hasMask && S.fg && !S.showCut) ? S.fg : S.src, 0, 0, S.w, S.h);
         if (!S.hasMask) return;
         if (S.showCut) {
-            // 显示删除区：不抠掉原图，只在「会被删掉」的区域蒙一层洋红，
-            // 这样既能看清哪里会被删，又能看到底下的原图细节，方便对着画笔修
+            // 显示删除区：不抠掉原图，只用「半透明斜纹」把会被删掉的区域标记出来。
+            // 纯色蒙版会把底下的原图糊成一片，看不到原本长什么样；斜纹既能一眼分辨，
+            // 又留出大量透明间隙，原图细节（反光、纹理、投影）全都看得见。
             const cut = document.createElement('canvas');
             cut.width = S.w; cut.height = S.h;
             const c = cut.getContext('2d');
-            c.fillStyle = 'rgba(255,0,170,0.42)';
+            // 条纹按「适应窗口时的屏幕尺度」定，缩放到 100% 也不会变成粗色块
+            const step = Math.max(8, Math.round(20 / (S.baseScale || 1)));
+            const lw = Math.max(1, step * 0.26);
+            c.fillStyle = 'rgba(255,0,170,0.12)';
             c.fillRect(0, 0, S.w, S.h);
+            // 洋红 + 白两色交替斜纹：背景本身是洋红/粉色时，纯洋红条纹会看不出来，
+            // 加一组白色错位条纹，任何底色上都能明确分辨「这块会被删掉」
+            const stripe = (color, offset) => {
+                c.strokeStyle = color;
+                c.lineWidth = lw;
+                c.beginPath();
+                for (let i = -S.h + offset; i < S.w + S.h; i += step * 2) {
+                    c.moveTo(i, 0);
+                    c.lineTo(i + S.h, S.h);
+                }
+                c.stroke();
+            };
+            stripe('rgba(255,0,170,0.62)', 0);
+            stripe('rgba(255,255,255,0.62)', step);
+            // 只保留「会被删掉」的部分：保留区连同斜纹一起抠掉，露出的就是原样
             c.globalCompositeOperation = 'destination-out';
             c.drawImage(S.mask, 0, 0, S.w, S.h);
             ctx.drawImage(cut, 0, 0, S.w, S.h);
@@ -987,7 +1006,11 @@
         S.undo = []; S.redo = [];
         syncHistoryButtons();
         const stage = $('#mattingStage');
-        if (stage) stage.classList.remove('is-empty');
+        if (stage) {
+            stage.classList.remove('is-empty');
+            // 有图才锁滚轮：此后画布上的滚轮只用来缩放，不再带动页面滚动
+            stage.dataset.wheelLock = '1';
+        }
         const empty = $('#mattingEmpty');
         if (empty) empty.style.display = 'none';
         $$('.matting-need-img').forEach(el => el.style.display = '');
@@ -1161,7 +1184,7 @@
         S.src = null; S.hasMask = false; S.fg = null; S.bgColor = undefined; S.undo = []; S.redo = [];
         S.userZoomed = false; S.zoom = 1; S.tx = 0; S.ty = 0;
         const stage = $('#mattingStage');
-        if (stage) { stage.classList.add('is-empty'); stage.style.height = ''; }
+        if (stage) { stage.classList.add('is-empty'); stage.style.height = ''; delete stage.dataset.wheelLock; }
         const cv = $('#mattingCanvas');
         if (cv) { cv.style.transform = ''; cv.style.width = ''; cv.style.height = ''; }
         const lab = $('#mattingZoomVal');
@@ -1321,6 +1344,7 @@
             stage.addEventListener('wheel', (e) => {
                 if (!S.src) return;
                 e.preventDefault();
+                e.stopPropagation();
                 const unit = e.deltaMode === 1 ? 16 : (e.deltaMode === 2 ? 400 : 1);
                 const dy = e.deltaY * unit;
                 if (!dy) return;
