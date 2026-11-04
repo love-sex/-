@@ -54,6 +54,8 @@ const App = (() => {
     todoCatFilter: '', // '' 或 categoryId
     // 自定义主题：用户通过"添加主题"创建
     customThemes: [], // [{id, name, primary, accent, text, bg}]
+    // 灵魂角色测试：历史结果 + 未答完的草稿（跟着「导出全部数据」一起走）
+    soul: { history: [], draft: null },
     // 全局数据（粉丝、健身体重历史等）
     global: {
       fanHistory: [
@@ -332,6 +334,14 @@ const App = (() => {
     if (name === 'excerpt') renderExcerpt();
     if (name === 'study') renderStudy();
     if (name === 'settings') renderSettings();
+    if (name === 'soul' && typeof window.__soulView === 'function') window.__soulView();
+  };
+
+  // 供独立模块（灵魂角色测试）读写自己的那段数据，保证跟着导出/导入一起走
+  window.__soul = {
+    get: () => (data.soul = data.soul || { history: [], draft: null }),
+    // 立刻落盘：答题中途关页面也不丢草稿
+    set: v => { data.soul = v; (save.now || save)(); }
   };
 
   /* ---------- 日历 ---------- */

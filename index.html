@@ -21,6 +21,7 @@
     <link rel="stylesheet" href="login.css?v=20261030">
     <!-- 抠图工具样式 -->
     <link rel="stylesheet" href="matting.css?v=20261112">
+    <link rel="stylesheet" href="personality.css?v=20261118">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
@@ -263,6 +264,11 @@
                                 <div class="module-icon">✂️</div>
                                 <div class="module-name">抠图</div>
                                 <div class="module-stat">自动去背 · 矢量</div>
+                            </button>
+                            <button class="module-card" data-target="soul">
+                                <div class="module-icon">🔮</div>
+                                <div class="module-name">灵魂角色</div>
+                                <div class="module-stat">40 题 · 122 位角色</div>
                             </button>
                         </div>
                     </div>
@@ -688,6 +694,19 @@
                             <button class="btn btn-primary btn-block" id="studyNoteSave">保存笔记</button>
                         </div>
                         <div class="ex-list" id="studyNoteList"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ 灵魂角色测试 ============ -->
+            <section class="view" data-view="soul" style="display:none;">
+                <div class="view-content">
+                    <div class="page-head">
+                        <button class="back-btn" data-back>← 返回首页</button>
+                        <h2 class="page-title">🔮 灵魂角色</h2>
+                    </div>
+                    <div id="soulApp">
+                        <div class="soul-loading">正在加载题库…</div>
                     </div>
                 </div>
             </section>
@@ -1369,6 +1388,7 @@ PORTFOLIO</p>
     <script src="script.js?v=20261030"></script>
     <script src="workbench.js?v=20261113"></script>
     <script src="matting.js?v=20261117"></script>
+    <script src="personality.js?v=20261118"></script>
     <script src="portfolio.js?v=20261029"></script>
     <script src="login-cards.js?v=20261030"></script>
 </body>

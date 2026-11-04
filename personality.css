@@ -1,0 +1,218 @@
+/* ===== 灵魂角色测试（soul） =====
+   配色沿用工作台设计变量，不引入新的色板。 */
+
+.soul-wrap { display: block; }
+
+/* ---- 首页 ---- */
+.soul-hero { text-align: center; padding: 26px 16px 20px; }
+.soul-mark {
+  width: 62px; height: 62px; margin: 0 auto 14px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--serif, Georgia, serif); font-size: 30px; color: var(--bg-soft);
+  background: linear-gradient(150deg, var(--primary-light), var(--primary));
+  box-shadow: 0 10px 24px -14px rgba(var(--primary-rgb), .9);
+}
+.soul-kicker {
+  font-size: 10px; letter-spacing: .28em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 10px;
+}
+.soul-title {
+  font-family: var(--serif, Georgia, serif);
+  font-size: 26px; line-height: 1.5; font-weight: 700; color: var(--text);
+  margin: 0 0 10px;
+}
+.soul-title em {
+  font-style: normal;
+  background: linear-gradient(100deg, var(--gold-deep), var(--gold));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.soul-sub { font-size: 13px; color: var(--text-secondary); line-height: 1.9; margin: 0; }
+
+.soul-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 16px 0 4px; }
+.soul-chip {
+  font-size: 11px; padding: 5px 11px; border-radius: 999px;
+  color: var(--text-secondary); background: var(--surface-2);
+  border: 1px solid rgba(var(--primary-rgb), .08);
+}
+
+.soul-rule {
+  font-size: 12.5px; line-height: 1.95; color: var(--text-secondary);
+  background: var(--surface); border-radius: var(--radius);
+  padding: 14px 16px; margin: 14px 0; box-shadow: var(--shadow);
+}
+.soul-rule b { color: var(--primary); }
+
+/* ---- 通用按钮 ---- */
+.soul-btn {
+  display: block; width: 100%; padding: 13px 16px; border: 0; cursor: pointer;
+  border-radius: 999px; font-size: 14px; font-weight: 600; letter-spacing: .02em;
+  color: var(--bg-soft); background: var(--primary);
+  transition: transform .12s ease, opacity .12s ease;
+  font-family: inherit;
+}
+.soul-btn:active { transform: scale(.98); }
+.soul-btn.ghost {
+  color: var(--primary); background: transparent;
+  border: 1px solid rgba(var(--primary-rgb), .22);
+}
+.soul-btn.mini { width: auto; padding: 8px 14px; font-size: 12.5px; }
+.soul-btn-row { display: flex; gap: 10px; margin-top: 12px; }
+.soul-btn-row .soul-btn { flex: 1; }
+
+/* ---- 答题 ---- */
+.soul-qtop { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 6px 0 10px; }
+.soul-qmeta {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 12px; color: var(--muted); margin-bottom: 8px;
+}
+.soul-qidx b { font-size: 17px; color: var(--primary); }
+.soul-back-q {
+  border: 0; background: transparent; color: var(--text-secondary);
+  font-size: 12.5px; cursor: pointer; padding: 4px 0; font-family: inherit;
+}
+.soul-back-q[disabled] { opacity: .35; }
+.soul-bar { height: 4px; border-radius: 4px; background: rgba(var(--primary-rgb), .1); overflow: hidden; }
+.soul-bar i { display: block; height: 100%; width: 0; border-radius: 4px; background: linear-gradient(90deg, var(--gold), var(--primary)); transition: width .28s ease; }
+
+.soul-qtext {
+  font-size: 17px; line-height: 1.75; font-weight: 600; color: var(--text);
+  margin: 18px 0 16px;
+}
+.soul-opts { display: flex; flex-direction: column; gap: 10px; }
+.soul-opt {
+  display: flex; align-items: flex-start; gap: 11px; width: 100%; text-align: left;
+  padding: 13px 14px; cursor: pointer; font-family: inherit;
+  font-size: 13.5px; line-height: 1.65; color: var(--text);
+  background: var(--surface); border: 1px solid rgba(var(--primary-rgb), .09);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  transition: border-color .15s, background .15s, transform .12s;
+}
+.soul-opt:active { transform: scale(.995); }
+.soul-opt .k {
+  flex: 0 0 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  background: var(--surface-2); border: 1px solid rgba(var(--primary-rgb), .1);
+}
+.soul-opt.on { border-color: var(--gold); background: #fffdf6; }
+.soul-opt.on .k { color: var(--bg-soft); background: var(--gold-deep); border-color: transparent; }
+.soul-hint { text-align: center; font-size: 11px; color: var(--muted); margin: 16px 0 4px; }
+
+/* ---- 结果 ---- */
+.soul-res-head { text-align: center; padding: 6px 0 2px; }
+.soul-res-kicker { font-size: 10.5px; letter-spacing: .24em; color: var(--muted); text-transform: uppercase; }
+.soul-av {
+  width: 76px; height: 76px; margin: 14px auto 12px; border-radius: 26px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--serif, Georgia, serif); font-size: 34px; color: #fff;
+  box-shadow: 0 12px 26px -16px rgba(0, 0, 0, .85);
+}
+.soul-name { font-family: var(--serif, Georgia, serif); font-size: 25px; font-weight: 700; margin: 0 0 4px; }
+.soul-from { font-size: 12.5px; color: var(--text-secondary); }
+.soul-tags { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; margin: 12px 0 0; }
+.soul-tag {
+  font-size: 11.5px; padding: 4px 10px; border-radius: 999px;
+  color: var(--gold-deep); background: rgba(201, 163, 90, .14);
+}
+
+.soul-quote {
+  margin: 16px 0; padding: 14px 16px; border-radius: var(--radius);
+  background: var(--surface); box-shadow: var(--shadow);
+  border-left: 3px solid var(--gold);
+}
+.soul-quote p { margin: 0 0 6px; font-size: 13.5px; line-height: 1.85; color: var(--text); font-style: italic; }
+.soul-quote span { font-size: 11.5px; color: var(--muted); }
+
+.soul-info { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.soul-info div {
+  background: var(--surface); border-radius: var(--radius-sm); padding: 9px 6px; text-align: center;
+  box-shadow: var(--shadow);
+}
+.soul-info .k { font-size: 10px; color: var(--muted); margin-bottom: 3px; }
+.soul-info .v { font-size: 12px; font-weight: 600; color: var(--text); }
+
+.soul-sec { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .1em; margin: 20px 0 10px; }
+.soul-intro { font-size: 13px; line-height: 2; color: var(--text-secondary); margin: 0; }
+
+.soul-match {
+  background: var(--surface); border-radius: var(--radius); padding: 16px;
+  box-shadow: var(--shadow); text-align: center;
+}
+.soul-match .num { font-size: 34px; font-weight: 700; color: var(--primary); font-family: var(--serif, Georgia, serif); }
+.soul-match .num small { font-size: 14px; font-weight: 600; margin-left: 2px; }
+.soul-match .txt { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
+.soul-radar { position: relative; height: 300px; }
+.soul-radar canvas { max-width: 100%; }
+
+.soul-dims { display: flex; flex-direction: column; gap: 9px; }
+.soul-dim { display: grid; grid-template-columns: 62px 1fr 62px; align-items: center; gap: 8px; }
+.soul-dim .lbl, .soul-dim .val { font-size: 11.5px; color: var(--text-secondary); }
+.soul-dim .val { text-align: right; }
+.soul-dim .lbl b, .soul-dim .val b { color: var(--primary); font-weight: 700; }
+.soul-dim .track { position: relative; height: 6px; border-radius: 6px; background: rgba(var(--primary-rgb), .09); }
+.soul-dim .track i { position: absolute; top: 0; height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--gold), var(--gold-deep)); }
+
+.soul-rank { display: flex; flex-direction: column; gap: 8px; }
+.soul-rank-item {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface); border-radius: var(--radius-sm); padding: 9px 12px;
+  box-shadow: var(--shadow);
+}
+.soul-rank-item .rk { font-size: 12px; color: var(--muted); width: 14px; }
+.soul-rank-item .av {
+  width: 30px; height: 30px; border-radius: 10px; flex: 0 0 30px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; color: #fff; font-family: var(--serif, Georgia, serif);
+}
+.soul-rank-item .nm { flex: 1; min-width: 0; }
+.soul-rank-item .nm b { display: block; font-size: 13px; }
+.soul-rank-item .nm span { display: block; font-size: 11px; color: var(--muted); }
+.soul-rank-item .pc { font-size: 12px; color: var(--gold-deep); font-weight: 600; }
+.soul-note { font-size: 11px; line-height: 1.9; color: var(--muted); margin: 16px 0 6px; }
+
+/* 历史 */
+.soul-his { display: flex; flex-direction: column; gap: 8px; }
+.soul-his-item {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer;
+  background: var(--surface); border-radius: var(--radius-sm); box-shadow: var(--shadow);
+  border: 0; width: 100%; text-align: left; font-family: inherit;
+}
+.soul-his-item .av {
+  width: 28px; height: 28px; border-radius: 9px; flex: 0 0 28px; color: #fff;
+  display: flex; align-items: center; justify-content: center; font-family: var(--serif, Georgia, serif);
+}
+.soul-his-item .t { flex: 1; font-size: 12.5px; color: var(--text); }
+.soul-his-item .d { font-size: 11px; color: var(--muted); }
+
+.soul-loading { text-align: center; padding: 40px 0; font-size: 13px; color: var(--muted); }
+
+/* 分享长图（离屏渲染，不参与布局） */
+.soul-share {
+  position: fixed; left: -2000px; top: 0; width: 420px;
+  padding: 26px 24px 20px; color: #2d1f15;
+  background: linear-gradient(165deg, #fffaf0 0%, #f7ead8 55%, #f1e0c8 100%);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+.soul-share .sh-kicker { font-size: 9.5px; letter-spacing: .3em; color: #a8833a; text-transform: uppercase; }
+.soul-share .sh-name { font-family: Georgia, "Songti SC", serif; font-size: 27px; font-weight: 700; margin: 8px 0 3px; }
+.soul-share .sh-from { font-size: 12px; color: #7d6650; }
+.soul-share .sh-tags { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 0; }
+.soul-share .sh-tags span { font-size: 10.5px; padding: 3px 9px; border-radius: 999px; color: #a8833a; background: rgba(201,163,90,.16); }
+.soul-share .sh-quote { margin: 14px 0 0; font-size: 12.5px; line-height: 1.85; font-style: italic; color: #4a3524; border-left: 2px solid #c9a35a; padding-left: 10px; }
+.soul-share .sh-radar { margin: 10px 0 0; }
+.soul-share .sh-radar img { width: 100%; display: block; }
+.soul-share .sh-row { display: flex; justify-content: space-between; align-items: baseline; margin-top: 12px; border-top: 1px solid rgba(61,40,23,.12); padding-top: 10px; }
+.soul-share .sh-pct { font-family: Georgia, serif; font-size: 22px; font-weight: 700; color: #3d2817; }
+.soul-share .sh-kw { font-size: 11px; color: #7d6650; text-align: right; }
+.soul-share .sh-more { margin-top: 8px; font-size: 11px; color: #7d6650; }
+.soul-share .sh-foot { margin-top: 12px; font-size: 10px; color: #a8927a; display: flex; justify-content: space-between; }
+
+@media (min-width: 760px) {
+  .soul-title { font-size: 31px; }
+  .soul-qtext { font-size: 18.5px; }
+  .soul-radar { height: 340px; }
+}
+@media (max-width: 380px) {
+  .soul-info { grid-template-columns: repeat(2, 1fr); }
+}
