@@ -22,6 +22,7 @@
     <!-- 抠图工具样式 -->
     <link rel="stylesheet" href="matting.css?v=20261112">
     <link rel="stylesheet" href="personality.css?v=20261118p">
+    <link rel="stylesheet" href="pose.css?v=20261118d">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
@@ -269,6 +270,11 @@
                                 <div class="module-icon">🔮</div>
                                 <div class="module-name">灵魂角色</div>
                                 <div class="module-stat">40 题 · 134 位角色</div>
+                            </button>
+                            <button class="module-card" data-target="pose">
+                                <div class="module-icon">🧍</div>
+                                <div class="module-name">姿态图鉴</div>
+                                <div class="module-stat">57 组 · 285 张视角</div>
                             </button>
                         </div>
                     </div>
@@ -708,6 +714,17 @@
                     <div id="soulApp">
                         <div class="soul-loading">正在加载题库…</div>
                     </div>
+                </div>
+            </section>
+
+            <!-- ============ 姿态图鉴 ============ -->
+            <section class="view" data-view="pose" style="display:none;">
+                <div class="view-content">
+                    <div class="page-head">
+                        <button class="back-btn" data-back>← 返回首页</button>
+                        <h2 class="page-title">🧍 姿态图鉴</h2>
+                    </div>
+                    <div id="poseApp"></div>
                 </div>
             </section>
 
@@ -1389,6 +1406,7 @@ PORTFOLIO</p>
     <script src="workbench.js?v=20261113"></script>
     <script src="matting.js?v=20261117"></script>
     <script src="personality.js?v=20261118p"></script>
+    <script src="pose.js?v=20261118d"></script>
     <script src="portfolio.js?v=20261029"></script>
     <script src="login-cards.js?v=20261030"></script>
 </body>

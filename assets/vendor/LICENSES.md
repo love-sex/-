@@ -7,6 +7,7 @@
 | `chart.umd.min.js` | [chartjs/Chart.js](https://github.com/chartjs/Chart.js)（67.8k ★） | 4.4.1 | MIT | © 2014-2024 Chart.js Contributors |
 | `html2canvas.min.js` | [niklasvh/html2canvas](https://github.com/niklasvh/html2canvas)（31.9k ★） | 1.4.1 | MIT | © 2012 Niklas von Hertzen |
 | `anime.iife.min.js` | [juliangarnier/anime](https://github.com/juliangarnier/anime)（74.2k ★） | 4.0.2 | MIT | © 2025 Julian Garnier |
+| `jszip.min.js` | [Stuk/jszip](https://github.com/Stuk/jszip)（10.4k ★） | 3.10.1 | MIT 或 GPLv3（本项目按 MIT 使用） | © 2009-2016 Stuart Knightley, David Duponchel, Franz Buchinger, António Afonso |
 | `fuse.min.js` | [krisk/Fuse](https://github.com/krisk/Fuse)（20.5k ★） | 7.0.0 | Apache-2.0 | © 2017 Kiro Risk |
 | `medium-zoom.min.js` | [francoischalifour/medium-zoom](https://github.com/francoischalifour/medium-zoom)（3.9k ★） | 1.1.0 | MIT | © 2018 François Chalifour |
 
@@ -18,3 +19,4 @@ MIT / Apache-2.0 许可证允许自由使用、修改与再分发，保留版权
 - anime.js：结果页角色卡、相似角色列表的入场动效；系统开启「减少动态效果」时不加载。
 - Fuse.js：角色图鉴的模糊搜索（角色名 / 作品名 / 标签，允许错别字与部分匹配），只在打开图鉴时加载。
 - medium-zoom：点角色立绘看原图（带过渡动画）。
+- JSZip：姿态图鉴里「打包 ZIP」把选中的姿态批量导出为 SVG（每组 5 个视角）。
