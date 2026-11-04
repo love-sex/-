@@ -75,6 +75,7 @@
 .soul-bar i { display: block; height: 100%; width: 0; border-radius: 4px; background: linear-gradient(90deg, var(--gold), var(--primary)); transition: width .28s ease; }
 
 .soul-qtext {
+  scroll-margin-top: 84px;
   font-size: 17px; line-height: 1.75; font-weight: 600; color: var(--text);
   margin: 18px 0 16px;
 }
@@ -207,6 +208,110 @@
 .soul-share .sh-kw { font-size: 11px; color: #7d6650; text-align: right; }
 .soul-share .sh-more { margin-top: 8px; font-size: 11px; color: #7d6650; }
 .soul-share .sh-foot { margin-top: 12px; font-size: 10px; color: #a8927a; display: flex; justify-content: space-between; }
+
+/* 答题页底部留白：给自定义输入面板腾出滚动空间，避免被右下角的助手挡住 */
+.soul-wrap-quiz { padding-bottom: 120px; }
+@media (max-width: 720px) {
+  .soul-wrap-quiz { padding-bottom: 200px; }
+}
+
+/* ---- 自定义回答 ---- */
+.soul-custom-btn {
+  display: block; width: 100%; margin-top: 12px; padding: 11px 14px;
+  border: 1px dashed rgba(var(--primary-rgb), .28); border-radius: var(--radius);
+  background: transparent; color: var(--text-secondary); cursor: pointer;
+  font-family: inherit; font-size: 12.5px; text-align: center;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.soul-custom-btn:hover, .soul-custom-btn:focus-visible {
+  color: var(--primary); border-color: var(--gold); background: rgba(201, 163, 90, .06);
+}
+.soul-custom {
+  margin-top: 10px; padding: 12px; border-radius: var(--radius);
+  background: var(--surface); box-shadow: var(--shadow);
+  border: 1px solid rgba(201, 163, 90, .35);
+}
+.soul-custom textarea {
+  width: 100%; resize: vertical; min-height: 76px;
+  border: 1px solid rgba(var(--primary-rgb), .16); border-radius: var(--radius-sm);
+  background: #fffdf8; color: var(--text); font-family: inherit;
+  font-size: 13.5px; line-height: 1.7; padding: 10px 12px; outline: none;
+}
+.soul-custom textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(201, 163, 90, .16); }
+.soul-custom-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.soul-custom-tip { flex: 1; font-size: 11px; color: var(--muted); line-height: 1.5; }
+.soul-anchor { display: flex; flex-direction: column; gap: 7px; margin-top: 10px; }
+.soul-anchor-btn {
+  text-align: left; padding: 9px 11px; cursor: pointer; font-family: inherit;
+  font-size: 12.5px; line-height: 1.6; color: var(--text);
+  background: var(--surface-2); border: 1px solid rgba(var(--primary-rgb), .1);
+  border-radius: var(--radius-sm);
+}
+.soul-anchor-btn:hover { border-color: var(--gold); }
+
+.soul-chosen {
+  margin-top: 12px; padding: 10px 12px; border-radius: var(--radius-sm);
+  background: rgba(201, 163, 90, .1); border-left: 2px solid var(--gold);
+  font-size: 12.5px; line-height: 1.7; color: var(--text);
+}
+.soul-chosen b { display: block; font-size: 10.5px; color: var(--gold-deep); margin-bottom: 2px; letter-spacing: .08em; }
+.soul-chosen i { display: block; font-style: normal; font-size: 10.5px; color: var(--muted); margin-top: 4px; }
+
+.soul-flag {
+  display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 999px;
+  font-size: 10px; font-weight: 600; color: var(--bg-soft); background: var(--gold-deep);
+  vertical-align: 2px;
+}
+
+/* ---- 精算（加试） ---- */
+.soul-refine {
+  margin-top: 14px; padding: 14px 16px; border-radius: var(--radius);
+  background: linear-gradient(150deg, rgba(201, 163, 90, .16), rgba(201, 163, 90, .05));
+  border: 1px solid rgba(201, 163, 90, .38);
+}
+.soul-refine-t { font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 4px; }
+.soul-refine-d { font-size: 11.5px; line-height: 1.75; color: var(--text-secondary); margin-bottom: 10px; }
+
+/* ---- 角色立绘 + 动效 ---- */
+.soul-av { position: relative; overflow: visible; }
+.soul-av-art {
+  overflow: hidden; background: #e8dccb;
+  width: 92px; height: 92px; border-radius: 30px;
+}
+.soul-av-art img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  animation: soulFloat 5.2s ease-in-out infinite;
+}
+@keyframes soulFloat {
+  0%, 100% { transform: scale(1.02) translateY(0); }
+  50% { transform: scale(1.06) translateY(-2px); }
+}
+.soul-aura {
+  position: absolute; inset: -7px; border-radius: inherit;
+  border: 1px solid rgba(201, 163, 90, .55);
+  pointer-events: none;
+  animation: soulAura 3.6s ease-in-out infinite;
+}
+.soul-aura::after {
+  content: ''; position: absolute; inset: -1px; border-radius: inherit;
+  box-shadow: 0 0 0 0 rgba(201, 163, 90, .45);
+  animation: soulPulse 3.6s ease-out infinite;
+}
+@keyframes soulAura {
+  0%, 100% { opacity: .35; transform: scale(1); }
+  50% { opacity: .9; transform: scale(1.04); }
+}
+@keyframes soulPulse {
+  0% { box-shadow: 0 0 0 0 rgba(201, 163, 90, .4); }
+  70% { box-shadow: 0 0 0 14px rgba(201, 163, 90, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(201, 163, 90, 0); }
+}
+.soul-rank-item .av.soul-av-art { overflow: hidden; }
+.soul-tag-live { color: #fff; background: var(--gold-deep); }
+
+@media (prefers-reduced-motion: reduce) {
+  .soul-aura, .soul-aura::after, .soul-av-art img { animation: none; }
+}
 
 @media (min-width: 760px) {
   .soul-title { font-size: 31px; }

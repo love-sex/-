@@ -1,0 +1,6 @@
+{
+  "_readme": "在这里登记有立绘的角色。支持两种写法：{\"names\":[\"灰原哀\"]}（图片放 assets/soul/灰原哀.webp）或 {\"map\":{\"灰原哀\":\"assets/soul/xxx.webp\"}}。names 为空时全部走渐变字牌兜底。",
+  "version": "2026-11",
+  "updated": "2026-11-04",
+  "names": []
+}
