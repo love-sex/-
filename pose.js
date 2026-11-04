@@ -44,7 +44,7 @@
     return { x: VIEW.cx + x1 * s, y: VIEW.base - y2 * s - (opt.shift || 0), z: z2 };
   }
 
-  function build(p, off) {
+  function build(p, off, J) {
     var segs = [];
     var r = p.r || [0, 0, 0];
     var root = qMul(qy(p.yaw || 0), qMul(qz(r[2] || 0), qx(r[0] || 0)));
@@ -65,6 +65,7 @@
     seg(chest, neckTop, 5.0, 4.4);
     segs.push({ joint: chest, r: 6.4 });
     var headC = add(neckTop, qRot(wNeck, [0, BODY.head, 0]));
+    if (J) { J.head = headC; J.neck = neckTop; J.chest = chest; J.pelvis = pelvis; J.headR = BODY.headR; J.wNeck = wNeck; J.wUp = wUp; }
     segs.push({ head: headC, r: BODY.headR });
 
     [['L', 1], ['R', -1]].forEach(function (it) {
@@ -82,6 +83,7 @@
       seg(wr, hd, 3.0, 2.3);
       segs.push({ joint: sh, r: 5.6 });
       segs.push({ joint: el, r: 4.3 });
+      if (J) { J[side + 'sh'] = sh; J[side + 'el'] = el; J[side + 'wr'] = wr; J[side + 'hd'] = hd; }
 
       var l = p['l' + side] || [0, 2, 0, 2, 0];
       var wLeg = qMul(root, qMul(qy((l[2] || 0) * sg), qMul(qz((l[1] || 0) * sg), qx(l[0] || 0))));
@@ -96,6 +98,7 @@
       seg(an, toe, 3.6, 2.8);
       segs.push({ joint: kn, r: 5.9 });
       segs.push({ joint: an, r: 3.9 });
+      if (J) { J[side + 'hip'] = hip; J[side + 'kn'] = kn; J[side + 'an'] = an; J[side + 'toe'] = toe; }
     });
     return segs;
   }
@@ -298,6 +301,88 @@
       duo: { x: 24, y: -50, sp: [4, -10, 0], nk: [0, 12], aL: [12, 10, 0, 56], aR: [12, 10, 0, 56], lL: [86, 5, 0, 92, 0], lR: [86, 5, 0, 92, 0] } }
   ];
 
+  /* ================= 姿态扩容：身体不动，按语义替换手臂 =================
+     思路参考 open-pose-editor / ControlNet 的"骨架 + 常用手位"用法：
+     同一副躯干 + 腿，换 3~9 种手臂，等于多出几十组可直接当参考的姿势。 */
+  var ARMSETS = {
+    stand: [
+      { zh: '垂手', en: 'arms down', ja: '腕を下ろす', aL: [0, 8, 0, 8], aR: [0, 8, 0, 8] },
+      { zh: '叉腰', en: 'hands on hips', ja: '腰に手', aL: [14, 26, 0, 68], aR: [14, 26, 0, 68] },
+      { zh: '抱臂', en: 'arms crossed', ja: '腕組み', aL: [22, 12, 0, 122], aR: [22, 12, 0, 122] },
+      { zh: '插兜', en: 'hands in pockets', ja: 'ポケットに手', aL: [12, 14, 0, 74], aR: [12, 14, 0, 74] },
+      { zh: '前伸', en: 'arms forward', ja: '腕を前に', aL: [62, 10, 0, 18], aR: [62, 10, 0, 18] },
+      { zh: '上举', en: 'arms up', ja: '万歳', aL: [158, 24, 0, 26], aR: [158, 24, 0, 26] },
+      { zh: '抱头', en: 'hands behind head', ja: '頭の後ろ', aL: [168, 26, 0, 96], aR: [168, 26, 0, 96] },
+      { zh: '单手叉腰', en: 'one hand on hip', ja: '片手を腰に', aL: [14, 26, 0, 68], aR: [0, 8, 0, 8] },
+      { zh: '张开手臂', en: 'arms open', ja: '腕を広げる', aL: [24, 42, 0, 12], aR: [24, 42, 0, 12] }
+    ],
+    sit: [
+      { zh: '手放膝上', en: 'hands on knees', ja: '膝に手', aL: [12, 10, 0, 58], aR: [12, 10, 0, 58] },
+      { zh: '双手撑膝', en: 'leaning on knees', ja: '膝に手をつく', aL: [30, 16, 0, 72], aR: [30, 16, 0, 72] },
+      { zh: '抱臂', en: 'arms crossed', ja: '腕組み', aL: [22, 12, 0, 122], aR: [22, 12, 0, 122] },
+      { zh: '托腮', en: 'chin on hand', ja: '頬杖', aL: [58, 18, 0, 132], aR: [10, 10, 0, 56] },
+      { zh: '手撑地面', en: 'hands on floor', ja: '床に手', aL: [8, 30, 0, 10], aR: [8, 30, 0, 10] },
+      { zh: '单手举起', en: 'one arm raised', ja: '片手を上げる', aL: [150, 22, 0, 30], aR: [12, 10, 0, 58] }
+    ],
+    lie: [
+      { zh: '手放身侧', en: 'arms at sides', ja: '腕を体側に', aL: [0, 10, 0, 6], aR: [0, 10, 0, 6] },
+      { zh: '手撑头', en: 'head propped', ja: '頭を支える', aL: [162, 30, 0, 96], aR: [6, 12, 0, 10] },
+      { zh: '双手上举', en: 'arms overhead', ja: '両手を上げる', aL: [155, 26, 0, 20], aR: [155, 26, 0, 20] },
+      { zh: '手放胸前', en: 'hands on chest', ja: '胸に手', aL: [26, 10, 0, 96], aR: [26, 10, 0, 96] },
+      { zh: '单臂支撑', en: 'one arm support', ja: '片腕で支える', aL: [70, 20, 0, 20], aR: [0, 10, 0, 6] }
+    ],
+    move: [
+      { zh: '前后摆臂', en: 'arm swing', ja: '腕振り', aL: [70, 8, 0, 16], aR: [-40, 8, 0, 30] },
+      { zh: '反向摆臂', en: 'swing reversed', ja: '逆の腕振り', aL: [-46, 10, 0, 24], aR: [64, 8, 0, 18] },
+      { zh: '张开平衡', en: 'arms for balance', ja: 'バランス', aL: [10, 46, 0, 14], aR: [10, 46, 0, 14] },
+      { zh: '举臂冲刺', en: 'sprint arms', ja: '全力疾走', aL: [96, 12, 0, 8], aR: [-20, 10, 0, 40] }
+    ],
+    stretch: [
+      { zh: '上举合掌', en: 'hands together up', ja: '頭上で合掌', aL: [168, 14, 0, 12], aR: [168, 14, 0, 12] },
+      { zh: '侧向伸展', en: 'side reach', ja: '横に伸ばす', aL: [80, 44, 0, 8], aR: [80, 44, 0, 8] },
+      { zh: '前伸舒展', en: 'forward reach', ja: '前に伸ばす', aL: [88, 6, 0, 6], aR: [88, 6, 0, 6] },
+      { zh: '向后打开', en: 'backward open', ja: '後ろに開く', aL: [-40, 20, 0, 30], aR: [-40, 20, 0, 30] }
+    ],
+    half: [
+      { zh: '手托下巴', en: 'chin resting', ja: '顎を支える', aL: [56, 16, 0, 128], aR: [30, 12, 0, 60] },
+      { zh: '手拨头发', en: 'hand in hair', ja: '髪に手', aL: [150, 30, 0, 108], aR: [8, 10, 0, 30] },
+      { zh: '前伸', en: 'reaching out', ja: '手を伸ばす', aL: [60, 8, 0, 20], aR: [60, 8, 0, 20] }
+    ]
+  };
+  var FAM_LABEL = { stand: '站姿', sit: '坐姿', lie: '卧姿', move: '动态', stretch: '伸展', half: '半身', action: '战斗', duo: '双人' };
+  var FAM_EN = { stand: 'Standing', sit: 'Seated', lie: 'Lying', move: 'Motion', stretch: 'Stretch', half: 'Half', action: 'Combat' };
+  var FAM_JA = { stand: '立ち', sit: '座り', lie: '寝', move: '動き', stretch: 'ストレッチ', half: '半身', action: '戦闘' };
+
+  function armSig(p) { return (p.aL || []).join(',') + '|' + (p.aR || []).join(','); }
+  // 各分量角度差都在 6° 以内视为同一姿势，避免生成「垂手」这类和原姿态重复的项
+  function armNear(a, b) {
+    if (!a || !b) { return false; }
+    for (var i = 0; i < 4; i++) { if (Math.abs((a[i] || 0) - (b[i] || 0)) > 6) { return false; } }
+    return true;
+  }
+
+  var GEN = [];
+  (function () {
+    var idx = {};
+    POSES.forEach(function (p) {
+      if (p.duo || !ARMSETS[p.cat]) { return; }
+      idx[p.cat] = (idx[p.cat] || 0) + 1;
+      var n = idx[p.cat], own = armSig(p);
+      ARMSETS[p.cat].forEach(function (s, i) {
+        var v = {};
+        Object.keys(p).forEach(function (k) { v[k] = p[k]; });
+        v.id = p.id + 'g' + (i + 1);
+        v.aL = s.aL; v.aR = s.aR;
+        v.gen = true;
+        if (armSig(v) === own || (armNear(v.aL, p.aL) && armNear(v.aR, p.aR))) { return; }
+        v.zh = FAM_LABEL[p.cat] + n + ' · ' + s.zh;
+        v.en = (FAM_EN[p.cat] || p.cat) + ' ' + n + ' · ' + s.en;
+        v.ja = (FAM_JA[p.cat] || p.cat) + n + '・' + s.ja;
+        GEN.push(v);
+      });
+    });
+  })();
+
   /* ================= 镜像扩展：左右对称生成另一套 ================= */
   function sameArr(a, b) {
     if (!a || !b) { return !a && !b; }
@@ -331,7 +416,7 @@
     return m;
   }
   var ALL = [];
-  POSES.forEach(function (p) {
+  POSES.concat(GEN).forEach(function (p) {
     ALL.push(p);
     var m = mirrorOf(p);
     if (m) { ALL.push(m); }
@@ -379,6 +464,66 @@
     a.href = url; a.download = filename;
     document.body.appendChild(a); a.click();
     setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 3000);
+  }
+
+  /* ================= OpenPose（COCO-18）导出 =================
+     与 ControlNet / open-pose-editor 生态对齐：
+       JSON: {"people":[{"pose_keypoints_2d":[x,y,c ×18]}],"canvas_width":900,"canvas_height":900}
+       骨架 PNG: OpenPose 官方 18 色，可直接当 ControlNet 的 openpose 控制图 */
+  var OP_EDGES = [[1, 2], [1, 5], [2, 3], [3, 4], [5, 6], [6, 7], [1, 8], [8, 9], [9, 10], [1, 11], [11, 12], [12, 13], [1, 0], [0, 14], [14, 16], [0, 15], [15, 17]];
+  var OP_COLORS = ['#ff0000', '#ff5500', '#ffaa00', '#ffff00', '#aaff00', '#55ff00', '#00ff00', '#00ff55', '#00ffaa', '#00ffff', '#00aaff', '#0055ff', '#0000ff', '#5500ff', '#aa00ff', '#ff00aa', '#ff0055', '#ff0000'];
+
+  function opPoints(p, yaw) {
+    var J = {};
+    build(p, 0, J);
+    var opt = { zoom: p.z || 1, shift: p.shift || 0 }, pitch = -7;
+    function P(v) { var o = proj(v, yaw, pitch, opt); return [o.x, o.y]; }
+    var up = qRot(J.wNeck, [0, 1, 0]), side = qRot(J.wNeck, [1, 0, 0]), r = J.headR;
+    function mix(sv, a, uv, b) {
+      return [J.head[0] + side[0] * a * sv + up[0] * b * uv,
+        J.head[1] + side[1] * a * sv + up[1] * b * uv,
+        J.head[2] + side[2] * a * sv + up[2] * b * uv];
+    }
+    var pts = new Array(18);
+    function set(i, v, c) { var q = P(v); pts[i] = [q[0], q[1], c == null ? 1 : c]; }
+    set(0, mix(0, 0, 1, -r * 0.12));                    // 0 nose
+    set(1, add(J.chest, [0, BODY.neck * 0.55, 0]));     // 1 neck
+    [['R', 2, 8], ['L', 5, 11]].forEach(function (s) {
+      var k = s[0] === 'R' ? 1 : -1;
+      set(s[1], J[s[0] + 'sh']); set(s[1] + 1, J[s[0] + 'el']); set(s[1] + 2, J[s[0] + 'wr']);
+      set(s[2], J[s[0] + 'hip']); set(s[2] + 1, J[s[0] + 'kn']); set(s[2] + 2, J[s[0] + 'an']);
+      set(s[0] === 'R' ? 14 : 15, mix(k, r * 0.34, 1, r * 0.2), 0.6);   // 眼
+      set(s[0] === 'R' ? 16 : 17, mix(k, r * 0.9, 1, 0), 0.6);          // 耳
+    });
+    return pts;
+  }
+
+  function opJson(p, yaw) {
+    var pts = opPoints(p, yaw), arr = [];
+    pts.forEach(function (q) {
+      arr.push(Math.round(q[0] * 30) / 10, Math.round(q[1] * 30) / 10, q[2]);
+    });
+    return JSON.stringify({
+      version: 1.3,
+      people: [{ pose_keypoints_2d: arr, face_keypoints_2d: [], hand_left_keypoints_2d: [], hand_right_keypoints_2d: [] }],
+      canvas_width: 900, canvas_height: 900
+    }, null, 1);
+  }
+
+  function opSvg(p, yaw) {
+    var pts = opPoints(p, yaw), s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="900" height="900">' +
+      '<rect width="300" height="300" fill="#000"/><g stroke-linecap="round">';
+    OP_EDGES.forEach(function (e, i) {
+      var a = pts[e[0]], b = pts[e[1]];
+      if (!a || !b) { return; }
+      s += '<line x1="' + f(a[0]) + '" y1="' + f(a[1]) + '" x2="' + f(b[0]) + '" y2="' + f(b[1]) +
+        '" stroke="' + OP_COLORS[i] + '" stroke-width="2.6"/>';
+    });
+    pts.forEach(function (q, i) {
+      if (!q) { return; }
+      s += '<circle cx="' + f(q[0]) + '" cy="' + f(q[1]) + '" r="' + (q[2] < 1 ? 2 : 3.4) + '" fill="' + OP_COLORS[i] + '"/>';
+    });
+    return s + '</g></svg>';
   }
 
   /* ================= 模块 UI ================= */
@@ -445,7 +590,7 @@
     if (!q) { return arr; }
     if (window.Fuse) {
       if (!S.fuse || S.fuseTab !== S.tab) {
-        S.fuse = new window.Fuse(src, { keys: ['zh', 'en', 'ja'], threshold: 0.4, ignoreLocation: true });
+        S.fuse = new window.Fuse(src, { keys: ['zh', 'en', 'ja', 'tagStr'], threshold: 0.4, ignoreLocation: true });
         S.fuseTab = S.tab;
       }
       var hit = {};
@@ -454,7 +599,7 @@
     }
     var low = q.toLowerCase();
     return arr.filter(function (p) {
-      return (p.zh + p.en + p.ja).toLowerCase().indexOf(low) >= 0;
+      return (p.zh + p.en + p.ja + (p.tagStr || '')).toLowerCase().indexOf(low) >= 0;
     });
   }
 
@@ -611,12 +756,14 @@
         '<div class="pose-info">' +
           '<div class="pose-info-name">' + esc(nameOf(p)) + '</div>' +
           '<div class="pose-info-sub">' + esc(p.zh) + ' · ' + esc(p.en) + (S.lang === 'ja' ? '' : ' · ' + esc(p.ja)) + '</div>' +
-          '<div class="pose-info-tags"><span>' + esc(catLabel(cat)) + '</span><span>5 视角</span><span>矢量线稿</span>' +
+          '<div class="pose-info-tags"><span>' + esc(catLabel(cat)) + '</span><span>5 视角</span><span>矢量线稿</span><span>ControlNet 可用</span>' +
             (p.mirror ? '<span>镜像变体</span>' : '') + '</div>' +
         '</div>' +
         '<div class="pose-acts">' +
           '<button class="pose-btn primary" id="posePng">下载 PNG</button>' +
           '<button class="pose-btn" id="poseSvg">下载 SVG</button>' +
+          '<button class="pose-btn" id="poseOpPng">ControlNet 骨架</button>' +
+          '<button class="pose-btn" id="poseOpJson">OpenPose JSON</button>' +
           '<button class="pose-btn" id="posePrompt">复制提示词</button>' +
           '<button class="pose-btn' + (S.fav[id] ? ' fav' : '') + '" id="poseFav">' + (S.fav[id] ? '★ 已收藏' : '☆ 收藏') + '</button>' +
         '</div>' +
@@ -649,6 +796,16 @@
     };
     document.getElementById('posePrompt').onclick = function () {
       copyText(promptOf(p));
+    };
+    document.getElementById('poseOpPng').onclick = function () {
+      svgToBlob(opSvg(p, VIEWS[S.view].yaw))
+        .then(function (b) { saveBlob(b, 'openpose-' + p.id + '-v' + (S.view + 1) + '.png'); toast('骨架图已下载，可直接喂 ControlNet'); })
+        .catch(function (e) { toast(e.message); });
+    };
+    document.getElementById('poseOpJson').onclick = function () {
+      saveBlob(new Blob([opJson(p, VIEWS[S.view].yaw)], { type: 'application/json' }),
+        'openpose-' + p.id + '-v' + (S.view + 1) + '.json');
+      toast('OpenPose JSON 已下载');
     };
     var favBtn = document.getElementById('poseFav');
     favBtn.onclick = function () {
@@ -691,7 +848,9 @@
         '<div class="pose-info">' +
           '<div class="pose-info-name">' + esc(nameOf(g)) + '</div>' +
           '<div class="pose-info-sub">' + esc(g.zh) + ' · ' + esc(g.en) + (S.lang === 'ja' ? '' : ' · ' + esc(g.ja)) + '</div>' +
-          '<div class="pose-info-tags"><span>' + esc(catLabel(cat || { zh: '' })) + '</span><span>5 配色</span><span>平面裁剪</span><span>矢量线稿</span></div>' +
+          '<div class="pose-info-tags"><span>' + esc(catLabel(cat || { zh: '' })) + '</span>' +
+          (g.tags || []).map(function (tg) { return '<span class="pose-tag">' + esc(tg[S.lang === 'zh' ? 0 : S.lang === 'ja' ? 2 : 1]) + '</span>'; }).join('') +
+          '<span>5 配色</span><span>平面裁剪</span></div>' +
         '</div>' +
         '<div class="pose-acts">' +
           '<button class="pose-btn primary" id="posePng">下载 PNG</button>' +
@@ -781,7 +940,9 @@
         nPose++;
         VIEWS.forEach(function (v, vi) {
           var svg = render(it.d, { yaw: v.yaw, paper: '#fdfaf3' }).replace('<svg ', '<svg width="900" height="900" ');
-          zip.file('pose/' + it.d.id + '-v' + (vi + 1) + '-' + v.en.toLowerCase().replace(/[^a-z0-9]/g, '') + '.svg', svg);
+          var tag = v.en.toLowerCase().replace(/[^a-z0-9]/g, '');
+          zip.file('pose/' + it.d.id + '-v' + (vi + 1) + '-' + tag + '.svg', svg);
+          zip.file('pose/' + it.d.id + '-v' + (vi + 1) + '-' + tag + '-openpose.json', opJson(it.d, v.yaw));
         });
       });
       zip.file('README.txt', 'Pose Atlas 姿态 · 衣装图鉴（矢量线稿，可无损放大）\n' +
@@ -851,6 +1012,8 @@
     CATS: CATS,
     POSES: ALL,
     render: render,
+    opSvg: opSvg,
+    opJson: opJson,
     promptOf: promptOf,
     catOf: function (id) {
       for (var i = 0; i < CATS.length; i++) { if (CATS[i].id === id) { return CATS[i]; } }

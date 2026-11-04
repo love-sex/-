@@ -202,6 +202,10 @@
           var hemX = 150 + x * 15;
           out += '<path d="M' + xx + ' ' + (B.way + 8) + ' L' + hemX + ' ' + (hem - 4) + '" stroke="' + LINE + '" stroke-width="1" opacity=".4"/>';
         }
+      } else if (d === 'strap') {
+        out += '<path d="M' + (150 - 15) + ' ' + (B.way - 4) + ' L' + (150 - 21) + ' ' + (B.neckY + 16) +
+          ' M' + (150 + 15) + ' ' + (B.way - 4) + ' L' + (150 + 21) + ' ' + (B.neckY + 16) +
+          '" stroke="' + LINE + '" stroke-width="6" opacity=".35" stroke-linecap="round"/>';
       } else if (d === 'seam') {
         out += '<path d="M' + (150 - B.wa + 4) + ' ' + (B.ary + 6) + ' L' + (150 - B.wa + 4) + ' ' + (hemY(c) - 10) +
           ' M' + (150 + B.wa - 4) + ' ' + (B.ary + 6) + ' L' + (150 + B.wa - 4) + ' ' + (hemY(c) - 10) +
@@ -243,40 +247,98 @@
     { id: 'trad', zh: '传统', en: 'Traditional', ja: '伝統衣装' }
   ];
 
-  var ITEMS = [
-    { id: 'c1', cat: 'top', zh: '圆领短袖 T 恤', en: 'Crew neck tee', ja: 'クルーTシャツ', shape: 'top', len: .3, sleeve: 1, collar: 'round', detail: ['seam'], pal: 0 },
-    { id: 'c2', cat: 'top', zh: '开襟衬衫', en: 'Button shirt', ja: '開襟シャツ', shape: 'top', len: .42, sleeve: 3, collar: 'shirt', detail: ['placket', 'buttons', 'pocket'], pal: 1 },
-    { id: 'c3', cat: 'top', zh: '连帽卫衣', en: 'Hoodie', ja: 'パーカー', shape: 'top', len: .38, sleeve: 3, collar: 'hood', detail: ['pocket', 'ribs'], loose: 1, pal: 2 },
-    { id: 'c4', cat: 'bottom', zh: '直筒长裤', en: 'Straight pants', ja: 'ストレートパンツ', shape: 'pants', len: .95, detail: [], pal: 1 },
-    { id: 'c5', cat: 'bottom', zh: '百褶短裙', en: 'Pleated skirt', ja: 'プリーツスカート', shape: 'skirt', len: .35, detail: ['pleat'], pal: 2 },
-    { id: 'c6', cat: 'bottom', zh: '牛仔短裤', en: 'Denim shorts', ja: 'デニムショーツ', shape: 'shorts', len: .22, detail: ['pocket'], pal: 4 },
-    { id: 'c7', cat: 'dress', zh: '背心连衣裙', en: 'Sleeveless dress', ja: 'ノースリーブワンピ', shape: 'dress', len: .6, sleeve: 0, collar: 'round', detail: ['belt'], pal: 3 },
-    { id: 'c8', cat: 'dress', zh: '长袖连衣裙', en: 'Long sleeve dress', ja: '長袖ワンピース', shape: 'dress', len: .68, sleeve: 3, collar: 'stand', detail: ['waistband'], pal: 0 },
-    { id: 'c9', cat: 'dress', zh: '吊带长裙', en: 'Slip dress', ja: 'キャミソールドレス', shape: 'dress', len: .78, sleeve: 0, collar: 'strap', detail: ['seam'], pal: 1 },
-    { id: 'c10', cat: 'coat', zh: '单排扣风衣', en: 'Trench coat', ja: 'トレンチコート', shape: 'coat', len: .82, sleeve: 3, collar: 'lapel', detail: ['placket', 'buttons', 'belt'], loose: 1, pal: 4 },
-    { id: 'c11', cat: 'coat', zh: '短款夹克', en: 'Bomber jacket', ja: 'ブルゾン', shape: 'coat', len: .26, sleeve: 3, collar: 'stand', detail: ['zip', 'ribs'], loose: 1, pal: 2 },
-    { id: 'c12', cat: 'coat', zh: '长款大衣', en: 'Long coat', ja: 'ロングコート', shape: 'coat', len: .95, sleeve: 3, collar: 'lapel', detail: ['placket', 'buttons'], loose: 1, pal: 1 },
-    { id: 'c13', cat: 'uniform', zh: '水手服', en: 'Sailor uniform', ja: 'セーラー服', shape: 'top', len: .34, sleeve: 2, collar: 'sailor', detail: ['seam'], pal: 0 },
-    { id: 'c14', cat: 'uniform', zh: '西装校服', en: 'Blazer', ja: 'ブレザー', shape: 'coat', len: .4, sleeve: 3, collar: 'lapel', detail: ['buttons', 'pocket'], pal: 1 },
-    { id: 'c15', cat: 'uniform', zh: '运动校服', en: 'Gym uniform', ja: '体操服', shape: 'top', len: .42, sleeve: 3, collar: 'stand', detail: ['zip', 'stripes'], loose: 1, pal: 3 },
-    { id: 'c16', cat: 'tech', zh: '机能冲锋衣', en: 'Tech shell', ja: 'テックシェル', shape: 'coat', len: .52, sleeve: 3, collar: 'hood', detail: ['zip', 'pocket'], loose: 1, ang: 34, pal: 1 },
-    { id: 'c17', cat: 'tech', zh: '战术背心', en: 'Tactical vest', ja: 'タクティカルベスト', shape: 'top', len: .36, sleeve: 0, collar: 'v', detail: ['pocket', 'belt'], loose: 1, pal: 4 },
-    { id: 'c18', cat: 'tech', zh: '连体工装', en: 'Jumpsuit', ja: 'ツナギ', shape: 'dress', len: .92, sleeve: 3, collar: 'stand', detail: ['zip', 'belt'], ang: 30, pal: 2 },
-    { id: 'c19', cat: 'trad', zh: '和服', en: 'Kimono', ja: '着物', shape: 'coat', len: .9, sleeve: 2, sw1: 17, sw2: 20, ang: 34, collar: 'v', detail: ['obi'], loose: 1, pal: 0 },
-    { id: 'c20', cat: 'trad', zh: '汉服对襟', en: 'Hanfu', ja: '漢服', shape: 'coat', len: .95, sleeve: 2, sw1: 18, sw2: 22, ang: 32, collar: 'cross', detail: ['waistband'], loose: 1, pal: 3 },
-    { id: 'c21', cat: 'trad', zh: '旗袍', en: 'Qipao', ja: 'チャイナドレス', shape: 'dress', len: .82, sleeve: 1, collar: 'stand', detail: ['placket'], pal: 2 },
-    { id: 'c22', cat: 'bottom', zh: '阔腿裤', en: 'Wide-leg pants', ja: 'ワイドパンツ', shape: 'pants', len: .95, loose: 1, detail: [], pal: 0 },
-    { id: 'c23', cat: 'dress', zh: '学院风连衣裙', en: 'Pinafore dress', ja: 'ジャンパースカート', shape: 'dress', len: .5, sleeve: 0, collar: 'strap', detail: ['pleat', 'waistband'], pal: 4 },
-    { id: 'c24', cat: 'coat', zh: '针织开衫', en: 'Cardigan', ja: 'カーディガン', shape: 'coat', len: .44, sleeve: 3, collar: 'v', detail: ['buttons', 'ribs'], loose: 1, pal: 3 },
-    { id: 'c25', cat: 'bottom', zh: '运动短裤', en: 'Sport shorts', ja: 'スポートショーツ', shape: 'shorts', len: .28, loose: 1, detail: ['stripes'], pal: 1 },
-    { id: 'c26', cat: 'top', zh: '罗纹背心', en: 'Tank top', ja: 'タンクトップ', shape: 'top', len: .3, sleeve: 0, collar: 'round', detail: ['seam'], pal: 4 },
-    { id: 'c27', cat: 'top', zh: 'Polo 衫', en: 'Polo shirt', ja: 'ポロシャツ', shape: 'top', len: .36, sleeve: 1, collar: 'shirt', detail: ['placket', 'buttons'], pal: 3 },
-    { id: 'c28', cat: 'dress', zh: '衬衫连衣裙', en: 'Shirt dress', ja: 'シャツワンピース', shape: 'dress', len: .72, sleeve: 2, collar: 'shirt', detail: ['placket', 'buttons', 'belt'], pal: 0 }
+  /* ---- 面料：决定配色与三语标签（对齐对标站的"材质"筛选维度） ---- */
+  var MATS = {
+    '棉': { nz: '棉质', en: 'cotton', ja: 'コットン', pal: 0 },
+    '亚麻': { nz: '亚麻', en: 'linen', ja: 'リネン', pal: 4 },
+    '针织': { nz: '针织', en: 'knit', ja: 'ニット', pal: 3 },
+    '雪纺': { nz: '雪纺', en: 'chiffon', ja: 'シフォン', pal: 2 },
+    '牛仔': { nz: '牛仔', en: 'denim', ja: 'デニム', pal: 1 },
+    '羊毛': { nz: '羊毛', en: 'wool', ja: 'ウール', pal: 1 },
+    '皮革': { nz: '皮质', en: 'leather', ja: 'レザー', pal: 4 },
+    '真丝': { nz: '真丝', en: 'silk', ja: 'シルク', pal: 2 },
+    '涤纶': { nz: '涤纶', en: 'polyester', ja: 'ポリエステル', pal: 1 },
+    '灯芯绒': { nz: '灯芯绒', en: 'corduroy', ja: 'コーデュロイ', pal: 4 }
+  };
+
+  /* ---- 版型原型（36 个），每个再按面料展开成具体单品 ---- */
+  var PROTOS = [
+    { id: 'c1', cat: 'top', zh: '圆领短袖 T 恤', en: 'Crew neck tee', ja: 'クルーTシャツ', shape: 'top', len: .3, sleeve: 1, collar: 'round', detail: ['seam'], pal: 0, mats: ['棉', '亚麻', '涤纶'] },
+    { id: 'c2', cat: 'top', zh: '开襟衬衫', en: 'Button shirt', ja: '開襟シャツ', shape: 'top', len: .42, sleeve: 3, collar: 'shirt', detail: ['placket', 'buttons', 'pocket'], pal: 1, mats: ['棉', '亚麻', '真丝'] },
+    { id: 'c3', cat: 'top', zh: '连帽卫衣', en: 'Hoodie', ja: 'パーカー', shape: 'top', len: .38, sleeve: 3, collar: 'hood', detail: ['pocket', 'ribs'], loose: 1, pal: 2, mats: ['棉', '涤纶', '灯芯绒'] },
+    { id: 'c4', cat: 'bottom', zh: '直筒长裤', en: 'Straight pants', ja: 'ストレートパンツ', shape: 'pants', len: .95, detail: [], pal: 1, mats: ['牛仔', '羊毛', '棉'] },
+    { id: 'c5', cat: 'bottom', zh: '百褶短裙', en: 'Pleated skirt', ja: 'プリーツスカート', shape: 'skirt', len: .35, detail: ['pleat'], pal: 2, mats: ['涤纶', '羊毛', '真丝'] },
+    { id: 'c6', cat: 'bottom', zh: '牛仔短裤', en: 'Denim shorts', ja: 'デニムショーツ', shape: 'shorts', len: .22, detail: ['pocket'], pal: 4, mats: ['牛仔', '棉'] },
+    { id: 'c7', cat: 'dress', zh: '背心连衣裙', en: 'Sleeveless dress', ja: 'ノースリーブワンピ', shape: 'dress', len: .6, sleeve: 0, collar: 'round', detail: ['belt'], pal: 3, mats: ['棉', '针织', '雪纺'] },
+    { id: 'c8', cat: 'dress', zh: '长袖连衣裙', en: 'Long sleeve dress', ja: '長袖ワンピース', shape: 'dress', len: .68, sleeve: 3, collar: 'stand', detail: ['waistband'], pal: 0, mats: ['雪纺', '真丝', '棉'] },
+    { id: 'c9', cat: 'dress', zh: '吊带长裙', en: 'Slip dress', ja: 'キャミソールドレス', shape: 'dress', len: .78, sleeve: 0, collar: 'strap', detail: ['seam'], pal: 1, mats: ['真丝', '雪纺'] },
+    { id: 'c10', cat: 'coat', zh: '单排扣风衣', en: 'Trench coat', ja: 'トレンチコート', shape: 'coat', len: .82, sleeve: 3, collar: 'lapel', detail: ['placket', 'buttons', 'belt'], loose: 1, pal: 4, mats: ['棉', '涤纶'] },
+    { id: 'c11', cat: 'coat', zh: '短款夹克', en: 'Bomber jacket', ja: 'ブルゾン', shape: 'coat', len: .26, sleeve: 3, collar: 'stand', detail: ['zip', 'ribs'], loose: 1, pal: 2, mats: ['皮革', '涤纶', '牛仔'] },
+    { id: 'c12', cat: 'coat', zh: '长款大衣', en: 'Long coat', ja: 'ロングコート', shape: 'coat', len: .95, sleeve: 3, collar: 'lapel', detail: ['placket', 'buttons'], loose: 1, pal: 1, mats: ['羊毛', '灯芯绒'] },
+    { id: 'c13', cat: 'uniform', zh: '水手服', en: 'Sailor uniform', ja: 'セーラー服', shape: 'top', len: .34, sleeve: 2, collar: 'sailor', detail: ['seam'], pal: 0, mats: ['涤纶', '棉'] },
+    { id: 'c14', cat: 'uniform', zh: '西装校服', en: 'Blazer', ja: 'ブレザー', shape: 'coat', len: .4, sleeve: 3, collar: 'lapel', detail: ['buttons', 'pocket'], pal: 1, mats: ['羊毛', '涤纶'] },
+    { id: 'c15', cat: 'uniform', zh: '运动校服', en: 'Gym uniform', ja: '体操服', shape: 'top', len: .42, sleeve: 3, collar: 'stand', detail: ['zip', 'stripes'], loose: 1, pal: 3, mats: ['涤纶', '棉'] },
+    { id: 'c16', cat: 'tech', zh: '机能冲锋衣', en: 'Tech shell', ja: 'テックシェル', shape: 'coat', len: .52, sleeve: 3, collar: 'hood', detail: ['zip', 'pocket'], loose: 1, ang: 34, pal: 1, mats: ['涤纶'] },
+    { id: 'c17', cat: 'tech', zh: '战术背心', en: 'Tactical vest', ja: 'タクティカルベスト', shape: 'top', len: .36, sleeve: 0, collar: 'v', detail: ['pocket', 'belt'], loose: 1, pal: 4, mats: ['涤纶', '棉'] },
+    { id: 'c18', cat: 'tech', zh: '连体工装', en: 'Jumpsuit', ja: 'ツナギ', shape: 'dress', len: .92, sleeve: 3, collar: 'stand', detail: ['zip', 'belt'], ang: 30, pal: 2, mats: ['棉', '牛仔', '涤纶'] },
+    { id: 'c19', cat: 'trad', zh: '和服', en: 'Kimono', ja: '着物', shape: 'coat', len: .9, sleeve: 2, sw1: 17, sw2: 20, ang: 34, collar: 'v', detail: ['obi'], loose: 1, pal: 0, mats: ['真丝', '棉'] },
+    { id: 'c20', cat: 'trad', zh: '汉服对襟', en: 'Hanfu', ja: '漢服', shape: 'coat', len: .95, sleeve: 2, sw1: 18, sw2: 22, ang: 32, collar: 'cross', detail: ['waistband'], loose: 1, pal: 3, mats: ['真丝', '亚麻'] },
+    { id: 'c21', cat: 'trad', zh: '旗袍', en: 'Qipao', ja: 'チャイナドレス', shape: 'dress', len: .82, sleeve: 1, collar: 'stand', detail: ['placket'], pal: 2, mats: ['真丝', '棉'] },
+    { id: 'c22', cat: 'bottom', zh: '阔腿裤', en: 'Wide-leg pants', ja: 'ワイドパンツ', shape: 'pants', len: .95, loose: 1, detail: [], pal: 0, mats: ['亚麻', '棉', '羊毛'] },
+    { id: 'c23', cat: 'dress', zh: '学院风连衣裙', en: 'Pinafore dress', ja: 'ジャンパースカート', shape: 'dress', len: .5, sleeve: 0, collar: 'strap', detail: ['pleat', 'waistband'], pal: 4, mats: ['羊毛', '棉'] },
+    { id: 'c24', cat: 'coat', zh: '针织开衫', en: 'Cardigan', ja: 'カーディガン', shape: 'coat', len: .44, sleeve: 3, collar: 'v', detail: ['buttons', 'ribs'], loose: 1, pal: 3, mats: ['针织', '羊毛'] },
+    { id: 'c25', cat: 'bottom', zh: '运动短裤', en: 'Sport shorts', ja: 'スポートショーツ', shape: 'shorts', len: .28, loose: 1, detail: ['stripes'], pal: 1, mats: ['涤纶', '棉'] },
+    { id: 'c26', cat: 'top', zh: '罗纹背心', en: 'Tank top', ja: 'タンクトップ', shape: 'top', len: .3, sleeve: 0, collar: 'round', detail: ['seam'], pal: 4, mats: ['针织', '棉'] },
+    { id: 'c27', cat: 'top', zh: 'Polo 衫', en: 'Polo shirt', ja: 'ポロシャツ', shape: 'top', len: .36, sleeve: 1, collar: 'shirt', detail: ['placket', 'buttons'], pal: 3, mats: ['棉', '涤纶'] },
+    { id: 'c28', cat: 'dress', zh: '衬衫连衣裙', en: 'Shirt dress', ja: 'シャツワンピース', shape: 'dress', len: .72, sleeve: 2, collar: 'shirt', detail: ['placket', 'buttons', 'belt'], pal: 0, mats: ['棉', '亚麻'] },
+    { id: 'c29', cat: 'dress', zh: '连体泳装', en: 'One-piece swimsuit', ja: 'ワンピース水着', shape: 'dress', len: .18, sleeve: 0, collar: 'strap', detail: ['seam'], pal: 1, mats: ['涤纶'] },
+    { id: 'c30', cat: 'bottom', zh: '背带裤', en: 'Overalls', ja: 'オーバーオール', shape: 'pants', len: .9, loose: 1, detail: ['strap', 'pocket'], pal: 4, mats: ['牛仔', '棉'] },
+    { id: 'c31', cat: 'coat', zh: '短披风', en: 'Cape', ja: 'ケープ', shape: 'coat', len: .3, sleeve: 0, collar: 'v', detail: [], loose: 1, pal: 1, mats: ['羊毛', '灯芯绒'] },
+    { id: 'c32', cat: 'dress', zh: '礼服长裙', en: 'Evening gown', ja: 'イブニングドレス', shape: 'dress', len: .95, sleeve: 0, collar: 'strap', detail: ['pleat'], pal: 2, mats: ['真丝', '雪纺'] },
+    { id: 'c33', cat: 'trad', zh: '浴衣', en: 'Yukata', ja: '浴衣', shape: 'coat', len: .78, sleeve: 2, sw1: 16, sw2: 18, ang: 32, collar: 'cross', detail: ['obi'], loose: 1, pal: 0, mats: ['棉', '亚麻'] },
+    { id: 'c34', cat: 'dress', zh: '针织连衣裙', en: 'Knit dress', ja: 'ニットワンピ', shape: 'dress', len: .62, sleeve: 3, collar: 'round', detail: ['ribs'], pal: 3, mats: ['针织', '羊毛'] },
+    { id: 'c35', cat: 'bottom', zh: '西装长裤', en: 'Suit pants', ja: 'スーツパンツ', shape: 'pants', len: .95, detail: ['seam'], pal: 1, mats: ['羊毛', '涤纶'] },
+    { id: 'c36', cat: 'top', zh: '西装马甲', en: 'Waistcoat', ja: 'ベスト', shape: 'top', len: .32, sleeve: 0, collar: 'v', detail: ['buttons', 'pocket'], pal: 4, mats: ['羊毛', '皮革'] }
   ];
+
+  /* ---- 展开：原型 × 面料 = 单品；标签三语，可搜索 ---- */
+  var ITEMS = [];
+  (function () {
+    var catOf = {};
+    CATS.forEach(function (c) { catOf[c.id] = c; });
+    PROTOS.forEach(function (p) {
+      var base = {};
+      Object.keys(p).forEach(function (k) { base[k] = p[k]; });
+      var ct = catOf[p.cat] || { zh: '', en: '', ja: '' };
+      base.tags = [p.loose ? ['宽松', 'loose', 'ゆったり'] : ['修身', 'slim', 'スリム']];
+      ITEMS.push(base);
+      (p.mats || []).forEach(function (mz, i) {
+        var m = MATS[mz];
+        if (!m) { return; }
+        var v = {};
+        Object.keys(base).forEach(function (k) { v[k] = base[k]; });
+        v.id = p.id + 'm' + (i + 1);
+        v.proto = p.id;
+        v.mat = mz;
+        if (p.zh.indexOf(m.nz) === 0) { return; }   // 原型名里已含该面料，不再生成同名款
+        v.zh = m.nz + p.zh;
+        v.en = m.en + ' ' + String(p.en || '').toLowerCase();
+        v.ja = m.ja + p.ja;
+        v.pal = m.pal;
+        v.tags = [[mz, m.en, m.ja]].concat(base.tags);
+        ITEMS.push(v);
+      });
+    });
+    ITEMS.forEach(function (it) {
+      it.tagStr = it.tags.map(function (t) { return t.join(' '); }).join(' ');
+    });
+  })();
 
   window.CostumeAtlas = {
     CATS: CATS,
     ITEMS: ITEMS,
+    PROTOS: PROTOS,
+    MATS: MATS,
     PALS: PALS,
     render: render
   };
