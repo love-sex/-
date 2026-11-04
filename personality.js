@@ -219,6 +219,10 @@
     if (window.html2canvas) { return Promise.resolve(window.html2canvas); }
     return loadScript('assets/vendor/html2canvas.min.js?v=1.4.1').then(function () { return window.html2canvas; });
   }
+  function ensureZoom() {
+    if (window.mediumZoom) { return Promise.resolve(window.mediumZoom); }
+    return loadScript('assets/vendor/medium-zoom.min.js?v=1.1.0').then(function () { return window.mediumZoom; });
+  }
   function ensureAnime() {
     if (window.anime) { return Promise.resolve(window.anime); }
     if (loadingAnime) { return loadingAnime; }
@@ -285,25 +289,52 @@
   }
 
   /* ---------------- 计分与匹配 ---------------- */
+  /* 加试只当"微调"：把加试题单独归一成方向向量，再按 BETA 的小步长叠加到主测坐标上。
+     这样既能拉开第 1、2 名，又不会因为多答 6 题就把坐标整体改写（之前 ×2 权重会把雷达图撑变形）。 */
+  var EXTRA_BETA = 0.5;
+  function statsOf(qs) {
+    var mean = {}, sd = {};
+    KEYS.forEach(function (k) {
+      var m = 0, vr = 0;
+      qs.forEach(function (q) {
+        var vals = q.o.map(function (o) { return (o.s && o.s[k]) || 0; });
+        var mu = vals.reduce(function (a, b) { return a + b; }, 0) / vals.length;
+        m += mu;
+        vr += vals.reduce(function (a, v) { return a + (v - mu) * (v - mu); }, 0) / vals.length;
+      });
+      mean[k] = m; sd[k] = Math.sqrt(vr) || 1;
+    });
+    return { mean: mean, sd: sd };
+  }
   function scoreUser(main, extra) {
-    var v = {};
-    KEYS.forEach(function (k) { v[k] = 0; });
+    var raw = {};
+    KEYS.forEach(function (k) { raw[k] = 0; });
     (main || []).forEach(function (a, qi) {
       if (!answered(a)) { return; }
       if (typeof a === 'number') {
         var s = (QS[qi].o[a] || {}).s || {};
-        Object.keys(s).forEach(function (k) { if (v[k] !== undefined) { v[k] += s[k]; } });
+        Object.keys(s).forEach(function (k) { if (raw[k] !== undefined) { raw[k] += s[k]; } });
       } else if (a && a.v) {
-        Object.keys(a.v).forEach(function (k) { if (v[k] !== undefined) { v[k] += a.v[k] * 1.2; } });
+        Object.keys(a.v).forEach(function (k) { if (raw[k] !== undefined) { raw[k] += a.v[k] * 1.2; } });
       }
     });
-    var extraQs = (window.SOUL_EXTRA || []);
+    var zMain = KEYS.map(function (k) { return (raw[k] - BASE.mean[k]) / BASE.sd[k]; });
+
+    var exQs = (window.SOUL_EXTRA || []).slice(0, (extra || []).length || 0);
+    var used = (extra || []).filter(function (a) { return typeof a === 'number'; }).length;
+    if (!used || !exQs.length) { return zMain; }
+
+    var re = {};
+    KEYS.forEach(function (k) { re[k] = 0; });
     (extra || []).forEach(function (a, qi) {
-      if (typeof a !== 'number' || !extraQs[qi]) { return; }
-      var s = (extraQs[qi].o[a] || {}).s || {};
-      Object.keys(s).forEach(function (k) { if (v[k] !== undefined) { v[k] += s[k] * 2; } });
+      if (typeof a !== 'number' || !exQs[qi]) { return; }
+      var s = (exQs[qi].o[a] || {}).s || {};
+      Object.keys(s).forEach(function (k) { if (re[k] !== undefined) { re[k] += s[k]; } });
     });
-    return KEYS.map(function (k) { return (v[k] - BASE.mean[k]) / BASE.sd[k]; });
+    var st = statsOf(exQs);
+    var zEx = KEYS.map(function (k) { return (re[k] - st.mean[k]) / st.sd[k]; });
+    var ue = norm(zEx);
+    return KEYS.map(function (k, i) { return zMain[i] + ue[i] * EXTRA_BETA; });
   }
   function norm(vec) {
     var m = Math.sqrt(vec.reduce(function (a, x) { return a + x * x; }, 0)) || 1;
@@ -324,7 +355,8 @@
     var t = n > 1 ? rank / (n - 1) : 0;
     return Math.round(93 - 28 * Math.pow(t, 0.55));
   }
-  function strengthOf(z) { return Math.round(Math.min(100, Math.abs(z) / 3.5 * 100)); }
+  /* 0-100 强度：开方式映射，弱维度也能撑起形状，强维度不会一根尖刺戳到顶 */
+  function strengthOf(z) { return Math.round(Math.min(100, Math.sqrt(Math.abs(z) / 3) * 100)); }
   function keywordList(vec) {
     return KEYS.map(function (k, i) { return { k: k, z: vec[i] }; })
       .sort(function (a, b) { return Math.abs(b.z) - Math.abs(a.z); })
@@ -357,15 +389,48 @@
     var s = readStore();
     var done = s.draft ? s.draft.answers.filter(answered).length : 0;
     var resume = done > 0 ? '<button class="soul-btn" id="soulResume" style="margin-bottom:10px;">继续上次（' + done + '/' + TOTAL + '）</button>' : '';
-    var his = s.history.slice(0, 5);
+    var his = s.history.slice(0, 20);
+    var selCount = 0;
+    his.forEach(function (r) { if (hisSel[r.ts]) { selCount++; } });
     var hisHtml = his.length ? (
-      '<div class="soul-sec">历史记录</div><div class="soul-his">' +
-      his.map(function (r, i) {
-        return '<button class="soul-his-item" data-his="' + i + '">' +
-          '<span class="av" style="background:' + esc(r.color || 'linear-gradient(145deg,#6d7683,#31383f)') + '">' + esc((r.name || '?').charAt(0)) + '</span>' +
-          '<span class="t">' + esc(r.name) + ' <span class="d">' + esc(r.pct) + '%' + (r.refined ? ' · 精算' : '') + '</span></span>' +
+      '<div class="soul-sec soul-sec-row"><span>历史记录</span>' +
+        (hisManage
+          ? '<span class="soul-his-tools">' +
+              '<button class="soul-mini" id="soulHisAll">' + (selCount === his.length ? '取消全选' : '全选') + '</button>' +
+              '<button class="soul-mini danger" id="soulHisDel"' + (selCount ? '' : ' disabled') + '>删除所选' +
+                (selCount ? '（' + selCount + '）' : '') + '</button>' +
+              '<button class="soul-mini" id="soulHisDone">完成</button>' +
+            '</span>'
+          : '<button class="soul-mini" id="soulHisManage">管理</button>') +
+      '</div><div class="soul-his">' +
+      his.map(function (r) {
+        var label = r.label || r.name;
+        var av = '<span class="av" style="background:' + esc(r.color || 'linear-gradient(145deg,#6d7683,#31383f)') + '">' +
+          esc((r.name || '?').charAt(0)) + '</span>';
+        if (hisManage) {
+          var on = !!hisSel[r.ts];
+          var editing = renaming === r.ts;
+          return '<div class="soul-his-item manage' + (on ? ' sel' : '') + '" data-ts="' + r.ts + '">' +
+            '<span class="ck"><i></i></span>' + av +
+            '<span class="t">' +
+              (editing
+                ? '<input class="soul-rename" data-rename="' + r.ts + '" maxlength="12" value="' + esc(label) + '">'
+                : '<b>' + esc(label) + '</b>' +
+                  '<span class="d">' + (r.label ? esc(r.name) + ' · ' : '') + esc(r.pct) + '%' +
+                  (r.refined ? ' · 精算' : '') + ' · ' + esc(r.date || '') + '</span>') +
+            '</span>' +
+            (editing ? '' :
+              '<span class="acts">' +
+                '<button class="soul-mini" data-act="rename" data-ts="' + r.ts + '">改名</button>' +
+                '<button class="soul-mini danger" data-act="del" data-ts="' + r.ts + '">删除</button>' +
+              '</span>') +
+          '</div>';
+        }
+        return '<button class="soul-his-item" data-his="' + r.ts + '">' + av +
+          '<span class="t">' + esc(label) + ' <span class="d">' + esc(r.pct) + '%' +
+          (r.refined ? ' · 精算' : '') + '</span></span>' +
           '<span class="d">' + esc(r.date || '') + '</span>' +
-          '</button>';
+        '</button>';
       }).join('') + '</div>'
     ) : '';
     var metaLine = meta ? '题库更新于 ' + esc(meta.updated) : '';
@@ -412,11 +477,111 @@
     }
     Array.prototype.forEach.call(app.querySelectorAll('[data-his]'), function (b) {
       b.onclick = function () {
-        var r = his[+b.dataset.his];
-        if (r && r.vec) { renderResult(r.vec, { fromHistory: true, refined: !!r.refined }); }
+        var ts = +b.dataset.his;
+        var r = his.filter(function (x) { return x.ts === ts; })[0];
+        if (r && r.vec) {
+          renderResult(r.vec, { fromHistory: true, refined: !!r.refined, drift: r.drift, label: r.label });
+        }
       };
     });
+    bindHistoryTools(his);
     scrollTop();
+  }
+
+  /* ---- 历史记录：管理 / 多选 / 改名 / 删除 ---- */
+  var hisManage = false, hisSel = {}, renaming = 0;
+
+  function deleteHistory(tsList) {
+    var s = readStore();
+    s.history = s.history.filter(function (r) { return tsList.indexOf(r.ts) === -1; });
+    writeStore(s);
+    tsList.forEach(function (ts) { delete hisSel[ts]; });
+  }
+  function renameHistory(ts, label) {
+    var s = readStore();
+    s.history.forEach(function (r) {
+      if (r.ts !== ts) { return; }
+      if (label) { r.label = label; } else { delete r.label; }
+    });
+    writeStore(s);
+  }
+  function bindHistoryTools(his) {
+    var m = $('#soulHisManage');
+    if (m) {
+      m.onclick = function () {
+        hisManage = true; hisSel = {}; renaming = 0;
+        renderIntro();
+      };
+    }
+    var d = $('#soulHisDone');
+    if (d) {
+      d.onclick = function () {
+        hisManage = false; hisSel = {}; renaming = 0;
+        renderIntro();
+      };
+    }
+    var a = $('#soulHisAll');
+    if (a) {
+      a.onclick = function () {
+        var all = his.every(function (r) { return hisSel[r.ts]; });
+        hisSel = {};
+        if (!all) { his.forEach(function (r) { hisSel[r.ts] = true; }); }
+        renderIntro();
+      };
+    }
+    var del = $('#soulHisDel');
+    if (del) {
+      del.onclick = function () {
+        var list = his.filter(function (r) { return hisSel[r.ts]; }).map(function (r) { return r.ts; });
+        if (!list.length) { return; }
+        if (!window.confirm('删除选中的 ' + list.length + ' 条历史记录？删除后无法恢复。')) { return; }
+        deleteHistory(list);
+        toast('已删除 ' + list.length + ' 条');
+        if (!readStore().history.length) { hisManage = false; }
+        renderIntro();
+      };
+    }
+    Array.prototype.forEach.call(app.querySelectorAll('.soul-his-item.manage'), function (row) {
+      row.onclick = function (e) {
+        if (e.target.closest('button, input')) { return; }
+        var ts = +row.dataset.ts;
+        hisSel[ts] = !hisSel[ts];
+        renderIntro();
+      };
+    });
+    Array.prototype.forEach.call(app.querySelectorAll('[data-act]'), function (b) {
+      b.onclick = function (e) {
+        e.stopPropagation();
+        var ts = +b.dataset.ts;
+        if (b.dataset.act === 'del') {
+          deleteHistory([ts]);
+          toast('已删除 1 条');
+          var left = readStore().history.length;
+          if (!left) { hisManage = false; }
+          renderIntro();
+        } else {
+          renaming = ts;
+          renderIntro();
+          var input = $('.soul-rename');
+          if (input) { input.focus(); input.select(); }
+        }
+      };
+    });
+    var input = $('.soul-rename');
+    if (input) {
+      var commit = function () {
+        var ts = +input.dataset.rename;
+        var v = input.value.trim();
+        renaming = 0;
+        renameHistory(ts, v);
+        renderIntro();
+      };
+      input.onkeydown = function (e) {
+        if (e.key === 'Enter') { commit(); }
+        if (e.key === 'Escape') { renaming = 0; renderIntro(); }
+      };
+      input.onblur = commit;
+    }
   }
 
   /* ---------------- 答题 ---------------- */
@@ -608,6 +773,9 @@
   }
   function finishExtra() {
     var vec = scoreUser(MAIN.ans, EXTRA.ans);
+    var base = scoreUser(MAIN.ans, null);
+    var drift = 0;
+    KEYS.forEach(function (k, i) { drift = Math.max(drift, Math.abs(strengthOf(vec[i]) - strengthOf(base[i]))); });
     var ranked = compare(vec);
     var top = ranked[0];
     lastRefined = true;
@@ -618,10 +786,11 @@
       rec.name = top.ch.n; rec.from = top.ch.f; rec.color = top.ch.c;
       rec.pct = pctOf(0, ranked.length); rec.kw = keywordList(vec); rec.vec = vec;
       rec.refined = true;
+      rec.drift = drift;
       rec.qCount = MAIN.ans.filter(answered).length + EXTRA.ans.filter(function (x) { return typeof x === 'number'; }).length;
     }
     writeStore(s);
-    renderResult(vec, { refined: true });
+    renderResult(vec, { refined: true, drift: drift });
   }
 
   /* ---------------- 结果 ---------------- */
@@ -698,6 +867,7 @@
           avatarHtml(best) +
           '<h2 class="soul-name">' + esc(best.n) + '</h2>' +
           '<div class="soul-from">' + esc(best.f) + '</div>' +
+          (opt.label ? '<div class="soul-mylabel">备注：' + esc(opt.label) + '</div>' : '') +
           '<div class="soul-tags">' + (best.tg || []).map(function (t) { return '<span class="soul-tag">' + esc(t) + '</span>'; }).join('') +
             (opt.refined ? '<span class="soul-tag soul-tag-live">已精算</span>' : '') + '</div>' +
         '</div>' +
@@ -714,7 +884,7 @@
         '<div class="soul-match">' +
           '<div class="num">' + bestPct + '<small>%</small></div>' +
           '<div class="txt">与你的答案向量重合 · 共 ' + N + ' 位角色比对' +
-            (opt.refined ? ' · 加试 6 题后重算' : '') +
+            (opt.refined ? ' · 加试 6 题后微调' + (opt.drift ? '，单维最大变化 ' + opt.drift + ' 分' : '') : '') +
             (customCount && !opt.fromHistory ? ' · 其中 ' + customCount + ' 题是你自己写的回答' : '') + '</div>' +
           '<div class="soul-tags" style="margin-top:10px;">' + kw.map(function (w) { return '<span class="soul-tag">' + esc(w) + '</span>'; }).join('') + '</div>' +
         '</div>' +
@@ -722,7 +892,7 @@
           '<div class="soul-refine-t">' + (closeCall
             ? '第 1 名和第 2 名咬得非常紧（' + esc(ranked[1].ch.n) + '）'
             : '还想更准一点？') + '</div>' +
-          '<div class="soul-refine-d">再答 6 道区分度最高的加试题（权重 ×2），把结果算实。</div>' +
+          '<div class="soul-refine-d">再答 6 道最能区分你和第 2 名的题。加试只做小幅微调（约占总坐标 15%），不会推翻主测的十维形状。</div>' +
           '<button class="soul-btn" id="soulRefine">开始加试 6 题</button>' +
         '</div>' : '') +
         '<div class="soul-sec">你的十维坐标</div>' +
@@ -773,6 +943,15 @@
 
     drawRadar(vec);
     animateResult();
+    // 点角色立绘可以放大看原图
+    var heroImg = $('.soul-av-art img');
+    if (heroImg) {
+      ensureZoom().then(function (mz) {
+        if (typeof mz === 'function') {
+          mz(heroImg, { margin: 28, background: 'rgba(255,250,240,.97)', scrollOffset: 0 });
+        }
+      }).catch(function () { });
+    }
     scrollTop();
   }
 
@@ -814,8 +993,7 @@
       var cs = getComputedStyle(document.body);
       var gold = (cs.getPropertyValue('--gold') || '#c9a35a').trim();
       var goldDeep = (cs.getPropertyValue('--gold-deep') || '#a8833a').trim();
-      var peak = Math.max.apply(null, radarData(vec).concat([0]));
-      var top = Math.max(45, Math.ceil(peak / 10) * 10);
+      var top = 100;
       destroyChart();
       chart = new Chart(cv, {
         type: 'radar',

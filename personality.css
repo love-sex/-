@@ -211,10 +211,54 @@
 .soul-share .sh-more { margin-top: 8px; font-size: 11px; color: #7d6650; }
 .soul-share .sh-foot { margin-top: 12px; font-size: 10px; color: #a8927a; display: flex; justify-content: space-between; }
 
-/* 答题页底部留白：给自定义输入面板腾出滚动空间，避免被右下角的助手挡住 */
+/* 底部留白：给右下角的助手腾位置，末尾的按钮/列表能滚上来 */
+.soul-wrap { padding-bottom: 96px; }
 .soul-wrap-quiz { padding-bottom: 120px; }
 @media (max-width: 720px) {
+  .soul-wrap { padding-bottom: 150px; }
   .soul-wrap-quiz { padding-bottom: 200px; }
+}
+
+/* ---- 历史记录：管理 / 多选 / 改名 ---- */
+.soul-sec-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.soul-his-tools { display: flex; gap: 6px; }
+.soul-mini {
+  padding: 4px 9px; border-radius: 999px; cursor: pointer;
+  font-family: inherit; font-size: 11px; line-height: 1.6;
+  color: var(--text-secondary); background: var(--surface-2);
+  border: 1px solid rgba(var(--primary-rgb), .14);
+  transition: color .15s, border-color .15s, background .15s;
+}
+.soul-mini:hover:not(:disabled) { color: var(--primary); border-color: var(--gold); }
+.soul-mini:disabled { opacity: .45; cursor: not-allowed; }
+.soul-mini.danger { color: #a8402f; border-color: rgba(168, 64, 47, .28); }
+.soul-mini.danger:hover:not(:disabled) { background: rgba(168, 64, 47, .08); border-color: #a8402f; }
+
+.soul-his-item.manage {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  cursor: pointer; border: 1px solid transparent;
+}
+.soul-his-item.manage.sel { border-color: var(--gold); background: rgba(201, 163, 90, .12); }
+.soul-his-item.manage .ck {
+  flex: none; width: 17px; height: 17px; border-radius: 5px;
+  border: 1.5px solid rgba(var(--primary-rgb), .3); background: #fffdf8;
+  display: flex; align-items: center; justify-content: center;
+}
+.soul-his-item.manage .ck i { width: 9px; height: 9px; border-radius: 2px; background: transparent; }
+.soul-his-item.manage.sel .ck { border-color: var(--gold-deep); background: var(--gold-deep); }
+.soul-his-item.manage.sel .ck i { background: #fffaf0; }
+.soul-his-item.manage .acts { flex: none; display: flex; gap: 5px; }
+.soul-his-item.manage .t { flex: 1; min-width: 0; }
+.soul-his-item.manage .t b { display: block; font-size: 13px; font-weight: 600; color: var(--text); }
+.soul-his-item.manage .t .d { display: block; font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+.soul-rename {
+  width: 100%; padding: 4px 8px; font-family: inherit; font-size: 13px;
+  color: var(--text); background: #fffdf8; outline: none;
+  border: 1px solid var(--gold); border-radius: 6px;
+}
+.soul-mylabel {
+  margin-top: 6px; font-size: 11px; color: var(--gold-deep);
+  letter-spacing: .04em;
 }
 
 /* ---- 自定义回答 ---- */
@@ -279,14 +323,28 @@
 .soul-av-art {
   overflow: hidden; background: #e8dccb;
   width: 92px; height: 92px; border-radius: 30px;
+  cursor: zoom-in;
 }
 .soul-av-art img {
   width: 100%; height: 100%; object-fit: cover; display: block;
   animation: soulFloat 5.2s ease-in-out infinite;
+  transition: transform .35s ease;
+}
+.soul-av-art:hover img { transform: scale(1.08); }
+/* 立绘上缓缓扫过的高光 */
+.soul-av-art::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(115deg, transparent 32%, rgba(255, 255, 255, .45) 48%, transparent 62%);
+  transform: translateX(-130%);
+  animation: soulShine 5.6s ease-in-out infinite;
 }
 @keyframes soulFloat {
   0%, 100% { transform: scale(1.02) translateY(0); }
   50% { transform: scale(1.06) translateY(-2px); }
+}
+@keyframes soulShine {
+  0%, 62% { transform: translateX(-130%); }
+  88%, 100% { transform: translateX(130%); }
 }
 .soul-aura {
   position: absolute; inset: -7px; border-radius: inherit;
@@ -308,11 +366,11 @@
   70% { box-shadow: 0 0 0 14px rgba(201, 163, 90, 0); }
   100% { box-shadow: 0 0 0 0 rgba(201, 163, 90, 0); }
 }
-.soul-rank-item .av.soul-av-art { overflow: hidden; }
+.soul-rank-item .av.soul-av-art { overflow: hidden; cursor: default; }
 .soul-tag-live { color: #fff; background: var(--gold-deep); }
 
 @media (prefers-reduced-motion: reduce) {
-  .soul-aura, .soul-aura::after, .soul-av-art img { animation: none; }
+  .soul-aura, .soul-aura::after, .soul-av-art img, .soul-av-art::after { animation: none; }
 }
 
 @media (min-width: 760px) {

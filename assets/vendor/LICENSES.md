@@ -7,6 +7,7 @@
 | `chart.umd.min.js` | [chartjs/Chart.js](https://github.com/chartjs/Chart.js)（67.8k ★） | 4.4.1 | MIT | © 2014-2024 Chart.js Contributors |
 | `html2canvas.min.js` | [niklasvh/html2canvas](https://github.com/niklasvh/html2canvas)（31.9k ★） | 1.4.1 | MIT | © 2012 Niklas von Hertzen |
 | `anime.iife.min.js` | [juliangarnier/anime](https://github.com/juliangarnier/anime)（74.2k ★） | 4.0.2 | MIT | © 2025 Julian Garnier |
+| `medium-zoom.min.js` | [francoischalifour/medium-zoom](https://github.com/francoischalifour/medium-zoom)（3.9k ★） | 1.1.0 | MIT | © 2018 François Chalifour |
 
 MIT 许可证允许自由使用、修改与再分发，保留版权声明即可。
 
