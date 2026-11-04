@@ -172,6 +172,77 @@
       shadow + out + '</svg>';
   }
 
+  /* ---- 深度图：与线稿同一套骨架数据，逐段按深度着灰（ControlNet depth：越亮越近，黑底） ---- */
+  function depthSvg(pose, opts) {
+    opts = opts || {};
+    var yaw = opts.yaw == null ? 0 : opts.yaw;
+    var pitch = opts.pitch == null ? -7 : opts.pitch;
+    var opt = { zoom: (pose.z || 1) * (opts.zoom || 1), shift: pose.shift || 0 };
+    var segs = build(pose, 0);
+    if (pose.duo) { segs = segs.concat(build(pose.duo, 0)); }
+
+    var items = segs.map(function (s) {
+      if (s.head) {
+        var hc = proj(s.head, yaw, pitch, opt);
+        return { kind: 'head', c: hc, r: s.r * VIEW.s * opt.zoom, z: hc.z, za: hc.z, zb: hc.z };
+      }
+      if (s.joint) {
+        var jc = proj(s.joint, yaw, pitch, opt);
+        return { kind: 'joint', c: jc, r: s.r * VIEW.s * opt.zoom, z: jc.z + 0.4, za: jc.z, zb: jc.z };
+      }
+      var a = proj(s.a, yaw, pitch, opt), b = proj(s.b, yaw, pitch, opt);
+      return {
+        kind: 'seg', a: a, b: b,
+        ra: s.ra * VIEW.s * opt.zoom, rb: s.rb * VIEW.s * opt.zoom,
+        z: (a.z + b.z) / 2, za: a.z, zb: b.z
+      };
+    }).sort(function (m, n) { return m.z - n.z; });
+
+    var zmin = 1e9, zmax = -1e9;
+    items.forEach(function (it) {
+      zmin = Math.min(zmin, it.za, it.zb);
+      zmax = Math.max(zmax, it.za, it.zb);
+    });
+    if (zmax - zmin < 1e-6) { zmax = zmin + 1; }
+    // z 越大越靠近相机（实测：前伸手腕 +39、头顶 -18.6），所以近处要更亮；
+    // 头到脚的深度跨度会吃掉大半灰阶，用 gamma 把中间调提上来，人物才不会糊成一团深灰
+    function gray(z) {
+      var t = (z - zmin) / (zmax - zmin);
+      return Math.round(52 + Math.pow(t, 0.68) * 186);   // 远 52 → 近 238
+    }
+
+    var gid = 'dg' + (depthSvg._n = (depthSvg._n || 0) + 1);
+    var defs = [], body = [];
+    items.forEach(function (it, i) {
+      if (it.kind === 'seg') {
+        var ga = gray(it.za), gb = gray(it.zb);
+        defs.push('<linearGradient id="' + gid + 'g' + i + '" gradientUnits="userSpaceOnUse"' +
+          ' x1="' + f(it.a.x) + '" y1="' + f(it.a.y) + '" x2="' + f(it.b.x) + '" y2="' + f(it.b.y) + '">' +
+          '<stop offset="0" stop-color="rgb(' + ga + ',' + ga + ',' + ga + ')"/>' +
+          '<stop offset="1" stop-color="rgb(' + gb + ',' + gb + ',' + gb + ')"/></linearGradient>');
+        body.push('<path d="' + capPath(it.a, it.b, it.ra, it.rb) + '" fill="url(#' + gid + 'g' + i + ')"/>');
+      } else if (it.kind === 'head') {
+        var gh = gray(it.z);
+        defs.push('<radialGradient id="' + gid + 'h' + i + '"><stop offset="0" stop-color="rgb(' +
+          Math.min(255, gh + 22) + ',' + Math.min(255, gh + 22) + ',' + Math.min(255, gh + 22) + ')"/>' +
+          '<stop offset="1" stop-color="rgb(' + gh + ',' + gh + ',' + gh + ')"/></radialGradient>');
+        body.push('<circle cx="' + f(it.c.x) + '" cy="' + f(it.c.y) + '" r="' + f(it.r) +
+          '" fill="url(#' + gid + 'h' + i + ')"/>');
+      } else {
+        var gj = gray(it.z);
+        body.push('<circle cx="' + f(it.c.x) + '" cy="' + f(it.c.y) + '" r="' + f(it.r * 0.94) +
+          '" fill="rgb(' + gj + ',' + gj + ',' + gj + ')"/>');
+      }
+    });
+
+    return '<svg viewBox="0 0 ' + VIEW.w + ' ' + VIEW.h + '" xmlns="http://www.w3.org/2000/svg" class="pose-svg" role="img">' +
+      '<defs>' + defs.join('') +
+      '<filter id="' + gid + 'b" x="-20%" y="-20%" width="140%" height="140%">' +
+      '<feGaussianBlur stdDeviation="1.1"/></filter></defs>' +
+      '<rect width="100%" height="100%" fill="#000"/>' +
+      '<g filter="url(#' + gid + 'b)">' + body.join('') + '</g></svg>';
+  }
+
   /* ================= 姿态数据 ================= */
   var CATS = [
     { id: 'stand', zh: '站姿', en: 'Standing', ja: '立ち' },
@@ -421,6 +492,7 @@
     var m = mirrorOf(p);
     if (m) { ALL.push(m); }
   });
+  ALL.forEach(function (p, i) { p.no = 'P' + ('000' + (i + 1)).slice(-3); });
 
   /* ================= 提示词 / 导出 ================= */
   function promptOf(p) {
@@ -473,10 +545,10 @@
   var OP_EDGES = [[1, 2], [1, 5], [2, 3], [3, 4], [5, 6], [6, 7], [1, 8], [8, 9], [9, 10], [1, 11], [11, 12], [12, 13], [1, 0], [0, 14], [14, 16], [0, 15], [15, 17]];
   var OP_COLORS = ['#ff0000', '#ff5500', '#ffaa00', '#ffff00', '#aaff00', '#55ff00', '#00ff00', '#00ff55', '#00ffaa', '#00ffff', '#00aaff', '#0055ff', '#0000ff', '#5500ff', '#aa00ff', '#ff00aa', '#ff0055', '#ff0000'];
 
-  function opPoints(p, yaw) {
+  function opPoints(p, yaw, pitchIn) {
     var J = {};
     build(p, 0, J);
-    var opt = { zoom: p.z || 1, shift: p.shift || 0 }, pitch = -7;
+    var opt = { zoom: p.z || 1, shift: p.shift || 0 }, pitch = pitchIn == null ? -7 : pitchIn;
     function P(v) { var o = proj(v, yaw, pitch, opt); return [o.x, o.y]; }
     var up = qRot(J.wNeck, [0, 1, 0]), side = qRot(J.wNeck, [1, 0, 0]), r = J.headR;
     function mix(sv, a, uv, b) {
@@ -498,8 +570,8 @@
     return pts;
   }
 
-  function opJson(p, yaw) {
-    var pts = opPoints(p, yaw), arr = [];
+  function opJson(p, yaw, pitch) {
+    var pts = opPoints(p, yaw, pitch), arr = [];
     pts.forEach(function (q) {
       arr.push(Math.round(q[0] * 30) / 10, Math.round(q[1] * 30) / 10, q[2]);
     });
@@ -510,8 +582,8 @@
     }, null, 1);
   }
 
-  function opSvg(p, yaw) {
-    var pts = opPoints(p, yaw), s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="900" height="900">' +
+  function opSvg(p, yaw, pitch) {
+    var pts = opPoints(p, yaw, pitch), s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="900" height="900">' +
       '<rect width="300" height="300" fill="#000"/><g stroke-linecap="round">';
     OP_EDGES.forEach(function (e, i) {
       var a = pts[e[0]], b = pts[e[1]];
@@ -532,10 +604,12 @@
     { yaw: 36, zh: '前侧', en: '3/4' },
     { yaw: 90, zh: '侧面', en: 'Side' },
     { yaw: 144, zh: '后侧', en: 'Back 3/4' },
-    { yaw: 180, zh: '背面', en: 'Back' }
+    { yaw: 180, zh: '背面', en: 'Back' },
+    { yaw: 0, pitch: -42, zh: '俯视', en: 'High angle' },
+    { yaw: 0, pitch: 34, zh: '仰视', en: 'Low angle' }
   ];
   var STORE_KEY = 'pose-atlas-v1';
-  var S = { lang: 'zh', tab: 'pose', cat: 'all', q: '', stage: 'list', cur: null, view: 0, pal: 0, fav: {}, sel: {}, fuse: null, fuseTab: '' };
+  var S = { lang: 'zh', tab: 'pose', cat: 'all', q: '', stage: 'list', cur: null, view: 0, pal: 0, mode: 'line', cmp: 0, fav: {}, sel: {}, fuse: null, fuseTab: '' };
   var app = null, booted = false;
 
   function C() { return window.CostumeAtlas || { CATS: [], ITEMS: [], PALS: [], render: function () { return ''; } }; }
@@ -588,9 +662,15 @@
     var arr = src.filter(function (p) { return S.cat === 'all' || p.cat === S.cat; });
     var q = (S.q || '').trim();
     if (!q) { return arr; }
+    // 纯编号（P018 / 018 / 18）走精确匹配，别让模糊搜索把整页都算进来
+    var mc = q.match(/^[pP]?[-_]?(\d{1,3})$/);
+    if (!isCostume() && mc) {
+      var code = 'P' + ('000' + mc[1]).slice(-3);
+      return arr.filter(function (p) { return p.no === code; });
+    }
     if (window.Fuse) {
       if (!S.fuse || S.fuseTab !== S.tab) {
-        S.fuse = new window.Fuse(src, { keys: ['zh', 'en', 'ja', 'tagStr'], threshold: 0.4, ignoreLocation: true });
+        S.fuse = new window.Fuse(src, { keys: ['zh', 'en', 'ja', 'tagStr', 'no'], threshold: 0.4, ignoreLocation: true });
         S.fuseTab = S.tab;
       }
       var hit = {};
@@ -599,7 +679,7 @@
     }
     var low = q.toLowerCase();
     return arr.filter(function (p) {
-      return (p.zh + p.en + p.ja + (p.tagStr || '')).toLowerCase().indexOf(low) >= 0;
+      return (p.zh + p.en + p.ja + (p.tagStr || '') + (p.no || '')).toLowerCase().indexOf(low) >= 0;
     });
   }
 
@@ -613,7 +693,7 @@
       '<label class="pose-ck" title="选中"><input type="checkbox" data-sel="' + p.id + '"' + (S.sel[p.id] ? ' checked' : '') + '></label>' +
       '<div class="pose-meta">' +
         '<div class="pose-name">' + esc(nameOf(p)) + '</div>' +
-        '<div class="pose-sub">' + esc(altOf(p)) + '</div>' +
+        '<div class="pose-sub">' + (p.no ? '<span class="pose-no">' + esc(p.no) + '</span> · ' : '') + esc(altOf(p)) + '</div>' +
       '</div>' +
     '</div>';
   }
@@ -649,7 +729,7 @@
         '</div>' +
         '<div class="pose-count" id="poseCount">' + arr.length + (isCostume()
           ? ' 套衣装 · 每套 5 种配色 · 平面裁剪线稿，可无限放大'
-          : ' 组姿态 · 每组 5 个视角 · 线稿可无限放大') + '</div>' +
+          : ' 组姿态 · 每组 7 视角（线稿 + 深度图）· 矢量可无限放大') + '</div>' +
         '<div class="pose-grid' + (isCostume() ? ' pose-grid-garm' : '') + '" id="poseGrid">' +
           (arr.length ? arr.map(cardHtml).join('') : '<div class="pose-empty">没找到' + (isCostume() ? '这套衣装' : '这个姿态') + '，换个词试试</div>') +
         '</div>' +
@@ -661,7 +741,7 @@
         '</div>' +
         '<div class="pose-note">' + (isCostume()
           ? '衣装按平面裁剪画法生成（衣身 / 袖窿 / 侧缝 / 领型 / 裆弯），底下一层虚线是人体参照；每套 5 种配色，点开可下载 SVG / PNG、复制提示词。'
-          : '线稿由本页实时生成的矢量人台渲染，不含任何第三方图片素材；每组都有 5 个视角，点开可看大图、下载 SVG / PNG、复制生图提示词。') + '</div>' +
+          : '线稿与深度图都由本页实时生成（同一副骨架，逐段按深度着灰），不含任何第三方图片素材；每组 7 个视角，点开可切线稿 / 深度 / 对比，下载 SVG / PNG 或直接导 ControlNet。') + '</div>' +
       '</div>'
     ));
     bindList();
@@ -733,6 +813,25 @@
     }
   }
 
+  /* ---- 详情舞台：线稿 / 深度 / 对比 ---- */
+  function curView() { return VIEWS[S.view] || VIEWS[0]; }
+  function poseSvgFor(p, mode, zoom) {
+    var v = curView();
+    return mode === 'depth'
+      ? depthSvg(p, { yaw: v.yaw, pitch: v.pitch, zoom: zoom })
+      : render(p, { yaw: v.yaw, pitch: v.pitch, zoom: zoom });
+  }
+  function stageInner(p) {
+    if (!S.cmp) { return poseSvgFor(p, S.mode); }
+    return '<div class="pose-cmp">' +
+      '<div class="pose-cmp-in">' + poseSvgFor(p, 'line') + '</div>' +
+      '<div class="pose-cmp-in pose-cmp-b" id="poseCmpB">' + poseSvgFor(p, 'depth') + '</div>' +
+      '<div class="pose-cmp-line" id="poseCmpLine" style="left:46%"></div>' +
+      '<span class="pose-cmp-tag l">线稿</span><span class="pose-cmp-tag r">深度</span>' +
+      '<input class="pose-cmp-range" id="poseCmpRange" type="range" min="0" max="100" value="46" aria-label="线稿与深度对比">' +
+      '</div>';
+  }
+
   function openDetail(id) {
     var it = findItem(id);
     if (!it) { return; }
@@ -741,22 +840,28 @@
     S.stage = 'detail';
     S.cur = id;
     S.view = 0;
+    S.cmp = 0;
     var cat = PoseAtlas.catOf(p.cat);
     app.innerHTML = '';
     app.appendChild(el(
       '<div class="pose-wrap pose-wrap-detail">' +
         '<button class="pose-back" id="poseBack">← 返回列表</button>' +
-        '<div class="pose-stage" id="poseStage">' + render(p, { yaw: VIEWS[S.view].yaw }) + '</div>' +
+        '<div class="pose-modes" role="group" aria-label="画法">' +
+          '<button class="pose-mode' + (S.mode === 'line' && !S.cmp ? ' on' : '') + '" data-mode="line">线稿</button>' +
+          '<button class="pose-mode' + (S.mode === 'depth' && !S.cmp ? ' on' : '') + '" data-mode="depth">深度图</button>' +
+          '<button class="pose-mode' + (S.cmp ? ' on' : '') + '" data-mode="cmp">对比</button>' +
+        '</div>' +
+        '<div class="pose-stage" id="poseStage"></div>' +
         '<div class="pose-views" id="poseViews">' +
           VIEWS.map(function (v, i) {
             return '<button class="pose-view' + (i === S.view ? ' on' : '') + '" data-view="' + i + '">' +
-              render(p, { yaw: v.yaw, zoom: 0.62 }) + '<span>' + v.zh + '</span></button>';
+              render(p, { yaw: v.yaw, pitch: v.pitch, zoom: 0.62 }) + '<span>' + v.zh + '</span></button>';
           }).join('') +
         '</div>' +
         '<div class="pose-info">' +
           '<div class="pose-info-name">' + esc(nameOf(p)) + '</div>' +
-          '<div class="pose-info-sub">' + esc(p.zh) + ' · ' + esc(p.en) + (S.lang === 'ja' ? '' : ' · ' + esc(p.ja)) + '</div>' +
-          '<div class="pose-info-tags"><span>' + esc(catLabel(cat)) + '</span><span>5 视角</span><span>矢量线稿</span><span>ControlNet 可用</span>' +
+          '<div class="pose-info-sub">' + esc(p.no || '') + ' · ' + esc(p.zh) + ' · ' + esc(p.en) + (S.lang === 'ja' ? '' : ' · ' + esc(p.ja)) + '</div>' +
+          '<div class="pose-info-tags"><span>' + esc(catLabel(cat)) + '</span><span>' + esc(p.no || '') + '</span><span>7 视角</span><span>线稿 + 深度图</span><span>ControlNet 可用</span>' +
             (p.mirror ? '<span>镜像变体</span>' : '') + '</div>' +
         '</div>' +
         '<div class="pose-acts">' +
@@ -769,41 +874,81 @@
         '</div>' +
         '<div class="pose-nav-row">' +
           '<button class="pose-mini ghost" id="posePrev">← 上一个</button>' +
-          '<span class="pose-hint">键盘 ← → 换姿态 · 1-5 换视角</span>' +
+          '<span class="pose-hint">← → 换姿态 · ↑ ↓ 同上 · 1-7 换视角 · D 切深度 · / 搜索</span>' +
           '<button class="pose-mini ghost" id="poseNext">下一个 →</button>' +
         '</div>' +
       '</div>'
     ));
     document.getElementById('poseBack').onclick = function () { renderList(); };
+
+    function paintStage() {
+      var st = document.getElementById('poseStage');
+      if (!st) { return; }
+      st.className = 'pose-stage' + (S.cmp ? ' pose-stage-cmp' : '') + (S.mode === 'depth' && !S.cmp ? ' pose-stage-depth' : '');
+      st.innerHTML = stageInner(p);
+      var r = document.getElementById('poseCmpRange');
+      if (r) {
+        r.oninput = function () {
+          var v = +r.value;
+          var b = document.getElementById('poseCmpB'), ln = document.getElementById('poseCmpLine');
+          if (b) { b.style.clipPath = 'inset(0 0 0 ' + v + '%)'; }
+          if (ln) { ln.style.left = v + '%'; }
+        };
+      }
+    }
+    function syncModeBtns() {
+      Array.prototype.forEach.call(app.querySelectorAll('[data-mode]'), function (b) {
+        b.classList.toggle('on', b.dataset.mode === (S.cmp ? 'cmp' : S.mode));
+      });
+    }
+    paintStage();
+    Array.prototype.forEach.call(app.querySelectorAll('[data-mode]'), function (b) {
+      b.onclick = function () {
+        if (b.dataset.mode === 'cmp') { S.cmp = 1; }
+        else { S.cmp = 0; S.mode = b.dataset.mode; }
+        syncModeBtns();
+        paintStage();
+      };
+    });
     Array.prototype.forEach.call(app.querySelectorAll('[data-view]'), function (b) {
       b.onclick = function () {
         S.view = +b.dataset.view;
-        document.getElementById('poseStage').innerHTML = render(p, { yaw: VIEWS[S.view].yaw });
+        paintStage();
         Array.prototype.forEach.call(app.querySelectorAll('.pose-view'), function (x) { x.classList.remove('on'); });
         b.classList.add('on');
       };
     });
     document.getElementById('posePng').onclick = function () {
-      svgToBlob(render(p, { yaw: VIEWS[S.view].yaw, paper: '#fdfaf3' }))
-        .then(function (b) { saveBlob(b, 'pose-' + p.id + '-v' + (S.view + 1) + '.png'); toast('PNG 已开始下载'); })
+      var d = S.mode === 'depth' && !S.cmp, v = curView();
+      var svg = d ? depthSvg(p, { yaw: v.yaw, pitch: v.pitch })
+        : render(p, { yaw: v.yaw, pitch: v.pitch, paper: '#fdfaf3' });
+      svgToBlob(svg)
+        .then(function (b) {
+          saveBlob(b, 'pose-' + p.id + '-v' + (S.view + 1) + (d ? '-depth' : '') + '.png');
+          toast(d ? '深度图已下载，可直接喂 ControlNet depth' : 'PNG 已开始下载');
+        })
         .catch(function (e) { toast(e.message); });
     };
     document.getElementById('poseSvg').onclick = function () {
-      var svg = render(p, { yaw: VIEWS[S.view].yaw, paper: '#fdfaf3' })
+      var d = S.mode === 'depth' && !S.cmp, v = curView();
+      var svg = (d ? depthSvg(p, { yaw: v.yaw, pitch: v.pitch })
+        : render(p, { yaw: v.yaw, pitch: v.pitch, paper: '#fdfaf3' }))
         .replace('<svg ', '<svg width="900" height="900" ');
-      saveBlob(new Blob([svg], { type: 'image/svg+xml' }), 'pose-' + p.id + '-v' + (S.view + 1) + '.svg');
+      saveBlob(new Blob([svg], { type: 'image/svg+xml' }), 'pose-' + p.id + '-v' + (S.view + 1) + (d ? '-depth' : '') + '.svg');
       toast('SVG 已开始下载');
     };
     document.getElementById('posePrompt').onclick = function () {
       copyText(promptOf(p));
     };
     document.getElementById('poseOpPng').onclick = function () {
-      svgToBlob(opSvg(p, VIEWS[S.view].yaw))
+      var v = curView();
+      svgToBlob(opSvg(p, v.yaw, v.pitch))
         .then(function (b) { saveBlob(b, 'openpose-' + p.id + '-v' + (S.view + 1) + '.png'); toast('骨架图已下载，可直接喂 ControlNet'); })
         .catch(function (e) { toast(e.message); });
     };
     document.getElementById('poseOpJson').onclick = function () {
-      saveBlob(new Blob([opJson(p, VIEWS[S.view].yaw)], { type: 'application/json' }),
+      var v = curView();
+      saveBlob(new Blob([opJson(p, v.yaw, v.pitch)], { type: 'application/json' }),
         'openpose-' + p.id + '-v' + (S.view + 1) + '.json');
       toast('OpenPose JSON 已下载');
     };
@@ -939,15 +1084,22 @@
         }
         nPose++;
         VIEWS.forEach(function (v, vi) {
-          var svg = render(it.d, { yaw: v.yaw, paper: '#fdfaf3' }).replace('<svg ', '<svg width="900" height="900" ');
           var tag = v.en.toLowerCase().replace(/[^a-z0-9]/g, '');
-          zip.file('pose/' + it.d.id + '-v' + (vi + 1) + '-' + tag + '.svg', svg);
-          zip.file('pose/' + it.d.id + '-v' + (vi + 1) + '-' + tag + '-openpose.json', opJson(it.d, v.yaw));
+          var base = it.d.id + '-v' + (vi + 1) + '-' + tag;
+          var svg = render(it.d, { yaw: v.yaw, pitch: v.pitch, paper: '#fdfaf3' })
+            .replace('<svg ', '<svg width="900" height="900" ');
+          zip.file('pose/' + base + '.svg', svg);
+          var dep = depthSvg(it.d, { yaw: v.yaw, pitch: v.pitch })
+            .replace('<svg ', '<svg width="900" height="900" ');
+          zip.file('pose/' + base + '-depth.svg', dep);
+          zip.file('pose/' + base + '-openpose.json', opJson(it.d, v.yaw, v.pitch));
         });
       });
-      zip.file('README.txt', 'Pose Atlas 姿态 · 衣装图鉴（矢量线稿，可无损放大）\n' +
+      zip.file('README.txt', 'Pose Atlas 姿态 · 衣装图鉴（矢量线稿 + 深度图，可无损放大）\n' +
         '由 think-workbench 实时生成，不含第三方图片素材，可自由用于个人创作。\n' +
-        '姿态：每组 5 个视角（front / 3-4 / side / back-3-4 / back），在 pose/ 目录。\n' +
+        '姿态：每组 7 个视角（front / 3-4 / side / back-3-4 / back / high-angle / low-angle），在 pose/ 目录。\n' +
+        '  *-depth.svg  深度图：越亮越近，黑底，可直接当 ControlNet depth 控制图\n' +
+        '  *-openpose.json  COCO-18 关键点，可导入 ControlNet / open-pose-editor\n' +
         '衣装：每套 5 种配色（p1~p5），在 costume/ 目录。\n' +
         '本次导出：姿态 ' + nPose + ' 组，衣装 ' + nGarm + ' 套。\n');
       return zip.generateAsync({ type: 'blob' });
@@ -997,12 +1149,31 @@
   }
 
   document.addEventListener('keydown', function (e) {
-    if (!app || !app.offsetParent || S.stage !== 'detail') { return; }
+    if (!app || !app.offsetParent) { return; }
     var tag = (e.target.tagName || '').toLowerCase();
-    if (tag === 'input' || tag === 'textarea') { return; }
-    if (e.key === 'ArrowLeft') { step(-1); }
-    else if (e.key === 'ArrowRight') { step(1); }
-    else if (e.key >= '1' && e.key <= '5') {
+    if (tag === 'input' || tag === 'textarea' || e.metaKey || e.ctrlKey || e.altKey) { return; }
+    if (e.key === '/') {
+      e.preventDefault();
+      if (S.stage !== 'list') { renderList(); }
+      var s = document.getElementById('poseSearch');
+      if (s) { s.focus(); s.select(); }
+      return;
+    }
+    if (e.key === 'l' || e.key === 'L') {
+      var order = ['zh', 'en', 'ja'];
+      var nx = order[(order.indexOf(S.lang) + 1) % 3];
+      var lb = app.querySelector('[data-lang="' + nx + '"]');
+      if (lb) { lb.click(); }
+      return;
+    }
+    if (S.stage !== 'detail') { return; }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); step(-1); }
+    else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); step(1); }
+    else if ((e.key === 'd' || e.key === 'D') && !isCostume()) {
+      var mb = app.querySelector('[data-mode="' + (S.mode === 'depth' ? 'line' : 'depth') + '"]');
+      if (mb) { mb.click(); }
+    }
+    else if (e.key >= '1' && e.key <= '7') {
       var b = app.querySelector('[' + (isCostume() ? 'data-pal' : 'data-view') + '="' + (+e.key - 1) + '"]');
       if (b) { b.click(); }
     }
@@ -1014,6 +1185,9 @@
     render: render,
     opSvg: opSvg,
     opJson: opJson,
+    depthSvg: depthSvg,
+    _proj: proj,
+    _build: build,
     promptOf: promptOf,
     catOf: function (id) {
       for (var i = 0; i < CATS.length; i++) { if (CATS[i].id === id) { return CATS[i]; } }

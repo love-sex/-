@@ -195,3 +195,47 @@
 }.pose-stage-garm svg { max-width: 300px; }
 .pose-grid-garm .pose-thumb { background: #fdfaf3; }
 @media (min-width: 760px) { .pose-stage-garm svg { max-width: 320px; } }
+/* ---- 线稿 / 深度 / 对比 ---- */
+.pose-modes { display: flex; gap: 6px; margin: 8px 0 2px; }
+.pose-mode {
+  padding: 6px 14px; border: 0; border-radius: 999px; cursor: pointer;
+  font-family: inherit; font-size: 12.5px; color: var(--text-secondary, #6b5c45);
+  background: rgba(var(--primary-rgb, 60, 45, 30), .05);
+  transition: background .15s, color .15s, box-shadow .15s;
+}
+.pose-mode.on {
+  background: rgba(201, 163, 90, .18); color: var(--gold-deep, #a8833a); font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(201, 163, 90, .42);
+}
+.pose-stage-depth { background: #f7f0e3; }
+.pose-stage-depth svg { border-radius: 10px; }
+.pose-stage-cmp { padding: 0; overflow: hidden; }
+.pose-stage-cmp .pose-cmp { width: 100%; max-width: 430px; }
+.pose-cmp { position: relative; width: 100%; max-width: 430px; margin: 0 auto; aspect-ratio: 1 / 1; }
+.pose-cmp-in { position: absolute; inset: 0; }
+.pose-cmp-in svg { width: 100%; height: 100%; display: block; max-width: none; }
+.pose-cmp-b { clip-path: inset(0 0 0 50%); }
+.pose-cmp-line {
+  position: absolute; top: 0; bottom: 0; width: 2px; pointer-events: none;
+  background: rgba(201, 163, 90, .95); transform: translateX(-1px);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .18);
+}
+.pose-cmp-line::after {
+  content: '⇄'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 26px; height: 26px; border-radius: 50%; background: var(--gold, #c9a35a);
+  color: #3a2c1c; font-size: 13px; line-height: 26px; text-align: center;
+}
+.pose-cmp-range { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; }
+.pose-no { font-variant-numeric: tabular-nums; letter-spacing: .03em; color: var(--gold-deep, #a8833a); }
+@media (max-width: 720px) {
+  .pose-mode { padding: 5px 11px; font-size: 12px; }
+  .pose-cmp-line::after { width: 22px; height: 22px; line-height: 22px; font-size: 12px; }
+}
+.pose-cmp-tag {
+  position: absolute; bottom: 10px; padding: 3px 9px; border-radius: 999px;
+  font-size: 10.5px; letter-spacing: .04em; pointer-events: none;
+  background: rgba(20, 16, 12, .55); color: #f7f0e3;
+}
+.pose-cmp-tag.l { left: 10px; }
+.pose-cmp-tag.r { right: 10px; }
+.pose-cmp-b { clip-path: inset(0 0 0 46%); }
