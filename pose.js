@@ -390,8 +390,25 @@
     { yaw: 180, zh: '背面', en: 'Back' }
   ];
   var STORE_KEY = 'pose-atlas-v1';
-  var S = { lang: 'zh', cat: 'all', q: '', stage: 'list', cur: null, view: 0, fav: {}, sel: {}, fuse: null };
+  var S = { lang: 'zh', tab: 'pose', cat: 'all', q: '', stage: 'list', cur: null, view: 0, pal: 0, fav: {}, sel: {}, fuse: null, fuseTab: '' };
   var app = null, booted = false;
+
+  function C() { return window.CostumeAtlas || { CATS: [], ITEMS: [], PALS: [], render: function () { return ''; } }; }
+  function isCostume() { return S.tab === 'costume'; }
+  function curCats() { return isCostume() ? C().CATS : CATS; }
+  function curItems() { return isCostume() ? C().ITEMS : ALL; }
+  function findItem(id) {
+    var i;
+    for (i = 0; i < ALL.length; i++) { if (ALL[i].id === id) { return { type: 'pose', d: ALL[i] }; } }
+    var cs = C().ITEMS;
+    for (i = 0; i < cs.length; i++) { if (cs[i].id === id) { return { type: 'costume', d: cs[i] }; } }
+    return null;
+  }
+  function isGarm(p) { return !!p.shape; }
+  function itemSvg(p, opt) {
+    if (isGarm(p)) { return C().render(p, opt && opt.pal != null ? opt.pal : (S.pal || 0)); }
+    return render(p, opt || { yaw: p.cam || 0 });
+  }
 
   function loadState() {
     try {
@@ -422,12 +439,14 @@
   }
 
   function filtered() {
-    var arr = ALL.filter(function (p) { return S.cat === 'all' || p.cat === S.cat; });
+    var src = curItems();
+    var arr = src.filter(function (p) { return S.cat === 'all' || p.cat === S.cat; });
     var q = (S.q || '').trim();
     if (!q) { return arr; }
     if (window.Fuse) {
-      if (!S.fuse) {
-        S.fuse = new window.Fuse(ALL, { keys: ['zh', 'en', 'ja'], threshold: 0.4, ignoreLocation: true });
+      if (!S.fuse || S.fuseTab !== S.tab) {
+        S.fuse = new window.Fuse(src, { keys: ['zh', 'en', 'ja'], threshold: 0.4, ignoreLocation: true });
+        S.fuseTab = S.tab;
       }
       var hit = {};
       S.fuse.search(q).forEach(function (r) { hit[r.item.id] = 1; });
@@ -443,7 +462,7 @@
     var on = S.sel[p.id] ? ' on' : '';
     return '<div class="pose-card' + on + '" data-card="' + p.id + '">' +
       '<button class="pose-open" data-open="' + p.id + '" aria-label="' + esc(nameOf(p)) + '">' +
-        '<div class="pose-thumb">' + render(p, { yaw: p.cam || 0 }) + '</div>' +
+        '<div class="pose-thumb">' + itemSvg(p) + '</div>' +
       '</button>' +
       (S.fav[p.id] ? '<span class="pose-star">★</span>' : '') +
       '<label class="pose-ck" title="选中"><input type="checkbox" data-sel="' + p.id + '"' + (S.sel[p.id] ? ' checked' : '') + '></label>' +
@@ -463,7 +482,7 @@
     app.appendChild(el(
       '<div class="pose-wrap">' +
         '<div class="pose-tools">' +
-          '<input class="pose-search" id="poseSearch" type="search" autocomplete="off" placeholder="搜姿态，例如 坐 / 奔跑 / jumping" value="' + esc(S.q) + '">' +
+          '<input class="pose-search" id="poseSearch" type="search" autocomplete="off" placeholder="' + (isCostume() ? '搜衣装，例如 衬衫 / 裙 / coat' : '搜姿态，例如 坐 / 奔跑 / jumping') + '" value="' + esc(S.q) + '">' +
           '<div class="pose-lang" role="group" aria-label="语言">' +
             ['zh', 'en', 'ja'].map(function (k) {
               return '<button class="pose-lang-btn' + (S.lang === k ? ' on' : '') + '" data-lang="' + k + '">' +
@@ -471,26 +490,33 @@
             }).join('') +
           '</div>' +
         '</div>' +
+        '<div class="pose-tabs">' +
+          '<button class="pose-tab' + (S.tab === 'pose' ? ' on' : '') + '" data-tab="pose">姿态 <i>' + ALL.length + '</i></button>' +
+          '<button class="pose-tab' + (S.tab === 'costume' ? ' on' : '') + '" data-tab="costume">衣装 <i>' + C().ITEMS.length + '</i></button>' +
+        '</div>' +
         '<div class="pose-chips">' +
-          '<button class="pose-chip' + (S.cat === 'all' ? ' on' : '') + '" data-cat="all">全部 <i>' + ALL.length + '</i></button>' +
-          CATS.map(function (c) {
-            var n = ALL.filter(function (p) { return p.cat === c.id; }).length;
+          '<button class="pose-chip' + (S.cat === 'all' ? ' on' : '') + '" data-cat="all">全部 <i>' + curItems().length + '</i></button>' +
+          curCats().map(function (c) {
+            var n = curItems().filter(function (p) { return p.cat === c.id; }).length;
             return '<button class="pose-chip' + (S.cat === c.id ? ' on' : '') + '" data-cat="' + c.id + '">' +
               esc(catLabel(c)) + ' <i>' + n + '</i></button>';
           }).join('') +
         '</div>' +
-        '<div class="pose-count" id="poseCount">' + arr.length + ' 组姿态 · 每组 5 个视角 · 线稿可无限放大</div>' +
-        '<div class="pose-grid" id="poseGrid">' +
-          (arr.length ? arr.map(cardHtml).join('') : '<div class="pose-empty">没找到这个姿态，换个词试试</div>') +
+        '<div class="pose-count" id="poseCount">' + arr.length + (isCostume()
+          ? ' 套衣装 · 每套 5 种配色 · 平面裁剪线稿，可无限放大'
+          : ' 组姿态 · 每组 5 个视角 · 线稿可无限放大') + '</div>' +
+        '<div class="pose-grid' + (isCostume() ? ' pose-grid-garm' : '') + '" id="poseGrid">' +
+          (arr.length ? arr.map(cardHtml).join('') : '<div class="pose-empty">没找到' + (isCostume() ? '这套衣装' : '这个姿态') + '，换个词试试</div>') +
         '</div>' +
         '<div class="pose-bar' + (selCount ? ' on' : '') + '" id="poseBar">' +
-          '<span class="pose-bar-t">已选 <b>' + selCount + '</b> 组</span>' +
+          '<span class="pose-bar-t">已选 <b>' + selCount + '</b> ' + (isCostume() ? '套' : '组') + '</span>' +
           '<button class="pose-mini" id="poseZip">打包 ZIP</button>' +
           '<button class="pose-mini" id="poseBoard">拼参考板</button>' +
           '<button class="pose-mini ghost" id="poseClear">清空</button>' +
         '</div>' +
-        '<div class="pose-note">线稿由本页实时生成的矢量人台渲染，不含任何第三方图片素材；' +
-          '每组都有 5 个视角，点开可看大图、下载 SVG / PNG、复制生图提示词。</div>' +
+        '<div class="pose-note">' + (isCostume()
+          ? '衣装按平面裁剪画法生成（衣身 / 袖窿 / 侧缝 / 领型 / 裆弯），底下一层虚线是人体参照；每套 5 种配色，点开可下载 SVG / PNG、复制提示词。'
+          : '线稿由本页实时生成的矢量人台渲染，不含任何第三方图片素材；每组都有 5 个视角，点开可看大图、下载 SVG / PNG、复制生图提示词。') + '</div>' +
       '</div>'
     ));
     bindList();
@@ -509,6 +535,18 @@
         if (i2) { i2.value = keep; i2.focus(); }
       }, 220);
     };
+    Array.prototype.forEach.call(app.querySelectorAll('[data-tab]'), function (b) {
+      b.onclick = function () {
+        if (S.tab === b.dataset.tab) { return; }
+        S.tab = b.dataset.tab;
+        S.cat = 'all';
+        S.q = '';
+        S.fuse = null;
+        renderList();
+        var m0 = document.getElementById('appMain');
+        if (m0) { m0.scrollTop = 0; }
+      };
+    });
     Array.prototype.forEach.call(app.querySelectorAll('[data-lang]'), function (b) {
       b.onclick = function () { S.lang = b.dataset.lang; saveState(); renderList(); };
     });
@@ -533,7 +571,7 @@
         if (bar) {
           bar.classList.toggle('on', !!n);
           var t = bar.querySelector('.pose-bar-t');
-          if (t) { t.innerHTML = '已选 <b>' + n + '</b> 组'; }
+          if (t) { t.innerHTML = '已选 <b>' + n + '</b> ' + (isCostume() ? '套' : '组'); }
         }
       };
     });
@@ -551,9 +589,10 @@
   }
 
   function openDetail(id) {
-    var p = null;
-    for (var i = 0; i < ALL.length; i++) { if (ALL[i].id === id) { p = ALL[i]; break; } }
-    if (!p) { return; }
+    var it = findItem(id);
+    if (!it) { return; }
+    if (it.type === 'costume') { openGarm(it.d); return; }
+    var p = it.d;
     S.stage = 'detail';
     S.cur = id;
     S.view = 0;
@@ -624,6 +663,82 @@
     if (m) { m.scrollTop = 0; }
   }
 
+  /* ---- 衣装详情：大图 + 5 配色 ---- */
+  function garmPrompt(g) {
+    return 'flat lay garment design, ' + String(g.en).toLowerCase() +
+      ', front view, technical fashion line art, clean seams and panels, ' +
+      'plain background, symmetrical, high detail, use as costume reference for character illustration';
+  }
+
+  function openGarm(g) {
+    S.stage = 'detail';
+    S.cur = g.id;
+    S.pal = 0;
+    var cat = null, cs = C().CATS;
+    for (var i = 0; i < cs.length; i++) { if (cs[i].id === g.cat) { cat = cs[i]; } }
+    var pals = C().PALS;
+    app.innerHTML = '';
+    app.appendChild(el(
+      '<div class="pose-wrap pose-wrap-detail">' +
+        '<button class="pose-back" id="poseBack">← 返回列表</button>' +
+        '<div class="pose-stage pose-stage-garm" id="poseStage">' + C().render(g, S.pal, { noPaper: true }) + '</div>' +
+        '<div class="pose-views" id="poseViews">' +
+          pals.map(function (p, i) {
+            return '<button class="pose-view' + (i === S.pal ? ' on' : '') + '" data-pal="' + i + '">' +
+              C().render(g, i) + '<span>' + p.zh + '</span></button>';
+          }).join('') +
+        '</div>' +
+        '<div class="pose-info">' +
+          '<div class="pose-info-name">' + esc(nameOf(g)) + '</div>' +
+          '<div class="pose-info-sub">' + esc(g.zh) + ' · ' + esc(g.en) + (S.lang === 'ja' ? '' : ' · ' + esc(g.ja)) + '</div>' +
+          '<div class="pose-info-tags"><span>' + esc(catLabel(cat || { zh: '' })) + '</span><span>5 配色</span><span>平面裁剪</span><span>矢量线稿</span></div>' +
+        '</div>' +
+        '<div class="pose-acts">' +
+          '<button class="pose-btn primary" id="posePng">下载 PNG</button>' +
+          '<button class="pose-btn" id="poseSvg">下载 SVG</button>' +
+          '<button class="pose-btn" id="posePrompt">复制提示词</button>' +
+          '<button class="pose-btn' + (S.fav[g.id] ? ' fav' : '') + '" id="poseFav">' + (S.fav[g.id] ? '★ 已收藏' : '☆ 收藏') + '</button>' +
+        '</div>' +
+        '<div class="pose-nav-row">' +
+          '<button class="pose-mini ghost" id="posePrev">← 上一个</button>' +
+          '<span class="pose-hint">键盘 ← → 换衣装 · 1-5 换配色</span>' +
+          '<button class="pose-mini ghost" id="poseNext">下一个 →</button>' +
+        '</div>' +
+      '</div>'
+    ));
+    document.getElementById('poseBack').onclick = function () { renderList(); };
+    Array.prototype.forEach.call(app.querySelectorAll('[data-pal]'), function (b) {
+      b.onclick = function () {
+        S.pal = +b.dataset.pal;
+        document.getElementById('poseStage').innerHTML = C().render(g, S.pal, { noPaper: true });
+        Array.prototype.forEach.call(app.querySelectorAll('.pose-view'), function (x) { x.classList.remove('on'); });
+        b.classList.add('on');
+      };
+    });
+    document.getElementById('posePng').onclick = function () {
+      svgToBlob(C().render(g, S.pal))
+        .then(function (b) { saveBlob(b, 'costume-' + g.id + '-p' + (S.pal + 1) + '.png'); toast('PNG 已开始下载'); })
+        .catch(function (e) { toast(e.message); });
+    };
+    document.getElementById('poseSvg').onclick = function () {
+      var svg = C().render(g, S.pal).replace('<svg ', '<svg width="900" height="900" ');
+      saveBlob(new Blob([svg], { type: 'image/svg+xml' }), 'costume-' + g.id + '-p' + (S.pal + 1) + '.svg');
+      toast('SVG 已开始下载');
+    };
+    document.getElementById('posePrompt').onclick = function () { copyText(garmPrompt(g)); };
+    var favBtn = document.getElementById('poseFav');
+    favBtn.onclick = function () {
+      if (S.fav[g.id]) { delete S.fav[g.id]; } else { S.fav[g.id] = 1; }
+      saveState();
+      favBtn.classList.toggle('fav', !!S.fav[g.id]);
+      favBtn.textContent = S.fav[g.id] ? '★ 已收藏' : '☆ 收藏';
+    };
+    document.getElementById('posePrev').onclick = function () { step(-1); };
+    document.getElementById('poseNext').onclick = function () { step(1); };
+    var m = document.getElementById('appMain');
+    if (m) { m.scrollTop = 0; }
+  }
+
   function step(dir) {
     var arr = filtered();
     if (!arr.length) { return; }
@@ -650,18 +765,30 @@
     toast('正在生成 ZIP…');
     ensureLib('JSZip', 'assets/vendor/jszip.min.js').then(function (JSZip) {
       var zip = new JSZip();
+      var nPose = 0, nGarm = 0;
       ids.forEach(function (id) {
-        var p = null;
-        for (var i = 0; i < ALL.length; i++) { if (ALL[i].id === id) { p = ALL[i]; break; } }
-        if (!p) { return; }
+        var it = findItem(id);
+        if (!it) { return; }
+        if (it.type === 'costume') {
+          nGarm++;
+          var pals = C().PALS;
+          pals.forEach(function (pl, pi) {
+            var svg = C().render(it.d, pi).replace('<svg ', '<svg width="900" height="900" ');
+            zip.file('costume/' + it.d.id + '-p' + (pi + 1) + '-' + ('01234'.charAt(pi)) + '.svg', svg);
+          });
+          return;
+        }
+        nPose++;
         VIEWS.forEach(function (v, vi) {
-          var svg = render(p, { yaw: v.yaw, paper: '#fdfaf3' }).replace('<svg ', '<svg width="900" height="900" ');
-          zip.file(p.id + '-v' + (vi + 1) + '-' + v.en.toLowerCase().replace(/[^a-z0-9]/g, '') + '.svg', svg);
+          var svg = render(it.d, { yaw: v.yaw, paper: '#fdfaf3' }).replace('<svg ', '<svg width="900" height="900" ');
+          zip.file('pose/' + it.d.id + '-v' + (vi + 1) + '-' + v.en.toLowerCase().replace(/[^a-z0-9]/g, '') + '.svg', svg);
         });
       });
-      zip.file('README.txt', 'Pose Atlas 姿态图鉴 · 矢量线稿（可无损放大）\n' +
+      zip.file('README.txt', 'Pose Atlas 姿态 · 衣装图鉴（矢量线稿，可无损放大）\n' +
         '由 think-workbench 实时生成，不含第三方图片素材，可自由用于个人创作。\n' +
-        '每组姿态 5 个视角：front / 3-4 / side / back-3-4 / back。\n');
+        '姿态：每组 5 个视角（front / 3-4 / side / back-3-4 / back），在 pose/ 目录。\n' +
+        '衣装：每套 5 种配色（p1~p5），在 costume/ 目录。\n' +
+        '本次导出：姿态 ' + nPose + ' 组，衣装 ' + nGarm + ' 套。\n');
       return zip.generateAsync({ type: 'blob' });
     }).then(function (blob) {
       saveBlob(blob, 'pose-atlas-' + ids.length + '.zip');
@@ -674,14 +801,11 @@
     if (!ids.length) { return; }
     toast('正在拼参考板…');
     ensureLib('html2canvas', 'assets/vendor/html2canvas.min.js').then(function (h2c) {
-      var items = ids.map(function (id) {
-        for (var i = 0; i < ALL.length; i++) { if (ALL[i].id === id) { return ALL[i]; } }
-        return null;
-      }).filter(Boolean);
-      var board = el('<div class="pose-board"><div class="pose-board-h">Pose Atlas · ' + items.length + ' 组姿态参考</div>' +
+      var items = ids.map(function (id) { var it = findItem(id); return it ? it.d : null; }).filter(Boolean);
+      var board = el('<div class="pose-board"><div class="pose-board-h">Pose Atlas · ' + items.length + ' 项参考</div>' +
         '<div class="pose-board-grid">' +
         items.map(function (p) {
-          return '<div class="pose-board-cell">' + render(p, { yaw: 0, paper: '#fdfaf3' }) +
+          return '<div class="pose-board-cell">' + itemSvg(p, { yaw: 0 }) +
             '<div class="pose-board-n">' + esc(nameOf(p)) + '<i>' + esc(p.en) + '</i></div></div>';
         }).join('') + '</div>' +
         '<div class="pose-board-f">think-workbench · pose reference sheet</div></div>');
@@ -718,7 +842,7 @@
     if (e.key === 'ArrowLeft') { step(-1); }
     else if (e.key === 'ArrowRight') { step(1); }
     else if (e.key >= '1' && e.key <= '5') {
-      var b = app.querySelector('[data-view="' + (+e.key - 1) + '"]');
+      var b = app.querySelector('[' + (isCostume() ? 'data-pal' : 'data-view') + '="' + (+e.key - 1) + '"]');
       if (b) { b.click(); }
     }
   });

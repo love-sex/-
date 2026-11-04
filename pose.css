@@ -172,3 +172,26 @@
 @media (prefers-reduced-motion: reduce) {
   .pose-card, .pose-toast { transition: none; }
 }
+
+/* ---- 姿态 / 衣装 页签 ---- */
+.pose-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+.pose-tab {
+  padding: 7px 15px; border: 0; border-radius: 999px; cursor: pointer;
+  font-family: inherit; font-size: 13px; color: var(--text-secondary, #6b5c45);
+  background: transparent; transition: background .15s, color .15s;
+}
+.pose-tab i { font-style: normal; font-size: 10.5px; opacity: .6; margin-left: 3px; }
+.pose-tab.on {
+  background: rgba(201, 163, 90, .16); color: var(--gold-deep, #a8833a); font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(201, 163, 90, .38);
+}
+.pose-grid-garm { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+@media (min-width: 760px) {
+  .pose-grid-garm { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+}
+@media (max-width: 720px) {
+  .pose-grid-garm { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
+  .pose-tab { padding: 6px 12px; font-size: 12.5px; }
+}.pose-stage-garm svg { max-width: 300px; }
+.pose-grid-garm .pose-thumb { background: #fdfaf3; }
+@media (min-width: 760px) { .pose-stage-garm svg { max-width: 320px; } }
