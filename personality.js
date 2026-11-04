@@ -401,7 +401,7 @@
                 (selCount ? '（' + selCount + '）' : '') + '</button>' +
               '<button class="soul-mini" id="soulHisDone">完成</button>' +
             '</span>'
-          : '<button class="soul-mini" id="soulHisManage">管理</button>') +
+          : '<button class="soul-mini primary" id="soulHisManage">✎ 编辑</button>') +
       '</div><div class="soul-his">' +
       his.map(function (r) {
         var label = r.label || r.name;
@@ -453,6 +453,7 @@
         '<div class="soul-rule">测试从 <b>10 个人格维度</b> 记录你的选择，再与 ' + ALL.length + ' 位动漫角色逐一比对，找出灵魂坐标最接近的那一个。<br>四个选项都不像你？点「自己写」，用一句话描述你会怎么做，照样能算。</div>' +
         resume +
         '<button class="soul-btn" id="soulStart">开始测试</button>' +
+        '<button class="soul-glink" id="soulGallery">角色图鉴 · 看看全部 ' + ALL.length + ' 位角色的立绘 →</button>' +
         hisHtml +
         '<div class="soul-note">匹配度按人格向量的方向相似度与距离综合计算，结果仅供娱乐参考<br>角色台词为流传版本，可能与原作表述略有出入' + (metaLine ? '<br>' + metaLine : '') + '</div>' +
       '</div>'
@@ -464,6 +465,8 @@
       var st = readStore(); st.draft = null; writeStore(st);
       renderQuiz(true);
     };
+    var gl = $('#soulGallery');
+    if (gl) { gl.onclick = renderGallery; }
     var rb = $('#soulResume');
     if (rb) {
       rb.onclick = function () {
@@ -806,11 +809,127 @@
     var cls = 'soul-av' + (art ? ' soul-av-art' : '');
     if (art) {
       return '<div class="' + cls + '" style="background:' + esc(ch.c) + '">' +
-        '<img src="' + esc(art) + '" alt="' + esc(ch.n) + '" loading="lazy">' +
+        '<img src="' + esc(art) + '" data-art="' + esc(art) + '" alt="' + esc(ch.n) +
+        '" loading="lazy" decoding="async">' +
         '<span class="soul-aura"></span></div>';
     }
     return '<div class="' + cls + '" style="background:' + esc(ch.c) + '">' + esc(ch.n.charAt(0)) +
       '<span class="soul-aura"></span></div>';
+  }
+
+  /* 立绘下载失败大多是网络抖动，自动重试 2 次（加 ?r=n 绕开缓存），仍失败才退回渐变字牌 */
+  document.addEventListener('error', function (e) {
+    var img = e.target;
+    if (!img || img.tagName !== 'IMG' || !img.getAttribute('data-art')) { return; }
+    var tried = (+img.getAttribute('data-try') || 0) + 1;
+    var box = img.parentNode;
+    if (tried > 2) {
+      var label = img.getAttribute('alt') || '';
+      if (box) {
+        box.classList.remove('soul-av-art');
+        box.innerHTML = (label ? esc(label.charAt(0)) : '?') + '<span class="soul-aura"></span>';
+      }
+      return;
+    }
+    img.setAttribute('data-try', tried);
+    var src = img.getAttribute('data-art');
+    setTimeout(function () {
+      img.src = src + (src.indexOf('?') < 0 ? '?' : '&') + 'r=' + tried;
+    }, 420 * tried);
+  }, true);
+
+  /* 图鉴里的计数跟着图片的 load/error 走，不依赖定时器（后台标签页会被节流） */
+  document.addEventListener('load', function (e) {
+    var img = e.target;
+    if (img && img.tagName === 'IMG' && img.parentNode && img.parentNode.className &&
+      String(img.parentNode.className).indexOf('soul-gart') >= 0) {
+      galleryStat();
+    }
+  }, true);
+
+  /* ---------------- 角色图鉴（全员立绘 + 模糊搜索） ---------------- */
+  var GAL = { q: '', fuse: null, statTimer: 0 };
+
+  function ensureFuse() {
+    if (window.Fuse) { return Promise.resolve(window.Fuse); }
+    return loadScript('assets/vendor/fuse.min.js?v=7.0.0').then(function () { return window.Fuse; });
+  }
+  function galleryItemHtml(c) {
+    var art = artOf(c.n);
+    return '<button class="soul-gitem" data-gn="' + esc(c.n) + '" title="' + esc(c.n + ' · ' + c.f) + '">' +
+      '<div class="soul-gart" style="background:' + esc(c.c) + '">' +
+        (art
+          ? '<img src="' + esc(art) + '" data-art="' + esc(art) + '" alt="' + esc(c.n) + '" loading="lazy" decoding="async">'
+          : '<span>' + esc(c.n.charAt(0)) + '</span>') +
+      '</div>' +
+      '<div class="soul-gname">' + esc(c.n) + '</div>' +
+      '<div class="soul-gfrom">' + esc(c.f) + '</div>' +
+    '</button>';
+  }
+  function galleryStat() {
+    var stat = $('#soulGStat');
+    if (!stat) { return; }
+    var imgs = app.querySelectorAll('.soul-gart img');
+    var ok = 0;
+    Array.prototype.forEach.call(imgs, function (i) { if (i.complete && i.naturalWidth > 0) { ok++; } });
+    var done = !imgs.length || ok >= imgs.length;
+    stat.textContent = '立绘已加载 ' + ok + ' / ' + imgs.length + (done ? ' · 全部就位' : ' · 正在加载…');
+  }
+  function filterGallery() {
+    var q = (GAL.q || '').trim();
+    var list = ALL;
+    if (q) {
+      if (window.Fuse) {
+        if (!GAL.fuse) {
+          GAL.fuse = new window.Fuse(ALL, {
+            keys: ['n', 'f', 'tg'], threshold: 0.42, ignoreLocation: true, minMatchCharLength: 1
+          });
+        }
+        list = GAL.fuse.search(q).map(function (r) { return r.item; });
+      } else {
+        list = ALL.filter(function (c) {
+          return c.n.indexOf(q) >= 0 || (c.f || '').indexOf(q) >= 0 ||
+            (c.tg || []).some(function (t) { return t.indexOf(q) >= 0; });
+        });
+      }
+    }
+    var grid = $('#soulGrid');
+    if (!grid) { return; }
+    grid.innerHTML = list.length ? list.map(galleryItemHtml).join('') :
+      '<div class="soul-gempty">没找到「' + esc(q) + '」这个角色，换个词试试</div>';
+    galleryStat();
+  }
+  function renderGallery() {
+    stage = 'gallery';
+    destroyChart();
+    app.innerHTML = '';
+    app.appendChild(el(
+      '<div class="soul-wrap soul-wrap-quiz">' +
+        '<div class="soul-gtop">' +
+          '<button class="soul-back" id="soulGBack">← 返回</button>' +
+          '<div class="soul-gtitle">角色图鉴<span>' + ALL.length + ' 位</span></div>' +
+        '</div>' +
+        '<div class="soul-gsearch"><input id="soulGInput" type="search" autocomplete="off" ' +
+          'placeholder="搜角色名或作品，例如 芙莉莲 / 电锯人"></div>' +
+        '<div class="soul-gstat" id="soulGStat"></div>' +
+        '<div class="soul-grid" id="soulGrid"></div>' +
+        '<div class="soul-note">立绘取自 AniList 公开角色库，版权归原作者与制作委员会。<br>' +
+          '某张显示成字牌＝这张图暂时没取到，多为网络抖动；重新打开或刷新会自动重试。</div>' +
+      '</div>'
+    ));
+    $('#soulGBack').onclick = function () { renderIntro(); };
+    var input = $('#soulGInput');
+    var timer = 0;
+    input.oninput = function () {
+      GAL.q = input.value;
+      clearTimeout(timer);
+      timer = setTimeout(filterGallery, 140);
+    };
+    filterGallery();
+    ensureFuse().then(function () {
+      if (GAL.q) { filterGallery(); }
+    }).catch(function () { });
+    scrollTop();
   }
 
   function renderResult(vec, opt) {
@@ -1117,6 +1236,7 @@
     if (!app) { return; }
     if (booted) {
       if (stage === 'quiz') { renderQuiz(true); }
+      else if (stage === 'gallery') { renderGallery(); }
       else if (stage === 'result' && lastVec) { renderResult(lastVec, { refined: lastRefined }); }
       else { renderIntro(); }
       return;
