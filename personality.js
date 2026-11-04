@@ -865,6 +865,7 @@
     var node = el(
       '<div class="soul-share" id="soulShareCard">' +
         '<div class="sh-kicker">Anime Soul Test</div>' +
+        (art ? '<div class="sh-art"><img src="' + esc(art) + '" alt=""></div>' : '') +
         '<div class="sh-name">' + esc(best.n) + '</div>' +
         '<div class="sh-from">' + esc(best.f) + ' · ' + esc(best.j) + '</div>' +
         '<div class="sh-tags">' + (best.tg || []).map(function (t) { return '<span>' + esc(t) + '</span>'; }).join('') + '</div>' +
