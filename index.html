@@ -22,8 +22,6 @@
     <!-- 抠图工具样式 -->
     <link rel="stylesheet" href="matting.css?v=20261112">
     <link rel="stylesheet" href="personality.css?v=20261118p">
-    <link rel="stylesheet" href="pose.css?v=20261121a">
-  <link rel="stylesheet" href="char.css?v=20261121g">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
@@ -271,17 +269,6 @@
                                 <div class="module-icon">🔮</div>
                                 <div class="module-name">灵魂角色</div>
                                 <div class="module-stat">40 题 · 134 位角色</div>
-                            </button>
-                            <button class="module-card" data-target="char">
-            <div class="module-icon">🎨</div>
-            <div class="module-name">二次元角色库</div>
-            <div class="module-stat">122 条 · 46 发型 · 换色实时重绘</div>
-          </button>
-
-          <button class="module-card" data-target="pose">
-                                <div class="module-icon">🧍</div>
-                                <div class="module-name">姿态图鉴</div>
-                                <div class="module-stat">306 姿态 · 2142 图 · 导 ControlNet</div>
                             </button>
                         </div>
                     </div>
@@ -724,28 +711,7 @@
                 </div>
             </section>
 
-            <!-- ============ 姿态图鉴 ============ -->
-            <section class="view" data-view="pose" style="display:none;">
-                <div class="view-content">
-                    <div class="page-head">
-                        <button class="back-btn" data-back>← 返回首页</button>
-                        <h2 class="page-title">🧍 姿态图鉴</h2>
-                    </div>
-                    <div id="poseApp"></div>
-                </div>
-            </section>
-
-            <section class="view" data-view="char" style="display:none;">
-        <div class="view-content">
-          <div class="page-head">
-            <button class="back-btn" data-back>← 返回首页</button>
-            <h2 class="page-title">🎨 二次元角色库</h2>
-          </div>
-          <div id="charApp"></div>
-        </div>
-      </section>
-
-      <!-- ============ 抠图 ============ -->
+            <!-- ============ 抠图 ============ -->
             <section class="view" data-view="matting" style="display:none;">
                 <div class="view-content">
                     <div class="page-head">
@@ -1420,12 +1386,9 @@ PORTFOLIO</p>
 
     <script src="script-game.js"></script>
     <script src="script.js?v=20261030"></script>
-    <script src="workbench.js?v=20261121c"></script>
+    <script src="workbench.js?v=20261121d"></script>
     <script src="matting.js?v=20261117"></script>
     <script src="personality.js?v=20261118p"></script>
-    <script src="costume.js?v=20261119c"></script>
-    <script src="pose.js?v=20261121h"></script>
-  <script src="char.js?v=20261121m"></script>
     <script src="portfolio.js?v=20261029"></script>
     <script src="login-cards.js?v=20261030"></script>
 </body>
