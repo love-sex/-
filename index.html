@@ -20,7 +20,7 @@
     <!-- 登录界面动效 -->
     <link rel="stylesheet" href="login.css?v=20261030">
     <!-- 抠图工具样式 -->
-    <link rel="stylesheet" href="matting.css?v=20261112">
+    <link rel="stylesheet" href="matting.css?v=20261121b">
     <link rel="stylesheet" href="personality.css?v=20261118p">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
@@ -757,6 +757,7 @@
                         <div class="matting-seg" id="mattingMode">
                             <button type="button" data-val="erase" class="on">🧽 擦除背景</button>
                             <button type="button" data-val="restore">🖌 恢复主体</button>
+                            <button type="button" data-val="remove">🪄 涂抹去物</button>
                             <button type="button" data-val="pan">✋ 移动画布</button>
                         </div>
                         <div style="height:12px;"></div>
@@ -776,6 +777,17 @@
                             <button class="btn btn-ghost btn-sm" id="mattingKeepAll">全部保留</button>
                             <button class="btn btn-ghost btn-sm" id="mattingCutAll">全部删除</button>
                             <button class="btn btn-ghost btn-sm" id="mattingRefineApply">✨ 边缘精修</button>
+                        </div>
+                    </div>
+
+                    <div class="card matting-need-img">
+                        <div class="card-title">🪄 魔法橡皮擦</div>
+                        <p class="muted" style="margin:-4px 0 12px;">像 Magic Eraser 一样抹掉照片里的路人、杂物、文字和水印：把模式切到「🪄 涂抹去物」，涂红要移除的内容（略超出边缘 4–6px），再点「移除涂抹区」。本地算法重建背景，不联网、不限次数；天空、墙面、草地、路面效果最好，复杂纹理建议分小块多次擦。</p>
+                        <div class="matting-bar">
+                            <button class="btn btn-gold btn-sm" id="mattingInpaint" disabled>✨ 移除涂抹区</button>
+                            <button class="btn btn-ghost btn-sm" id="mattingInpaintCmp" disabled>👁 按住对比</button>
+                            <button class="btn btn-ghost btn-sm" id="mattingInpaintUndo" disabled>↩ 撤销擦除</button>
+                            <button class="btn btn-ghost btn-sm" id="mattingInpaintClear" disabled>🧹 清除涂抹</button>
                         </div>
                     </div>
 
@@ -1387,7 +1399,7 @@ PORTFOLIO</p>
     <script src="script-game.js"></script>
     <script src="script.js?v=20261030"></script>
     <script src="workbench.js?v=20261121d"></script>
-    <script src="matting.js?v=20261117"></script>
+    <script src="matting.js?v=20261121a"></script>
     <script src="personality.js?v=20261118p"></script>
     <script src="portfolio.js?v=20261029"></script>
     <script src="login-cards.js?v=20261030"></script>

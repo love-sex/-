@@ -1,7 +1,9 @@
 /* =========================================================
  * 抠图：自动识别主体 → 一键删除背景 → 画笔修补 → 导出透明 PNG / SVG 矢量
+ * 另含「魔法橡皮擦」：涂抹要移除的人/物/文字，本地重建背景（对齐 magicremover.org/magic-eraser 的交互）
  * 全部在浏览器本地完成，图片不会上传到任何服务器。
  * 引擎：ISNet（MIT，imgly/isnet-general-onnx）+ onnxruntime-web（MIT）
+ * 去物：自研 Telea 思路修复（轴向加权插值 + 洞内扩散平滑，参考 OpenCV photo 模块 cv::INPAINT_TELEA）
  * 矢量：ImageTracerJS（The Unlicense / 公有领域）
  * ========================================================= */
 (function () {
@@ -76,8 +78,13 @@
         undo: [], redo: [],
         last: null,
         painting: false,
-        mode: 'erase',    // erase | restore | pan
+        mode: 'erase',    // erase | restore | remove | pan
         spaceDown: false, // 按住空格 = 临时抓手
+        // 涂抹去物（魔法橡皮擦）：独立于抠图蒙版的红色涂抹区
+        rmask: null, rmctx: null,
+        rmHas: false,        // 是否有未处理的涂抹
+        inpaintPrev: null,   // 上一次擦除前的整图，用于撤销 / 按住对比
+        showCmp: false,      // 按住对比原图中
         // 画布视图：布局尺寸 = 图片像素 * baseScale，再乘 zoom 得到实际显示大小
         zoom: 1, tx: 0, ty: 0, baseScale: 1, userZoomed: false,
         brush: 40,
@@ -150,12 +157,38 @@
         S.mask = document.createElement('canvas');
         S.mask.width = w; S.mask.height = h;
         S.mctx = S.mask.getContext('2d', { willReadFrequently: true });
+        // 涂抹去物蒙版（魔法橡皮擦）：白色笔触，alpha 即涂抹强度
+        S.rmask = document.createElement('canvas');
+        S.rmask.width = w; S.rmask.height = h;
+        S.rmctx = S.rmask.getContext('2d', { willReadFrequently: true });
+        S.rmHas = false;
+        S.inpaintPrev = null; S.showCmp = false;
         // 缓存原图 RGB，边缘精修时做引导图
+        cacheRGB();
+    };
+
+    // 把当前 S.src 画到 (w,h) 并缓存像素（引导滤波 + 修复算法共用）
+    const cacheRGB = () => {
+        if (!S.w || !S.h) return;
         const g = document.createElement('canvas');
-        g.width = w; g.height = h;
+        g.width = S.w; g.height = S.h;
         const gc = g.getContext('2d', { willReadFrequently: true });
-        gc.drawImage(S.src, 0, 0, w, h);
-        S.rgb = gc.getImageData(0, 0, w, h);
+        gc.drawImage(S.src, 0, 0, S.w, S.h);
+        S.rgb = gc.getImageData(0, 0, S.w, S.h);
+    };
+
+    // 涂抹去物：红色半透明覆盖层，让「要移除什么」一眼可见（渲染层，不动权威蒙版）
+    const drawRm = () => {
+        if (!S.rmHas || !S.rmctx) return;
+        const ctx = S.vctx;
+        const tint = document.createElement('canvas');
+        tint.width = S.w; tint.height = S.h;
+        const t = tint.getContext('2d');
+        t.drawImage(S.rmask, 0, 0);
+        t.globalCompositeOperation = 'source-in';
+        t.fillStyle = 'rgba(255,46,46,0.5)';
+        t.fillRect(0, 0, S.w, S.h);
+        ctx.drawImage(tint, 0, 0);
     };
 
     const render = () => {
@@ -164,8 +197,10 @@
         ctx.clearRect(0, 0, S.w, S.h);
         ctx.globalCompositeOperation = 'source-over';
         // 正常预览用「去过底色」的前景图，避免边缘挂一圈背景色；显示删除区时用原图，方便对着改
-        ctx.drawImage((S.hasMask && S.fg && !S.showCut) ? S.fg : S.src, 0, 0, S.w, S.h);
-        if (!S.hasMask) return;
+        // 按住「对比」时强制回看擦除前的原图
+        const base = (S.showCmp && S.inpaintPrev) ? S.inpaintPrev : S.src;
+        ctx.drawImage((S.hasMask && S.fg && !S.showCut) ? S.fg : base, 0, 0, S.w, S.h);
+        if (!S.hasMask) { drawRm(); return; }
         if (S.showCut) {
             // 显示删除区：不抠掉原图，只用「半透明斜纹」把会被删掉的区域标记出来。
             // 纯色蒙版会把底下的原图糊成一片，看不到原本长什么样；斜纹既能一眼分辨，
@@ -201,6 +236,7 @@
         ctx.globalCompositeOperation = 'destination-in';
         ctx.drawImage(S.mask, 0, 0, S.w, S.h);
         ctx.globalCompositeOperation = 'source-over';
+        drawRm();
     };
 
     /* ---------------- 画布视图：缩放 / 平移 ----------------
@@ -353,24 +389,43 @@
 
     /* ---------------- 画笔 ---------------- */
     const paintDot = (x, y) => {
-        const ctx = S.rctx;
         const r = S.brush;
-        const keep = S.mode === 'restore';
         const inner = Math.max(0.02, Math.min(0.98, S.hardness));
-        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        const g = () => {
+            const gg = S.rmctx.createRadialGradient(x, y, 0, x, y, r);
+            return gg;
+        };
+        // 涂抹去物：往独立的红蒙版画布上画白笔触，不碰抠图蒙版
+        if (S.mode === 'remove') {
+            const ctx = S.rmctx;
+            const gg = g();
+            gg.addColorStop(0, 'rgba(255,255,255,1)');
+            gg.addColorStop(inner, 'rgba(255,255,255,1)');
+            gg.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.fillStyle = gg;
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fill();
+            S.rmHas = true;
+            return;
+        }
+        const ctx = S.rctx;
+        const keep = S.mode === 'restore';
+        const gg = g();
         if (keep) {
-            g.addColorStop(0, 'rgba(255,255,255,1)');
-            g.addColorStop(inner, 'rgba(255,255,255,1)');
-            g.addColorStop(1, 'rgba(255,255,255,0)');
+            gg.addColorStop(0, 'rgba(255,255,255,1)');
+            gg.addColorStop(inner, 'rgba(255,255,255,1)');
+            gg.addColorStop(1, 'rgba(255,255,255,0)');
         } else {
-            g.addColorStop(0, 'rgba(0,0,0,1)');
-            g.addColorStop(inner, 'rgba(0,0,0,1)');
-            g.addColorStop(1, 'rgba(0,0,0,0)');
+            gg.addColorStop(0, 'rgba(0,0,0,1)');
+            gg.addColorStop(inner, 'rgba(0,0,0,1)');
+            gg.addColorStop(1, 'rgba(0,0,0,0)');
         }
         // 恢复=叠加白色提高 alpha；擦除=destination-out 减少 alpha
         const gco = keep ? 'source-over' : 'destination-out';
         ctx.globalCompositeOperation = gco;
-        ctx.fillStyle = g;
+        ctx.fillStyle = gg;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
@@ -1136,6 +1191,178 @@
         return cleared;
     };
 
+    /* ---------------- 涂抹去物（魔法橡皮擦） ----------------
+       算法：Telea 式图像修复，参考 OpenCV photo 模块 cv::INPAINT_TELEA（Apache-2.0）。
+       纯 JS 本地实现：蒙版外扩 → 从边界逐层向内推进，每层用周围已知像素做距离加权平均，
+       最后在填充区内部做几轮扩散平滑，让补出来的背景过渡自然。全程不联网。 */
+    const dilateMask = (m, w, h, r) => {
+        let cur = m;
+        for (let p = 0; p < r; p++) {
+            const out = new Uint8Array(cur);
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    const i = y * w + x;
+                    if (cur[i]) continue;
+                    if ((x > 0 && cur[i - 1]) || (x < w - 1 && cur[i + 1]) ||
+                        (y > 0 && cur[i - w]) || (y < h - 1 && cur[i + w]) ||
+                        (x > 0 && y > 0 && cur[i - w - 1]) || (x < w - 1 && y > 0 && cur[i - w + 1]) ||
+                        (x > 0 && y < h - 1 && cur[i + w - 1]) || (x < w - 1 && y < h - 1 && cur[i + w + 1])) {
+                        out[i] = 1;
+                    }
+                }
+            }
+            cur = out;
+        }
+        return cur;
+    };
+
+    // data: RGBA 像素（会被就地修改）；mask: 1 = 待填充
+    // 1) 横/纵两方向扫描：洞内像素向两侧最近的已知像素做 1/d² 加权插值（线性级 O(N)，不会有逐层推进的接缝）
+    // 2) 洞内扩散平滑若干轮，把插值的棱角磨掉
+    const inpaintTelea = (data, mask, w, h) => {
+        const N = w * h;
+        const known = new Uint8Array(N);
+        let holes = 0;
+        for (let i = 0; i < N; i++) { if (mask[i]) holes++; else known[i] = 1; }
+        if (!holes) return 0;
+        const aR = new Float32Array(N), aG = new Float32Array(N), aB = new Float32Array(N), aW = new Float32Array(N);
+
+        // 横向
+        for (let y = 0; y < h; y++) {
+            let x = 0, row = y * w;
+            while (x < w) {
+                if (known[row + x]) { x++; continue; }
+                let x1 = x;
+                while (x1 + 1 < w && !known[row + x1 + 1]) x1++;
+                const lx = x - 1, rx = x1 + 1;
+                const cL = lx >= 0 ? (row + lx) * 4 : -1;
+                const cR = rx < w ? (row + rx) * 4 : -1;
+                for (let xx = x; xx <= x1; xx++) {
+                    const i = row + xx;
+                    let sr = 0, sg = 0, sb = 0, sw = 0;
+                    if (cL >= 0) { const d = xx - lx, wt = 1 / (d * d); sr += data[cL] * wt; sg += data[cL + 1] * wt; sb += data[cL + 2] * wt; sw += wt; }
+                    if (cR >= 0) { const d = rx - xx, wt = 1 / (d * d); sr += data[cR] * wt; sg += data[cR + 1] * wt; sb += data[cR + 2] * wt; sw += wt; }
+                    if (sw > 0) { aR[i] += sr; aG[i] += sg; aB[i] += sb; aW[i] += sw; }
+                }
+                x = x1 + 1;
+            }
+        }
+        // 纵向（与横向加权合并：离哪个方向的边界近，就更信哪个方向）
+        for (let x = 0; x < w; x++) {
+            let y = 0;
+            while (y < h) {
+                if (known[y * w + x]) { y++; continue; }
+                let y1 = y;
+                while (y1 + 1 < h && !known[(y1 + 1) * w + x]) y1++;
+                const ty = y - 1, by = y1 + 1;
+                const cT = ty >= 0 ? (ty * w + x) * 4 : -1;
+                const cB = by < h ? (by * w + x) * 4 : -1;
+                for (let yy = y; yy <= y1; yy++) {
+                    const i = yy * w + x;
+                    let sr = 0, sg = 0, sb = 0, sw = 0;
+                    if (cT >= 0) { const d = yy - ty, wt = 1 / (d * d); sr += data[cT] * wt; sg += data[cT + 1] * wt; sb += data[cT + 2] * wt; sw += wt; }
+                    if (cB >= 0) { const d = by - yy, wt = 1 / (d * d); sr += data[cB] * wt; sg += data[cB + 1] * wt; sb += data[cB + 2] * wt; sw += wt; }
+                    if (sw > 0) { aR[i] += sr; aG[i] += sg; aB[i] += sb; aW[i] += sw; }
+                }
+                y = y1 + 1;
+            }
+        }
+        const holeIdx = [];
+        for (let i = 0; i < N; i++) {
+            if (known[i]) continue;
+            holeIdx.push(i);
+            if (aW[i] > 0) {
+                const q = i * 4;
+                data[q] = aR[i] / aW[i]; data[q + 1] = aG[i] / aW[i]; data[q + 2] = aB[i] / aW[i]; data[q + 3] = 255;
+            }
+        }
+        // 洞内扩散平滑：8 邻域加权（对角 0.7），已知像素固定不动
+        const tmp = new Float32Array(holeIdx.length * 3);
+        for (let it = 0; it < 12; it++) {
+            for (let k = 0; k < holeIdx.length; k++) {
+                const i = holeIdx[k], x = i % w, y = (i / w) | 0;
+                let sr = 0, sg = 0, sb = 0, n = 0;
+                const acc = (j, wt) => { const q = j * 4; sr += data[q] * wt; sg += data[q + 1] * wt; sb += data[q + 2] * wt; n += wt; };
+                if (x > 0) acc(i - 1, 1);
+                if (x < w - 1) acc(i + 1, 1);
+                if (y > 0) acc(i - w, 1);
+                if (y < h - 1) acc(i + w, 1);
+                if (x > 0 && y > 0) acc(i - w - 1, 0.7);
+                if (x < w - 1 && y > 0) acc(i - w + 1, 0.7);
+                if (x > 0 && y < h - 1) acc(i + w - 1, 0.7);
+                if (x < w - 1 && y < h - 1) acc(i + w + 1, 0.7);
+                const t = k * 3;
+                tmp[t] = n ? sr / n : data[i * 4];
+                tmp[t + 1] = n ? sg / n : data[i * 4 + 1];
+                tmp[t + 2] = n ? sb / n : data[i * 4 + 2];
+            }
+            for (let k = 0; k < holeIdx.length; k++) {
+                const q = holeIdx[k] * 4, t = k * 3;
+                data[q] = tmp[t]; data[q + 1] = tmp[t + 1]; data[q + 2] = tmp[t + 2];
+            }
+        }
+        return holes;
+    };
+
+    const syncRmButtons = () => {
+        const dis = (id, d) => { const el = $(id); if (el) el.disabled = d; };
+        dis('#mattingInpaint', !S.rmHas);
+        dis('#mattingInpaintClear', !S.rmHas);
+        dis('#mattingInpaintUndo', !S.inpaintPrev);
+        dis('#mattingInpaintCmp', !S.inpaintPrev);
+    };
+
+    const clearRm = (silent) => {
+        if (S.rmctx) S.rmctx.clearRect(0, 0, S.w, S.h);
+        S.rmHas = false;
+        syncRmButtons();
+        if (!silent) render();
+    };
+
+    const doInpaint = async () => {
+        if (!S.src) return toast('请先上传图片');
+        if (!S.rmHas) return toast('先在图上涂抹要移除的区域（模式切到「🪄 涂抹去物」）');
+        // 权威画布：当前显示像素（可能已被上一轮擦除过）
+        const work = document.createElement('canvas');
+        work.width = S.w; work.height = S.h;
+        const wc = work.getContext('2d', { willReadFrequently: true });
+        wc.drawImage(S.src, 0, 0, S.w, S.h);
+        // 擦除前快照：撤销 / 按住对比都要用
+        const prev = document.createElement('canvas');
+        prev.width = S.w; prev.height = S.h;
+        prev.getContext('2d').drawImage(work, 0, 0);
+        const rm = S.rmctx.getImageData(0, 0, S.w, S.h).data;
+        const m0 = new Uint8Array(S.w * S.h);
+        let n = 0;
+        for (let i = 0; i < m0.length; i++) { if (rm[i * 4 + 3] > 20) { m0[i] = 1; n++; } }
+        if (!n) return toast('涂抹区是空的');
+        setStatus('正在重建背景（本地修复，图大稍等）...');
+        await sleep(30);
+        const im = wc.getImageData(0, 0, S.w, S.h);
+        const t0 = performance.now();
+        inpaintTelea(im.data, dilateMask(m0, S.w, S.h, 2), S.w, S.h);
+        wc.putImageData(im, 0, 0);
+        S.inpaintPrev = prev;
+        S.src = work;                 // 之后的一切（精修/导出/再去背景）都用修复后的图
+        cacheRGB();
+        clearRm(true);
+        if (S.hasMask) scheduleFg(); else render();
+        syncRmButtons();
+        const sec = ((performance.now() - t0) / 1000).toFixed(1);
+        setStatus('已移除 ' + n.toLocaleString() + ' px（' + sec + 's）。复杂纹理可分小块多次擦，效果更稳。');
+        toast('已移除涂抹区');
+    };
+
+    const undoInpaint = () => {
+        if (!S.inpaintPrev) return;
+        S.src = S.inpaintPrev;
+        S.inpaintPrev = null;
+        cacheRGB();
+        if (S.hasMask) scheduleFg(); else render();
+        syncRmButtons();
+        toast('已撤销上次擦除');
+    };
+
     /* ---------------- 载入图片 ---------------- */
     const loadFile = async (file) => {
         if (!file) return;
@@ -1392,6 +1619,10 @@
 
     const reset = () => {
         S.src = null; S.hasMask = false; S.fg = null; S.bgColor = undefined; S.pickKey = null; S.undo = []; S.redo = [];
+        S.inpaintPrev = null; S.showCmp = false;
+        if (S.rmctx) S.rmctx.clearRect(0, 0, S.w, S.h);
+        S.rmHas = false;
+        syncRmButtons();
         S.userZoomed = false; S.zoom = 1; S.tx = 0; S.ty = 0;
         const stage = $('#mattingStage');
         if (stage) { stage.classList.add('is-empty'); stage.style.height = ''; delete stage.dataset.wheelLock; }
@@ -1480,7 +1711,9 @@
             };
             const endPaint = () => {
                 if (!S.painting) return;
-                S.painting = false; S.last = null; scheduleFg();
+                S.painting = false; S.last = null;
+                if (S.mode === 'remove') { syncRmButtons(); render(); return; }
+                scheduleFg();
             };
 
             // 事件挂在画布区（stage）而不是图片本身：手指/鼠标落到外面一圈也能拖动
@@ -1504,6 +1737,15 @@
                     panFrom = { x: e.clientX, y: e.clientY };
                     cv.style.cursor = 'grabbing';
                     e.preventDefault();
+                    return;
+                }
+                if (S.mode === 'remove') {
+                    // 涂抹去物不依赖抠图蒙版，随时可以涂
+                    S.painting = true;
+                    const p = toCanvasXY(e);
+                    S.last = p;
+                    paintDot(p.x, p.y);
+                    render();
                     return;
                 }
                 if (!S.hasMask) return toast('请先点「一键去背景」，再用画笔修补');
@@ -1537,7 +1779,7 @@
                 }
                 if (!S.painting) return;
                 paintTo(toCanvasXY(e).x, toCanvasXY(e).y);
-                refresh();
+                if (S.mode === 'remove') render(); else refresh();
             });
 
             const release = (e) => {
@@ -1607,6 +1849,7 @@
             S.mode = v;
             updateCursor();
             if (v === 'pan') setStatus('可拖动画面：把要修的地方移到眼前；滚轮或 ➕➖ 可缩放');
+            if (v === 'remove') setStatus('涂抹去物：把要移除的人/物/文字涂红（略超出边缘 4–6px），再点下方「移除涂抹区」');
         });
         seg('#mattingModel', (v) => {
             S.model = v;
@@ -1658,6 +1901,18 @@
 
         const on = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
         on('#mattingAutoBtn', autoRemove);
+        on('#mattingInpaint', doInpaint);
+        on('#mattingInpaintUndo', undoInpaint);
+        on('#mattingInpaintClear', () => { if (!S.rmHas) return; clearRm(); toast('已清除涂抹'); });
+        const cmpBtn = $('#mattingInpaintCmp');
+        if (cmpBtn) {
+            cmpBtn.onpointerdown = () => { if (!S.inpaintPrev) return; S.showCmp = true; render(); };
+            const cmpUp = () => { if (S.showCmp) { S.showCmp = false; render(); } };
+            cmpBtn.onpointerup = cmpUp;
+            cmpBtn.onpointerleave = cmpUp;
+            cmpBtn.onpointercancel = cmpUp;
+        }
+        syncRmButtons();
         on('#mattingUndo', undo);
         on('#mattingRedo', redo);
         on('#mattingRestore', restoreOriginal);

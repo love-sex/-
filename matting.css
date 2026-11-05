@@ -143,6 +143,8 @@
 
 .matting-seg {
     display: inline-flex;
+    flex-wrap: wrap;
+    max-width: 100%;
     border: 1px solid rgba(var(--primary-rgb), 0.15);
     border-radius: var(--radius-sm);
     overflow: hidden;
@@ -156,6 +158,7 @@
     border: 0;
     color: var(--text-secondary);
     cursor: pointer;
+    white-space: nowrap;
 }
 
 .matting-seg button + button { border-left: 1px solid rgba(var(--primary-rgb), 0.12); }
@@ -234,5 +237,7 @@
 
 @media (max-width: 520px) {
     .matting-range > label { flex-basis: 64px; font-size: 12px; }
-    .matting-seg button { padding: 6px 10px; font-size: 12px; }
+    /* 四个模式的开关占满一行，等分宽度；底色那一组保持可换行，别挤成一条 */
+    #mattingMode { display: flex; width: 100%; }
+    #mattingMode button { flex: 1 1 auto; padding: 6px 8px; font-size: 11.5px; }
 }
