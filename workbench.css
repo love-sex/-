@@ -795,6 +795,10 @@ body {
 /* 隐藏状态 */
 .ui-hidden { display: none !important; }
 
+/* 非首页视图（姿态/衣装/角色库等）不显示日历条，避免顶部占掉半屏 */
+body:not(.is-home) .date-bar,
+body:not(.is-home) .calendar-panel { display: none !important; }
+
 /* 主题色板：多主题网格 */
 .theme-grid {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;

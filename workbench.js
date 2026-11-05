@@ -320,13 +320,24 @@ const App = (() => {
   };
 
   /* ---------- 视图切换 ---------- */
+  // 首页模块卡兜底绑定：renderHome/重绘后 onclick 可能丢失，每次回首页补一次
+  function bindExtraCards() {
+    $$('.module-card[data-target]').forEach(c => {
+      c.onclick = () => showView(c.dataset.target);
+    });
+    $$('.link-more[data-target]').forEach(a => {
+      a.onclick = () => showView(a.dataset.target);
+    });
+  }
+
   const showView = (name) => {
+    document.body.classList.toggle('is-home', name === 'home');
     $$('.view').forEach(v => v.style.display = v.dataset.view === name ? 'block' : 'none');
     $$('.nav-item').forEach(n => n.classList.toggle('nav-active', n.dataset.nav === name));
     $('#backBtn').style.display = name === 'home' ? 'none' : 'inline-flex';
     document.body.scrollTop = 0;
     $('#appMain').scrollTop = 0;
-    if (name === 'home') renderHome();
+    if (name === 'home') { renderHome(); bindExtraCards(); }
     if (name === 'todo') renderTodo();
     if (name === 'sport') renderSport();
     if (name === 'finance') renderFinance();
@@ -336,6 +347,7 @@ const App = (() => {
     if (name === 'settings') renderSettings();
     if (name === 'soul' && typeof window.__soulView === 'function') window.__soulView();
     if (name === 'pose' && typeof window.__poseView === 'function') window.__poseView();
+  if (name === 'char' && typeof window.__charView === 'function') window.__charView();
   };
 
   // 供独立模块（灵魂角色测试）读写自己的那段数据，保证跟着导出/导入一起走
@@ -2399,7 +2411,14 @@ const App = (() => {
 
     // 导航
     $$('.nav-item').forEach(n => n.onclick = () => showView(n.dataset.nav));
-    $$('.module-card').forEach(c => c.onclick = () => showView(c.dataset.target));
+    bindExtraCards();
+  // 兜底：卡片被 renderHome 之类重绘过就丢了 onclick，捕获阶段补一次，避免"点了没反应"
+  document.addEventListener('click', (e) => {
+    const card = e.target.closest && e.target.closest('.module-card[data-target]');
+    if (!card) { return; }
+    if (typeof card.onclick === 'function') { return; }
+    showView(card.dataset.target);
+  }, true);
     $$('.link-more[data-target]').forEach(a => a.onclick = () => showView(a.dataset.target));
     $$('[data-back], .back-btn').forEach(b => b.onclick = () => showView('home'));
     $('#backBtn').onclick = () => showView('home');
