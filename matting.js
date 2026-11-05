@@ -766,7 +766,7 @@
 
     const importBrushes = async (files) => {
         const list = Array.from(files || []);
-        if (!list.length || !S.hasMask) return;
+        if (!list.length) return;
         let added = 0;
         const bad = [];
         for (const f of list) {
