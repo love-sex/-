@@ -239,3 +239,25 @@
 .pose-cmp-tag.l { left: 10px; }
 .pose-cmp-tag.r { right: 10px; }
 .pose-cmp-b { clip-path: inset(0 0 0 46%); }
+/* ---- 对齐对标站的信息架构：编号角标 / 三级标签 / 图数 / 线稿深浅切换 ---- */
+.pose-thumb { position: relative; }
+.pose-code {
+  position: absolute; top: 8px; left: 8px; z-index: 2;
+  padding: 1px 7px; border-radius: 5px;
+  font-size: 10.5px; font-variant-numeric: tabular-nums; letter-spacing: .04em;
+  color: var(--muted, #8a7b64); background: rgba(255, 253, 248, .86);
+  box-shadow: 0 1px 2px rgba(60, 45, 30, .06);
+}
+.pose-thumb-depth { background: #0c0c0c; }
+.pose-thumb-depth svg { border-radius: 10px; }
+.pose-tags {
+  margin-top: 2px; font-size: 10.5px; line-height: 1.4; color: var(--muted, #a3937c);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pose-subbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin: 12px 0 8px;
+}
+.pose-modes-sm { margin: 0; }
+.pose-modes-sm .pose-mode { padding: 4px 12px; font-size: 11.5px; }
+.pose-subbar .pose-count { margin: 0; text-align: right; }

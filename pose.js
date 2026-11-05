@@ -56,14 +56,14 @@
     var wUp = qMul(root, qB);
 
     var chest = add(pelvis, qRot(wUp, [0, BODY.low + BODY.up, 0]));
-    seg(pelvis, chest, 12.6, 14.2);          // 躯干整块，避免一节一节的接缝
-    segs.push({ joint: pelvis, r: 9.6 });    // 胯部球关节
+    // 躯干交给 render 用椭圆截面 loft 出剪影（有肩宽/腰凹/胯宽），depth 仍需要这块胶囊
+    segs.push({ a: pelvis, b: chest, ra: 12.6, rb: 14.2, torso: 1 });
+    segs.push({ joint: pelvis, r: 9.6, hipBall: 1 });   // 胯部球关节（视觉上由剪影盖住，depth 需要它）
 
     var nk = p.nk || [0, 0];
     var wNeck = qMul(wUp, qMul(qy(nk[1] || 0), qx(nk[0] || 0)));
     var neckTop = add(chest, qRot(wNeck, [0, BODY.neck, 0]));
     seg(chest, neckTop, 5.0, 4.4);
-    segs.push({ joint: chest, r: 6.4 });
     var headC = add(neckTop, qRot(wNeck, [0, BODY.head, 0]));
     if (J) { J.head = headC; J.neck = neckTop; J.chest = chest; J.pelvis = pelvis; J.headR = BODY.headR; J.wNeck = wNeck; J.wUp = wUp; }
     segs.push({ head: headC, r: BODY.headR });
@@ -80,22 +80,22 @@
       seg(add(chest, qRot(wUp, [5 * sg, 0, 0])), sh, 5.2, 5.8);
       seg(sh, el, 5.0, 4.3);
       seg(el, wr, 4.3, 3.4);
-      seg(wr, hd, 3.0, 2.3);
-      segs.push({ joint: sh, r: 5.6 });
+      segs.push({ a: wr, b: hd, ra: 3.2, rb: 2.5, hand: 1 });
+      segs.push({ joint: sh, r: 4.3 });
       segs.push({ joint: el, r: 4.3 });
       if (J) { J[side + 'sh'] = sh; J[side + 'el'] = el; J[side + 'wr'] = wr; J[side + 'hd'] = hd; }
 
       var l = p['l' + side] || [0, 2, 0, 2, 0];
       var wLeg = qMul(root, qMul(qy((l[2] || 0) * sg), qMul(qz((l[1] || 0) * sg), qx(l[0] || 0))));
-      var hip = add(pelvis, qRot(root, [7.8 * sg, -4, 0]));
+      var hip = add(pelvis, qRot(root, [8.6 * sg, -5, 0]));
       var kn = add(hip, qRot(wLeg, [0, -46, 0]));
       var wShin = qMul(wLeg, qx(-(l[3] || 0)));
       var an = add(kn, qRot(wShin, [0, -43, 0]));
       var wFoot = qMul(wShin, qx(l[4] || 0));
-      var toe = add(an, qRot(wFoot, [0, -2, 12]));
-      seg(hip, kn, 7.6, 6.0);
-      seg(kn, an, 6.0, 4.0);
-      seg(an, toe, 3.6, 2.8);
+      var toe = add(an, qRot(wFoot, [0, -4, 15]));
+      seg(hip, kn, 8.4, 6.4);
+      seg(kn, an, 6.4, 4.2);
+      segs.push({ a: an, b: toe, ra: 3.4, rb: 2.4, foot: 1 });
       segs.push({ joint: kn, r: 5.9 });
       segs.push({ joint: an, r: 3.9 });
       if (J) { J[side + 'hip'] = hip; J[side + 'kn'] = kn; J[side + 'an'] = an; J[side + 'toe'] = toe; }
@@ -115,15 +115,69 @@
       'A' + f(rb) + ' ' + f(rb) + ' 0 1 0 ' + f(p4[0]) + ' ' + f(p4[1]) + 'Z';
   }
 
+  /* ---- 平滑曲线：Catmull-Rom 转三次贝塞尔（人体轮廓要圆润，硬折线一眼假） ---- */
+  function sm(pts, close) {
+    var n = pts.length;
+    if (n < 2) { return ''; }
+    var d = 'M' + f(pts[0][0]) + ' ' + f(pts[0][1]);
+    var lim = close ? n : n - 1;
+    for (var i = 0; i < lim; i++) {
+      var p0 = pts[(i - 1 + n) % n] || pts[i], p1 = pts[i % n];
+      var p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n] || p2;
+      d += 'C' + f(p1[0] + (p2[0] - p0[0]) / 6) + ' ' + f(p1[1] + (p2[1] - p0[1]) / 6) + ' ' +
+        f(p2[0] - (p3[0] - p1[0]) / 6) + ' ' + f(p2[1] - (p3[1] - p1[1]) / 6) + ' ' +
+        f(p2[0]) + ' ' + f(p2[1]);
+    }
+    return d + (close ? 'Z' : '');
+  }
+
+  /* ---- 躯干剪影：沿脊柱放一串椭圆截面，取投影后的左右外包络
+     这样才有肩宽 → 收腰 → 胯宽的真实轮廓；侧面看也不会塌成一根线（靠前后厚度） ---- */
+  var TORSO_PROF = [
+    [-2, 14.6, 8.6],    // 胯底
+    [1, 15.2, 9.0],     // 胯最宽
+    [12, 11.2, 6.9],    // 腰
+    [22, 13.9, 8.2],    // 肋下
+    [28, 16.8, 9.2],    // 胸廓（含肩点）
+    [31, 15.0, 8.0]     // 肩斜收口
+  ];
+  function torsoOutline(pelvis, wUp, yaw, pitch, opt) {
+    var pA = proj(pelvis, yaw, pitch, opt);
+    var pB = proj(add(pelvis, qRot(wUp, [0, 31, 0])), yaw, pitch, opt);
+    var ux = pB.x - pA.x, uy = pB.y - pA.y;
+    var ul = Math.sqrt(ux * ux + uy * uy) || 0.001;
+    var nx = -uy / ul, ny = ux / ul;          // 脊柱轴的法线：无论站/躺都沿这个方向取边缘
+    var L = [], R = [];
+    TORSO_PROF.forEach(function (s) {
+      var c = add(pelvis, qRot(wUp, [0, s[0], 0]));
+      var cs = proj(c, yaw, pitch, opt);
+      var lo = 1e9, hi = -1e9, loP = null, hiP = null;
+      for (var k = 0; k < 20; k++) {
+        var t = k / 20 * Math.PI * 2;
+        var v = add(c, qRot(wUp, [Math.cos(t) * s[1], 0, Math.sin(t) * s[2]]));
+        var q = proj(v, yaw, pitch, opt);
+        var d = (q.x - cs.x) * nx + (q.y - cs.y) * ny;
+        if (d < lo) { lo = d; loP = q; }
+        if (d > hi) { hi = d; hiP = q; }
+      }
+      L.push([loP.x, loP.y]);
+      R.push([hiP.x, hiP.y]);
+    });
+    return sm(L.concat(R.slice().reverse()), true);
+  }
+
   function render(pose, opts) {
     opts = opts || {};
     var yaw = opts.yaw == null ? 0 : opts.yaw;
     var pitch = opts.pitch == null ? -7 : opts.pitch;
     var opt = { zoom: (pose.z || 1) * (opts.zoom || 1), shift: pose.shift || 0 };
-    var segs = build(pose, 0);
+    var J = {};
+    var segs = build(pose, 0, J);
     if (pose.duo) { segs = segs.concat(build(pose.duo, 0)); }
 
     var items = segs.map(function (s) {
+      if (s.torso) { return null; }
+      if (s.hipBall) { return null; }
       if (s.head) {
         var hc = proj(s.head, yaw, pitch, opt);
         return { kind: 'head', c: hc, r: s.r * VIEW.s * opt.zoom, z: hc.z };
@@ -138,24 +192,59 @@
         ra: s.ra * VIEW.s * opt.zoom, rb: s.rb * VIEW.s * opt.zoom,
         z: (a.z + b.z) / 2
       };
-    }).sort(function (m, n) { return m.z - n.z; });
+    }).filter(Boolean).sort(function (m, n) { return m.z - n.z; });
 
     var gid = 'pg' + (render._n = (render._n || 0) + 1);
-    var body = 'url(#' + gid + ')', line = '#b7a48c', sw = 1.3;
+    var body = 'url(#' + gid + ')', line = '#8d7a5e', sw = 1.15;
+
+    // 躯干剪影（先画，四肢压在上面）；胯部补一块无描边填充，盖住两条大腿根之间的缺口
+    var torso = (J.pelvis && J.wUp)
+      ? (function () {
+        var pc = proj(J.pelvis, yaw, pitch, opt);
+        var pr = 14.2 * VIEW.s * opt.zoom;
+        return '<ellipse cx="' + f(pc.x) + '" cy="' + f(pc.y) + '" rx="' + f(pr) + '" ry="' + f(pr * 0.62) +
+          '" fill="' + body + '" opacity=".98"/>' +
+          '<path d="' + torsoOutline(J.pelvis, J.wUp, yaw, pitch, opt) + '" fill="' + body +
+          '" stroke="' + line + '" stroke-width="' + sw + '" stroke-linejoin="round"/>';
+      })()
+      : '';
+
     var out = items.map(function (it) {
       if (it.kind === 'head') {
-        return '<circle cx="' + f(it.c.x) + '" cy="' + f(it.c.y) + '" r="' + f(it.r) +
-          '" fill="' + body + '" stroke="' + line + '" stroke-width="' + sw + '"/>' +
-          '<path d="M' + f(it.c.x - it.r * 0.62) + ' ' + f(it.c.y - it.r * 0.34) +
-          'Q' + f(it.c.x) + ' ' + f(it.c.y - it.r * 0.86) + ' ' + f(it.c.x + it.r * 0.62) + ' ' + f(it.c.y - it.r * 0.34) +
-          '" fill="none" stroke="' + line + '" stroke-width="1" opacity=".4"/>';
+        var rx = it.r * 0.83, ry = it.r * 1.04, cx = it.c.x, cy = it.c.y;
+        var skull = 'M' + f(cx - rx) + ' ' + f(cy - ry * 0.08) +
+          'C' + f(cx - rx) + ' ' + f(cy - ry * 0.96) + ' ' + f(cx + rx) + ' ' + f(cy - ry * 0.96) + ' ' + f(cx + rx) + ' ' + f(cy - ry * 0.08) +
+          'C' + f(cx + rx) + ' ' + f(cy + ry * 0.55) + ' ' + f(cx + rx * 0.46) + ' ' + f(cy + ry * 0.98) + ' ' + f(cx) + ' ' + f(cy + ry * 0.98) +
+          'C' + f(cx - rx * 0.46) + ' ' + f(cy + ry * 0.98) + ' ' + f(cx - rx) + ' ' + f(cy + ry * 0.55) + ' ' + f(cx - rx) + ' ' + f(cy - ry * 0.08) + 'Z';
+        // 人台标准画法：中线 + 眼线 + 下颌角
+        var cross = 'M' + f(cx) + ' ' + f(cy - ry * 0.92) + 'V' + f(cy + ry * 0.9) +
+          'M' + f(cx - rx * 0.74) + ' ' + f(cy - ry * 0.1) + 'H' + f(cx + rx * 0.74);
+        return '<path d="' + skull + '" fill="' + body + '" stroke="' + line + '" stroke-width="' + sw + '"/>' +
+          '<path d="' + cross + '" fill="none" stroke="' + line + '" stroke-width=".9" opacity=".5"/>';
       }
       if (it.kind === 'joint') {
-        return '<circle cx="' + f(it.c.x) + '" cy="' + f(it.c.y) + '" r="' + f(it.r * 0.94) +
-          '" fill="#efe3cf" stroke="' + line + '" stroke-width="1" opacity=".9"/>';
+        // 双圆：外圈是关节囊，内圈是骨端，专业人台的标志画法
+        return '<circle cx="' + f(it.c.x) + '" cy="' + f(it.c.y) + '" r="' + f(it.r * 0.96) +
+          '" fill="' + body + '" stroke="' + line + '" stroke-width=".95"/>' +
+          '<circle cx="' + f(it.c.x) + '" cy="' + f(it.c.y) + '" r="' + f(it.r * 0.46) +
+          '" fill="none" stroke="' + line + '" stroke-width=".8" opacity=".42"/>';
       }
-      return '<path d="' + capPath(it.a, it.b, it.ra, it.rb) + '" fill="' + body +
+      var base = '<path d="' + capPath(it.a, it.b, it.ra, it.rb) + '" fill="' + body +
         '" stroke="' + line + '" stroke-width="' + sw + '" stroke-linejoin="round"/>';
+      // 手：掌 + 指缝；脚：脚跟 + 趾根（细节，但一眼就能从"棍子"变回人）
+      if (it.hand || it.foot) {
+        var dx = it.b.x - it.a.x, dy = it.b.y - it.a.y, LL = Math.sqrt(dx * dx + dy * dy) || 1;
+        var px = -dy / LL, py = dx / LL, acc = '';
+        var n = it.hand ? 3 : 2, from = it.hand ? 0.5 : 0.62, step = it.hand ? 0.15 : 0.16;
+        for (var i = 0; i < n; i++) {
+          var t = from + i * step;
+          var mx = it.a.x + dx * t, my = it.a.y + dy * t;
+          var w = (it.ra * (1 - t) + it.rb * t) * 0.86;
+          acc += 'M' + f(mx + px * w) + ' ' + f(my + py * w) + 'L' + f(mx - px * w) + ' ' + f(my - py * w);
+        }
+        base += '<path d="' + acc + '" fill="none" stroke="' + line + '" stroke-width=".8" opacity=".45"/>';
+      }
+      return base;
     }).join('');
 
     var defs = '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0.35" y2="1">' +
@@ -166,10 +255,10 @@
     var shadow = '<ellipse cx="' + f(ground.x) + '" cy="' + f(ground.y) + '" rx="' + f(34 * opt.zoom) +
       '" ry="' + f(7 * opt.zoom) + '" fill="rgba(92,72,46,.10)"/>';
 
-    return '<svg viewBox="0 0 ' + VIEW.w + ' ' + VIEW.h + '" xmlns="http://www.w3.org/2000/svg" ' +
+    return '<svg viewBox="' + (opts.vb || ('0 0 ' + VIEW.w + ' ' + VIEW.h)) + '" xmlns="http://www.w3.org/2000/svg" ' +
       'class="pose-svg" role="img">' + defs +
       (opts.paper ? '<rect width="100%" height="100%" fill="' + opts.paper + '"/>' : '') +
-      shadow + out + '</svg>';
+      shadow + torso + out + '</svg>';
   }
 
   /* ---- 深度图：与线稿同一套骨架数据，逐段按深度着灰（ControlNet depth：越亮越近，黑底） ---- */
@@ -235,7 +324,7 @@
       }
     });
 
-    return '<svg viewBox="0 0 ' + VIEW.w + ' ' + VIEW.h + '" xmlns="http://www.w3.org/2000/svg" class="pose-svg" role="img">' +
+    return '<svg viewBox="' + (opts.vb || ('0 0 ' + VIEW.w + ' ' + VIEW.h)) + '" xmlns="http://www.w3.org/2000/svg" class="pose-svg" role="img">' +
       '<defs>' + defs.join('') +
       '<filter id="' + gid + 'b" x="-20%" y="-20%" width="140%" height="140%">' +
       '<feGaussianBlur stdDeviation="1.1"/></filter></defs>' +
@@ -598,6 +687,82 @@
     return s + '</g></svg>';
   }
 
+  /* ================= 多格式骨架导出 =================
+     除了上面的 COCO-18（ControlNet 默认），再补两种行业标准：
+       BODY_25  —— CMU-Perceptual-Computing-Lab/openpose (~31k★)
+       BlazePose 33 —— google-ai-edge/mediapipe (~30k★)
+     同一个 3D 骨架，只是投影后按各自的关键点顺序摆位。 */
+  function kp3(p) {
+    var J = {};
+    build(p, 0, J);
+    var up = qRot(J.wNeck, [0, 1, 0]), side = qRot(J.wNeck, [1, 0, 0]), r = J.headR;
+    function mix(sv, a, uv, b) {
+      return [J.head[0] + side[0] * a * sv + up[0] * b * uv,
+        J.head[1] + side[1] * a * sv + up[1] * b * uv,
+        J.head[2] + side[2] * a * sv + up[2] * b * uv];
+    }
+    var o = {};
+    o.nose = mix(0, 0, 1, -r * 0.12);
+    o.neck = add(J.chest, [0, BODY.neck * 0.55, 0]);
+    o.midhip = add(J.pelvis, [0, 3.5, 0]);
+    [['R', 1], ['L', -1]].forEach(function (it) {
+      var s = it[0], k = it[1];
+      o[s + 'sh'] = J[s + 'sh']; o[s + 'el'] = J[s + 'el']; o[s + 'wr'] = J[s + 'wr'];
+      o[s + 'hip'] = J[s + 'hip']; o[s + 'kn'] = J[s + 'kn']; o[s + 'an'] = J[s + 'an'];
+      o[s + 'toe'] = J[s + 'toe'];
+      o[s + 'ey'] = mix(k, r * 0.34, 1, r * 0.2);
+      o[s + 'ear'] = mix(k, r * 0.9, 1, 0);
+      // 脚跟在踝点后方 3cm（沿脚掌轴反向），趾根取脚尖
+      var v = [o[s + 'toe'][0] - o[s + 'an'][0], o[s + 'toe'][1] - o[s + 'an'][1], o[s + 'toe'][2] - o[s + 'an'][2]];
+      var L = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]) || 1;
+      o[s + 'heel'] = [o[s + 'an'][0] - v[0] / L * 3, o[s + 'an'][1] - v[1] / L * 3, o[s + 'an'][2] - v[2] / L * 3];
+    });
+    return o;
+  }
+  function kp2(v, yaw, pitch, opt) {
+    var q = proj(v, yaw, pitch, opt);
+    return [Math.round(q.x * 30) / 10, Math.round(q.y * 30) / 10, 1];
+  }
+  // CMU BODY_25 顺序
+  function body25Json(p, yaw, pitch) {
+    var k = kp3(p), opt = { zoom: p.z || 1, shift: p.shift || 0 };
+    var seq = ['nose', 'neck', 'Rsh', 'Rel', 'Rwr', 'Lsh', 'Lel', 'Lwr', 'midhip',
+      'Rhip', 'Rkn', 'Ran', 'Lhip', 'Lkn', 'Lan',
+      'Rey', 'Ley', 'Rear', 'Lear',
+      'Ltoe', 'Ltoe', 'Lheel', 'Rtoe', 'Rtoe', 'Rheel'];
+    var arr = [];
+    seq.forEach(function (n) { var q = kp2(k[n], yaw, pitch, opt); arr.push(q[0], q[1], q[2]); });
+    return JSON.stringify({
+      version: 1.3,
+      people: [{ pose_keypoints_2d: arr }],
+      canvas_width: 900, canvas_height: 900,
+      model: 'BODY_25'
+    }, null, 1);
+  }
+  // MediaPipe BlazePose 33，坐标归一化到 0~1
+  function blazeJson(p, yaw, pitch) {
+    var k = kp3(p), opt = { zoom: p.z || 1, shift: p.shift || 0 };
+    function mid(a, b) { return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2]; }
+    var seq = [k.nose,
+      k.Ley, k.Ley, k.Ley, k.Rey, k.Rey, k.Rey,
+      k.Lear, k.Rear,
+      mid(k.nose, k.Lear), mid(k.nose, k.Rear),
+      k.Lsh, k.Rsh, k.Lel, k.Rel, k.Lwr, k.Rwr,
+      k.Lwr, k.Rwr, k.Lwr, k.Rwr, k.Lwr, k.Rwr,
+      k.Lhip, k.Rhip, k.Lkn, k.Rkn, k.Lan, k.Ran,
+      k.Lheel, k.Rheel, k.Ltoe, k.Rtoe];
+    var pts = seq.map(function (v) {
+      var q = proj(v, yaw, pitch, opt);
+      return {
+        x: Math.round(q.x / VIEW.w * 1e4) / 1e4,
+        y: Math.round(q.y / VIEW.h * 1e4) / 1e4,
+        z: Math.round(q.z / 60 * 1e4) / 1e4,
+        visibility: 1
+      };
+    });
+    return JSON.stringify({ format: 'mediapipe-blazepose', landmark_count: pts.length, landmarks: pts }, null, 1);
+  }
+
   /* ================= 模块 UI ================= */
   var VIEWS = [
     { yaw: 0, zh: '正面', en: 'Front' },
@@ -609,7 +774,7 @@
     { yaw: 0, pitch: 34, zh: '仰视', en: 'Low angle' }
   ];
   var STORE_KEY = 'pose-atlas-v1';
-  var S = { lang: 'zh', tab: 'pose', cat: 'all', q: '', stage: 'list', cur: null, view: 0, pal: 0, mode: 'line', cmp: 0, fav: {}, sel: {}, fuse: null, fuseTab: '' };
+  var S = { lang: 'zh', tab: 'pose', cat: 'all', q: '', stage: 'list', cur: null, view: 0, pal: 0, mode: 'line', cmp: 0, thumb: 'line', fav: {}, sel: {}, fuse: null, fuseTab: '' };
   var app = null, booted = false;
 
   function C() { return window.CostumeAtlas || { CATS: [], ITEMS: [], PALS: [], render: function () { return ''; } }; }
@@ -624,9 +789,12 @@
     return null;
   }
   function isGarm(p) { return !!p.shape; }
+  var THUMB_VB = '56 0 188 300';   // 缩略图裁掉两侧空白，让人物撑满卡片（对标站的密度）
   function itemSvg(p, opt) {
     if (isGarm(p)) { return C().render(p, opt && opt.pal != null ? opt.pal : (S.pal || 0)); }
-    return render(p, opt || { yaw: p.cam || 0 });
+    var yaw = (opt && opt.yaw) || p.cam || 0;
+    if (S.thumb === 'depth') { return depthSvg(p, { yaw: yaw, vb: THUMB_VB }); }
+    return render(p, { yaw: yaw, vb: THUMB_VB });
   }
 
   function loadState() {
@@ -683,17 +851,33 @@
     });
   }
 
+  function catName(id) {
+    for (var i = 0; i < CATS.length; i++) { if (CATS[i].id === id) { return catLabel(CATS[i]); } }
+    return '';
+  }
+  // 对标站的三级标签：全身单人 / 上半身单人 / 双人组合 + 系列 + 分类
+  function scopeOf(p) {
+    if (p.duo || p.cat === 'duo') { return S.lang === 'zh' ? '双人组合' : S.lang === 'ja' ? 'ペア' : 'Duo'; }
+    if (p.cat === 'half') { return S.lang === 'zh' ? '上半身单人' : S.lang === 'ja' ? '上半身' : 'Upper body'; }
+    return S.lang === 'zh' ? '全身单人' : S.lang === 'ja' ? '全身' : 'Full body';
+  }
+  function seriesOf() { return S.lang === 'zh' ? '标准系' : S.lang === 'ja' ? '標準' : 'Standard'; }
+
   function cardHtml(p) {
     var on = S.sel[p.id] ? ' on' : '';
+    var garm = isGarm(p);
     return '<div class="pose-card' + on + '" data-card="' + p.id + '">' +
       '<button class="pose-open" data-open="' + p.id + '" aria-label="' + esc(nameOf(p)) + '">' +
-        '<div class="pose-thumb">' + itemSvg(p) + '</div>' +
+        '<div class="pose-thumb' + (!garm && S.thumb === 'depth' ? ' pose-thumb-depth' : '') + '">' +
+          (p.no ? '<span class="pose-code">' + esc(p.no) + '</span>' : '') + itemSvg(p) +
+        '</div>' +
       '</button>' +
       (S.fav[p.id] ? '<span class="pose-star">★</span>' : '') +
       '<label class="pose-ck" title="选中"><input type="checkbox" data-sel="' + p.id + '"' + (S.sel[p.id] ? ' checked' : '') + '></label>' +
       '<div class="pose-meta">' +
         '<div class="pose-name">' + esc(nameOf(p)) + '</div>' +
-        '<div class="pose-sub">' + (p.no ? '<span class="pose-no">' + esc(p.no) + '</span> · ' : '') + esc(altOf(p)) + '</div>' +
+        '<div class="pose-sub">' + esc(altOf(p)) + '</div>' +
+        (garm ? '' : '<div class="pose-tags">' + esc(scopeOf(p)) + ' · ' + esc(seriesOf()) + ' · ' + esc(catName(p.cat)) + '</div>') +
       '</div>' +
     '</div>';
   }
@@ -727,9 +911,16 @@
               esc(catLabel(c)) + ' <i>' + n + '</i></button>';
           }).join('') +
         '</div>' +
-        '<div class="pose-count" id="poseCount">' + arr.length + (isCostume()
-          ? ' 套衣装 · 每套 5 种配色 · 平面裁剪线稿，可无限放大'
-          : ' 组姿态 · 每组 7 视角（线稿 + 深度图）· 矢量可无限放大') + '</div>' +
+        '<div class="pose-subbar">' +
+          (isCostume() ? '<span></span>' :
+            '<div class="pose-modes pose-modes-sm" role="group" aria-label="缩略图">' +
+              '<button class="pose-mode' + (S.thumb === 'line' ? ' on' : '') + '" data-thumb="line">线稿</button>' +
+              '<button class="pose-mode' + (S.thumb === 'depth' ? ' on' : '') + '" data-thumb="depth">深度图</button>' +
+            '</div>') +
+          '<div class="pose-count" id="poseCount">' + (isCostume()
+            ? arr.length + ' 套衣装 · 每套 5 配色'
+            : arr.length + ' 姿态 · ' + (arr.length * 7) + ' 图') + '</div>' +
+        '</div>' +
         '<div class="pose-grid' + (isCostume() ? ' pose-grid-garm' : '') + '" id="poseGrid">' +
           (arr.length ? arr.map(cardHtml).join('') : '<div class="pose-empty">没找到' + (isCostume() ? '这套衣装' : '这个姿态') + '，换个词试试</div>') +
         '</div>' +
@@ -741,7 +932,7 @@
         '</div>' +
         '<div class="pose-note">' + (isCostume()
           ? '衣装按平面裁剪画法生成（衣身 / 袖窿 / 侧缝 / 领型 / 裆弯），底下一层虚线是人体参照；每套 5 种配色，点开可下载 SVG / PNG、复制提示词。'
-          : '线稿与深度图都由本页实时生成（同一副骨架，逐段按深度着灰），不含任何第三方图片素材；每组 7 个视角，点开可切线稿 / 深度 / 对比，下载 SVG / PNG 或直接导 ControlNet。') + '</div>' +
+          : '线稿是同一副 3D 骨架的矢量投影（躯干按椭圆截面放样、关节双圆），深度图逐段按深度着灰，两者像素对齐；每组 7 视角，点开可切线稿 / 深度 / 对比，导出 PNG / SVG / COCO-18 / BODY-25 / BlazePose 33。') + '</div>' +
       '</div>'
     ));
     bindList();
@@ -781,6 +972,14 @@
         renderList();
         var m = document.getElementById('appMain');
         if (m) { m.scrollTop = 0; }
+      };
+    });
+    Array.prototype.forEach.call(app.querySelectorAll('[data-thumb]'), function (b) {
+      b.onclick = function () {
+        if (S.thumb === b.dataset.thumb) { return; }
+        S.thumb = b.dataset.thumb;
+        saveState();
+        renderList();
       };
     });
     Array.prototype.forEach.call(app.querySelectorAll('[data-open]'), function (b) {
@@ -869,6 +1068,8 @@
           '<button class="pose-btn" id="poseSvg">下载 SVG</button>' +
           '<button class="pose-btn" id="poseOpPng">ControlNet 骨架</button>' +
           '<button class="pose-btn" id="poseOpJson">OpenPose JSON</button>' +
+          '<button class="pose-btn" id="poseB25">BODY-25 JSON</button>' +
+          '<button class="pose-btn" id="poseBlaze">BlazePose JSON</button>' +
           '<button class="pose-btn" id="posePrompt">复制提示词</button>' +
           '<button class="pose-btn' + (S.fav[id] ? ' fav' : '') + '" id="poseFav">' + (S.fav[id] ? '★ 已收藏' : '☆ 收藏') + '</button>' +
         '</div>' +
@@ -939,6 +1140,18 @@
     };
     document.getElementById('posePrompt').onclick = function () {
       copyText(promptOf(p));
+    };
+    document.getElementById('poseB25').onclick = function () {
+      var v = curView();
+      saveBlob(new Blob([body25Json(p, v.yaw, v.pitch)], { type: 'application/json' }),
+        'body25-' + p.id + '-v' + (S.view + 1) + '.json');
+      toast('BODY-25 已下载（CMU OpenPose 格式）');
+    };
+    document.getElementById('poseBlaze').onclick = function () {
+      var v = curView();
+      saveBlob(new Blob([blazeJson(p, v.yaw, v.pitch)], { type: 'application/json' }),
+        'blazepose-' + p.id + '-v' + (S.view + 1) + '.json');
+      toast('BlazePose 33 点已下载（MediaPipe 格式）');
     };
     document.getElementById('poseOpPng').onclick = function () {
       var v = curView();
@@ -1092,14 +1305,18 @@
           var dep = depthSvg(it.d, { yaw: v.yaw, pitch: v.pitch })
             .replace('<svg ', '<svg width="900" height="900" ');
           zip.file('pose/' + base + '-depth.svg', dep);
-          zip.file('pose/' + base + '-openpose.json', opJson(it.d, v.yaw, v.pitch));
+          zip.file('pose/' + base + '-openpose18.json', opJson(it.d, v.yaw, v.pitch));
+          zip.file('pose/' + base + '-body25.json', body25Json(it.d, v.yaw, v.pitch));
+          zip.file('pose/' + base + '-blazepose33.json', blazeJson(it.d, v.yaw, v.pitch));
         });
       });
       zip.file('README.txt', 'Pose Atlas 姿态 · 衣装图鉴（矢量线稿 + 深度图，可无损放大）\n' +
         '由 think-workbench 实时生成，不含第三方图片素材，可自由用于个人创作。\n' +
         '姿态：每组 7 个视角（front / 3-4 / side / back-3-4 / back / high-angle / low-angle），在 pose/ 目录。\n' +
         '  *-depth.svg  深度图：越亮越近，黑底，可直接当 ControlNet depth 控制图\n' +
-        '  *-openpose.json  COCO-18 关键点，可导入 ControlNet / open-pose-editor\n' +
+        '  *-openpose18.json  COCO-18 关键点（ControlNet / open-pose-editor 通用）\n' +
+        '  *-body25.json      CMU OpenPose BODY_25（25 点，含脚跟/趾根）\n' +
+        '  *-blazepose33.json MediaPipe BlazePose 33 点（归一化坐标，可直接喂姿态分类模型）\n' +
         '衣装：每套 5 种配色（p1~p5），在 costume/ 目录。\n' +
         '本次导出：姿态 ' + nPose + ' 组，衣装 ' + nGarm + ' 套。\n');
       return zip.generateAsync({ type: 'blob' });
@@ -1186,6 +1403,9 @@
     opSvg: opSvg,
     opJson: opJson,
     depthSvg: depthSvg,
+    _kp3: kp3,
+    body25Json: body25Json,
+    blazeJson: blazeJson,
     _proj: proj,
     _build: build,
     promptOf: promptOf,
