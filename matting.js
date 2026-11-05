@@ -103,6 +103,8 @@
         contrast: 0.4,
         smooth: 0,        // 边缘平滑：blur 后再锐化，圆掉锯齿状凹凸（PS「平滑」）
         shift: 0,         // 移动边缘：>0 外扩、<0 收缩（PS「移动边缘」）
+        wandTol: 18,      // 颜色点选（魔术棒）的容差 0-100
+        ghost: false,     // 原图残影：恢复主体时用来对齐被删掉的部分
         cutColor: '#d9463c', // 删除区预览的叠加色（PS 快速蒙版默认红系）
         cutOp: 0.3,       // 叠加浓度 0-0.8；0 = 纯灰暗预览
         bwView: false,    // 黑白蒙版视图（PS 里按 K）
@@ -110,6 +112,15 @@
         pickKey: null,    // 这张图上「复核后更干净」的模型，换图要清掉
         showCut: false,
         tracer: null
+    };
+
+    /* ---------------- 有图 / 无图 的界面状态 ----------------
+       光靠 display:none 会把栅格里的一栏留空，剩下的元素自动往前排（画布曾被压进 58px 的工具条列），
+       所以同时给工作区加 has-img，让栅格列数跟着变 */
+    const setNeedImg = (has) => {
+        $$('.matting-need-img').forEach(el => el.style.display = has ? '' : 'none');
+        // 类必须落在栅格容器（.matting-work）本身，落到外层卡片上是匹配不到 :not() 的
+        $$('.matting-work').forEach(el => el.classList.toggle('has-img', !!has));
     };
 
     /* ---------------- 全尺寸临时画布池 ----------------
@@ -376,6 +387,20 @@
         ctx.globalCompositeOperation = 'destination-in';
         ctx.drawImage(S.mask, 0, 0, S.w, S.h);
         ctx.globalCompositeOperation = 'source-over';
+        // 原图残影：只在「被删掉」的区域淡淡显出原图，主体本身保持像素原样，
+        // 这样补头发、衣角时能对着淡影对齐（借 cut-it-out 的 ghost 叠加）
+        if (S.ghost) {
+            const gc0 = tmpC('ghost');
+            const gc = gc0.getContext('2d');
+            gc.drawImage(S.src, 0, 0, S.w, S.h);
+            gc.globalCompositeOperation = 'destination-out';
+            gc.drawImage(S.mask, 0, 0, S.w, S.h);
+            gc.globalCompositeOperation = 'source-over';
+            ctx.save();
+            ctx.globalAlpha = 0.24;
+            ctx.drawImage(gc0, 0, 0);
+            ctx.restore();
+        }
         drawRm();
     };
 
@@ -412,6 +437,7 @@
         cv.style.transform = 'translate(' + S.tx + 'px,' + S.ty + 'px) scale(' + S.zoom + ')';
         const lab = $('#mattingZoomVal');
         if (lab) lab.textContent = Math.round(S.baseScale * S.zoom * 100) + '%';
+        if (S.syncRing) S.syncRing();   // 缩放后笔尖圈直径要跟着画布一起变
     };
 
     // 按容器大小重新算出「刚好铺满」的布局，居中显示
@@ -478,8 +504,8 @@
 
     const updateCursor = () => {
         const cv = $('#mattingCanvas');
-        if (!cv) return;
-        cv.style.cursor = wantPan() ? 'grab' : 'crosshair';
+        if (cv) cv.style.cursor = wantPan() ? 'grab' : (S.mode === 'wand' ? 'pointer' : 'crosshair');
+        if (S.syncRing) S.syncRing();   // 切到抓手/点选时把笔尖圈收掉
     };
     const wantPan = () => S.mode === 'pan' || S.spaceDown;
 
@@ -1779,7 +1805,7 @@
         }
         const empty = $('#mattingEmpty');
         if (empty) empty.style.display = 'none';
-        $$('.matting-need-img').forEach(el => el.style.display = '');
+        setNeedImg(true);
         render();
         S.userZoomed = false;      // 换图回到「适应窗口」
         fitView(false);
@@ -1896,6 +1922,96 @@
         render();
     };
 
+    /* ---------------- 颜色点选（魔术棒） ----------------
+       参考 cut-it-out / 各家网页抠图工具的 Magic Brush：点一下，把「和这一点颜色接近、
+       并且连在一起」的区域整块从蒙版里删掉（Shift 点 = 反向恢复）。
+       比逐个补画笔快得多，尤其适合大片残留底色、白边、纯色背景的图 */
+    const wandSelect = (e, restore) => {
+        if (!S.hasMask || !S.rctx || !S.rgb) return toast('请先点「一键去背景」，再用点选');
+        const p = toCanvasXY(e);
+        const x0 = Math.round(p.x), y0 = Math.round(p.y);
+        if (x0 < 1 || y0 < 1 || x0 >= S.w - 1 || y0 >= S.h - 1) return;
+        const w = S.w, h = S.h, n = w * h;
+        const d = S.rgb.data;
+        const s0 = (y0 * w + x0) * 4;
+        const r0 = d[s0], g0 = d[s0 + 1], b0 = d[s0 + 2];
+        const thr = Math.max(4, (S.wandTol || 18) * 1.8);   // 容差 1-100 → 颜色距离阈值
+        const thr2 = thr * thr;
+        const maxPx = Math.round(n * 0.5);                  // 兜底：最多改一半画面
+        const seen = new Uint8Array(n);
+        const stack = new Int32Array(n);
+        let sp = 0, cnt = 0;
+        const start = y0 * w + x0;
+        seen[start] = 1;
+        stack[sp++] = start;
+        const img = S.rctx.getImageData(0, 0, w, h);
+        const a = img.data;
+        const target = restore ? 255 : 0;
+        const hits = [];
+        while (sp > 0 && cnt < maxPx) {
+            const idx = stack[--sp];
+            const x = idx % w, y = (idx - x) / w;
+            hits.push(idx);
+            cnt++;
+            for (let k = 0; k < 4; k++) {
+                let t = -1;
+                if (k === 0) { if (x > 0) t = idx - 1; }
+                else if (k === 1) { if (x < w - 1) t = idx + 1; }
+                else if (k === 2) { if (y > 0) t = idx - w; }
+                else { if (y < h - 1) t = idx + w; }
+                if (t < 0 || seen[t]) continue;
+                const i = t * 4;
+                const dr = d[i] - r0, dg = d[i + 1] - g0, db = d[i + 2] - b0;
+                if (dr * dr + dg * dg + db * db > thr2) continue;
+                seen[t] = 1;
+                stack[sp++] = t;
+            }
+        }
+        if (!hits.length) return;
+        pushHistory();
+        for (let k = 0; k < hits.length; k++) a[hits[k] * 4 + 3] = target;
+        S.rctx.putImageData(img, 0, 0);
+        refresh();
+        setStatus((restore ? '点选恢复 ' : '点选删除 ') + hits.length.toLocaleString() + ' px（容差 ' + (S.wandTol || 18) + '，Shift+点 = '
+            + (restore ? '删除' : '恢复') + '）');
+    };
+
+    /* ---------------- 补小洞 ----------------
+       rembg 的 post_process_mask 是「形态学开 + 闭」：小的前景碎片删掉、小的背景孔补上。
+       碎片那一半上面已有 despeckle()（自动流程也在用），这里只补「闭运算」的补洞部分：
+       按背景连通域扫一遍，碰不到画面边缘、面积又很小的洞，直接填成实心 */
+    const fillHoles = () => {
+        const w = S.w, h = S.h, n = w * h;
+        const img = S.rctx.getImageData(0, 0, w, h);
+        const d = img.data;
+        const lab = new Uint8Array(n);
+        const stack = new Int32Array(n);
+        const minHole = Math.max(24, Math.round(n * 0.00025));   // 2MP 图约 500px
+        let filled = 0;
+        for (let j0 = 0; j0 < n; j0++) {
+            if (d[j0 * 4 + 3] > 128 || lab[j0]) continue;
+            let sp = 0, edge = false;
+            const comp = [];
+            lab[j0] = 1;
+            stack[sp++] = j0;
+            while (sp) {
+                const c = stack[--sp];
+                comp.push(c);
+                const x = c % w, y = (c - x) / w;
+                if (x === 0 || y === 0 || x === w - 1 || y === h - 1) edge = true;
+                if (x > 0 && !lab[c - 1] && d[(c - 1) * 4 + 3] <= 128) { lab[c - 1] = 1; stack[sp++] = c - 1; }
+                if (x < w - 1 && !lab[c + 1] && d[(c + 1) * 4 + 3] <= 128) { lab[c + 1] = 1; stack[sp++] = c + 1; }
+                if (y > 0 && !lab[c - w] && d[(c - w) * 4 + 3] <= 128) { lab[c - w] = 1; stack[sp++] = c - w; }
+                if (y < h - 1 && !lab[c + w] && d[(c + w) * 4 + 3] <= 128) { lab[c + w] = 1; stack[sp++] = c + w; }
+            }
+            if (edge || comp.length >= minHole) continue;
+            for (let k = 0; k < comp.length; k++) d[comp[k] * 4 + 3] = 255;
+            filled++;
+        }
+        if (filled) S.rctx.putImageData(img, 0, 0);
+        return filled;
+    };
+
     /* ---------------- 主流程 ---------------- */
     const autoRemove = async () => {
         if (!S.src) return toast('请先上传图片');
@@ -2010,7 +2126,7 @@
         if (lab) lab.textContent = '100%';
         const empty = $('#mattingEmpty');
         if (empty) empty.style.display = '';
-        $$('.matting-need-img').forEach(el => el.style.display = 'none');
+        setNeedImg(false);
         if (S.vctx && S.w) S.vctx.clearRect(0, 0, S.w, S.h);
         const fi = $('#mattingFile');
         if (fi) fi.value = '';
@@ -2076,6 +2192,30 @@
                 const r = stage.getBoundingClientRect();
                 return { x: e.clientX - r.left, y: e.clientY - r.top };
             };
+
+            /* ---------- 圆形画笔光标（PS 笔尖圈）：直径永远等于画笔落笔的实际直径 ---------- */
+            const ring = document.createElement('div');
+            ring.className = 'brush-ring';
+            ring.hidden = true;
+            stage.appendChild(ring);
+            const ringPos = { x: 0, y: 0, has: false };
+            const hideRing = () => {
+                ringPos.has = false;
+                ring.hidden = true;
+                stage.classList.remove('ring-on');
+            };
+            const syncRing = () => {
+                // 抓手/平移/点选时不留圈；触屏没有悬停概念，也不显示
+                if (!ringPos.has || !S.src || wantPan() || S.mode === 'pan' || S.mode === 'wand') { hideRing(); return; }
+                const d = Math.max(6, S.brush * (S.baseScale || 1) * S.zoom);
+                ring.style.width = d + 'px';
+                ring.style.height = d + 'px';
+                ring.style.left = ringPos.x + 'px';
+                ring.style.top = ringPos.y + 'px';
+                ring.hidden = false;
+                stage.classList.add('ring-on');
+            };
+            S.syncRing = syncRing;   // 缩放/改画笔大小时由外部再调一次
             const pinchInfo = () => {
                 const pts = Array.from(fingers.values());
                 if (pts.length < 2) return null;
@@ -2117,6 +2257,14 @@
                     e.preventDefault();
                     return;
                 }
+                if (S.mode === 'wand') {
+                    // 颜色点选：点一下就整块处理，不需要按住拖动
+                    endPaint();
+                    e.preventDefault();
+                    if (e.button !== 0 && e.button !== 2) return;
+                    wandSelect(e, e.shiftKey || e.altKey || e.button === 2);
+                    return;
+                }
                 if (S.mode === 'remove') {
                     // 涂抹去物不依赖抠图蒙版，随时可以涂
                     S.painting = true;
@@ -2137,6 +2285,13 @@
             });
 
             stage.addEventListener('pointermove', (e) => {
+                if (e.pointerType === 'touch') {
+                    hideRing();            // 手指没有悬停，别留一个停在原地不动的圈
+                } else {
+                    const p = stageXY(e);
+                    ringPos.x = p.x; ringPos.y = p.y; ringPos.has = true;
+                    syncRing();
+                }
                 if (fingers.has(e.pointerId)) fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
                 const pin = pinchInfo();
                 if (pin && pinchPrev) {
@@ -2164,6 +2319,8 @@
                 if (e) fingers.delete(e.pointerId);
                 if (fingers.size < 2) pinchPrev = null;
                 if (panFrom) { panFrom = null; updateCursor(); }
+                // 指针离开画布区就把笔尖圈收起来，否则会一直挂在边缘
+                if (e && e.type === 'pointerleave') hideRing();
                 endPaint();
             };
             stage.addEventListener('pointerup', release);
@@ -2198,7 +2355,7 @@
                     }
                     if (!e.ctrlKey && !e.metaKey && !e.altKey) {
                         // E 擦除 / R 恢复 / J 涂抹去物 / H 移动；[ ] 画笔大小；Q 删除预览；K 黑白蒙版
-                        const toolKeys = { e: 'erase', r: 'restore', j: 'remove', h: 'pan' };
+                        const toolKeys = { e: 'erase', r: 'restore', w: 'wand', j: 'remove', h: 'pan' };
                         const k = e.key.toLowerCase();
                         if (toolKeys[k]) {
                             const btn = document.querySelector('#mattingMode button[data-val="' + toolKeys[k] + '"]');
@@ -2270,6 +2427,7 @@
         seg('#mattingMode', (v) => {
             S.mode = v;
             updateCursor();
+            if (v === 'wand') setStatus('点选：点一下删掉「同色且连通」的整块区域（容差在右侧属性面板，Shift/右键点 = 恢复）');
             if (v === 'pan') setStatus('可拖动画面：把要修的地方移到眼前；滚轮或 ➕➖ 可缩放');
             if (v === 'remove') setStatus('涂抹去物：把要移除的人/物/文字涂红（略超出边缘 4–6px），再点下方「移除涂抹区」');
         });
@@ -2327,8 +2485,8 @@
                 S[key] = map ? map(raw) : raw;
                 if (out) out.textContent = fmt(raw);
             };
-            el.oninput = sync;
-            el.onchange = () => { sync(); if (S.hasMask) refresh(); };
+            el.oninput = () => { sync(); if (S.syncRing) S.syncRing(); };
+            el.onchange = () => { sync(); if (S.hasMask) refresh(); if (S.syncRing) S.syncRing(); };
             sync();
         };
         rng('#mattingBrush', 'brush', v => v + ' px');
@@ -2337,6 +2495,7 @@
         rng('#mattingContrast', 'contrast', v => v + '%', v => v / 100); // 0-100 → 0-1
         rng('#mattingSmooth', 'smooth', v => String(v));
         rng('#mattingShift', 'shift', v => (v > 0 ? '+' : '') + v + '%', v => v / 100); // >0 外扩 <0 收缩
+        rng('#mattingWandTol', 'wandTol', v => String(v));   // 颜色点选的容差
 
         // 删除区预览的叠加色 / 浓度（PS 快速蒙版思路）
         const cutColor = $('#mattingCutColor'), cutOp = $('#mattingCutOp');
@@ -2446,7 +2605,39 @@
         };
         on('#mattingShowCut', toggleShowCut);
 
-        $$('.matting-need-img').forEach(el => el.style.display = 'none');
+        // 原图残影（借 cut-it-out 的 ghost 叠加思路）：恢复主体时对齐被删掉的部分
+        const ghostBtn = $('#mattingGhost');
+        if (ghostBtn) {
+            ghostBtn.onclick = () => {
+                S.ghost = !S.ghost;
+                ghostBtn.classList.toggle('on', S.ghost);
+                if (!S.ghost) S._tmp = null;   // 关掉就把全尺寸临时画布放掉
+                render();
+                setStatus(S.ghost ? '原图残影已开：淡影是被删掉的内容，对着它把主体补回来' : '原图残影已关');
+            };
+        }
+
+        // 清理杂点 / 补小洞（rembg post_process_mask 的浏览器版：开运算 + 闭运算）
+        on('#mattingDespeckle', () => {
+            if (!S.hasMask) return toast('请先点「一键去背景」，再清理杂点');
+            setStatus('正在清理杂点…');
+            setTimeout(() => {
+                pushHistory();
+                const specks = despeckle();   // 复用自动流程里的碎块清理（连外围半透明雾一起擦）
+                const holes = fillHoles();    // 再补主体内部的小孔
+                if (!specks && !holes) { setStatus('清理杂点：没发现需要处理的碎片或小孔'); return; }
+                refresh();
+                setStatus('清理杂点：删掉 ' + specks.toLocaleString() + ' px 碎片、补上 ' + holes + ' 处小孔（可撤销）');
+            }, 30);   // 先让状态栏画出来，再跑连通域扫描
+        });
+
+        // 点选模式下右键盘不能弹出菜单（右键 = 恢复）
+        [cv, stage].forEach((el) => {
+            if (!el) return;
+            el.addEventListener('contextmenu', (e) => { if (S.mode === 'wand') e.preventDefault(); });
+        });
+
+        setNeedImg(false);
 
         // 精细模型如果已经缓存过，就默认用它（不用再等下载，效果明显更好）
         let hasPref = false;

@@ -20,7 +20,7 @@
     <!-- 登录界面动效 -->
     <link rel="stylesheet" href="login.css?v=20261030">
     <!-- 抠图工具样式 -->
-    <link rel="stylesheet" href="matting.css?v=20261122c">
+    <link rel="stylesheet" href="matting.css?v=20261122d">
     <link rel="stylesheet" href="personality.css?v=20261118p">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
@@ -774,6 +774,7 @@
                             <div class="matting-rail matting-need-img" id="mattingMode" role="toolbar" aria-label="工具">
                                 <button type="button" data-val="erase" class="on" title="擦除背景 (E)"><i>🧽</i><span>擦除</span></button>
                                 <button type="button" data-val="restore" title="恢复主体 (R)"><i>🖌️</i><span>恢复</span></button>
+                                <button type="button" data-val="wand" title="颜色点选：点一下删掉同色连通区，Shift+点 = 恢复（W）"><i>🎯</i><span>点选</span></button>
                                 <button type="button" data-val="remove" title="涂抹去物 (J)"><i>🪄</i><span>去物</span></button>
                                 <button type="button" data-val="pan" title="移动画布 (H)"><i>✋</i><span>移动</span></button>
                             </div>
@@ -782,7 +783,7 @@
                                     <div class="matting-empty" id="mattingEmpty">还没有图片，先上传一张吧</div>
                                     <canvas id="mattingCanvas"></canvas>
                                 </div>
-                                <p class="muted zoom-tip">滚轮缩放 · 空格/中键拖动 · 双指捏合（手机）· 快捷键：E 擦除 / R 恢复 / J 去物 / H 移动 / [ ] 画笔大小 / Q 删除预览 / K 黑白蒙版</p>
+                                <p class="muted zoom-tip">滚轮缩放 · 空格/中键拖动 · 双指捏合（手机）· 快捷键：E 擦除 / R 恢复 / W 点选 / J 去物 / H 移动 / [ ] 画笔大小 / Q 删除预览 / K 黑白蒙版</p>
                             </div>
                             <aside class="matting-props" id="mattingProps">
                                 <div class="mgroup matting-need-img">
@@ -797,6 +798,11 @@
                                         <input type="range" id="mattingHard" min="0" max="100" value="60">
                                         <span class="val" id="mattingHardVal">60%</span>
                                     </div>
+                                    <div class="matting-range">
+                                        <label for="mattingWandTol">容差</label>
+                                        <input type="range" id="mattingWandTol" min="1" max="100" value="18" title="颜色点选的容差（点选工具用）">
+                                        <span class="val" id="mattingWandTolVal">18</span>
+                                    </div>
                                 </div>
                                 <div class="mgroup matting-need-img">
                                     <div class="mgroup-t">👁 视图</div>
@@ -809,6 +815,9 @@
                                     </div>
                                     <div class="mopt-row">
                                         <button class="btn btn-ghost btn-sm" id="mattingShowCut" style="flex:1;">▨ 预览删除区</button>
+                                    </div>
+                                    <div class="mopt-row">
+                                        <button class="btn btn-ghost btn-sm" id="mattingGhost" style="flex:1;" title="把原图淡淡叠在成品上，方便「恢复」时对齐被删掉的部分">👻 原图残影</button>
                                     </div>
                                     <div class="mopt-row">
                                         <label for="mattingCutColor">叠加色</label>
@@ -838,6 +847,9 @@
                                         <label for="mattingShift">移动边缘</label>
                                         <input type="range" id="mattingShift" min="-50" max="50" value="0">
                                         <span class="val" id="mattingShiftVal">0</span>
+                                    </div>
+                                    <div class="mopt-row">
+                                        <button class="btn btn-ghost btn-sm" id="mattingDespeckle" style="flex:1;" title="删掉零碎的小色块、补上主体里的小孔">🧹 清理杂点</button>
                                     </div>
                                 </div>
                             </aside>
@@ -1434,7 +1446,7 @@ PORTFOLIO</p>
     <script src="script-game.js"></script>
     <script src="script.js?v=20261030"></script>
     <script src="workbench.js?v=20261121d"></script>
-    <script src="matting.js?v=20261122e"></script>
+    <script src="matting.js?v=20261122f"></script>
     <script src="personality.js?v=20261118p"></script>
     <script src="portfolio.js?v=20261029"></script>
     <script src="login-cards.js?v=20261030"></script>

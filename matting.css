@@ -270,6 +270,14 @@
     line-height: 1.6;
 }
 
+/* 属性面板里的开关按钮（预览删除区 / 原图残影 / 清理杂点）：选中态要看得见 */
+.mgroup .btn.on {
+    background: rgba(var(--primary-rgb), 0.16);
+    border-color: rgba(var(--primary-rgb), 0.5);
+    color: var(--primary);
+    box-shadow: inset 0 0 0 1px rgba(var(--primary-rgb), 0.28);
+}
+
 /* 「预览删除区」开启后的选中态：不看清就不知道这个开关生效了 */
 #mattingShowCut.on {
     background: rgba(var(--primary-rgb), 0.16);
@@ -284,6 +292,37 @@
     grid-template-columns: 58px minmax(0, 1fr) 218px;
     gap: 12px;
     align-items: start;
+}
+
+/* 还没上传图片时：工具栏和属性面板都不该参与栅格排布，
+   否则 display:none 只是「不画」，剩下的画布会被自动排进 58px 那一列（曾被压成一条竖字） */
+.matting-work:not(.has-img) {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.matting-work:not(.has-img) .matting-rail,
+.matting-work:not(.has-img) .matting-props {
+    display: none;
+}
+
+/* 圆形画笔光标（PS 笔尖圈）：直径 = 画笔像素 × 当前显示倍率 */
+.brush-ring {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 4;
+    /* 一圈细黑线 + 外侧白晕：浅底看清黑线、深底看清白晕，且不会像双环那样看着花 */
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7), 0 0 0 2.5px rgba(255, 255, 255, 0.75);
+}
+
+.brush-ring[hidden] { display: none; }
+
+/* 有笔尖圈时藏掉系统十字光标，避免两个东西叠在一起 */
+.matting-stage.ring-on #mattingCanvas {
+    cursor: none !important;
 }
 
 /* 左侧工具栏（PS 工具条）：图标 + 短标签竖排 */
@@ -319,6 +358,7 @@
     font-size: 10.5px;
     font-weight: 600;
     letter-spacing: .02em;
+    white-space: nowrap;
 }
 
 .matting-rail button:hover { border-color: rgba(var(--primary-rgb), 0.32); }
@@ -412,7 +452,7 @@
     margin: 0 2px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
     .matting-work { grid-template-columns: 58px minmax(0, 1fr); }
     .matting-props {
         grid-column: 1 / -1;
@@ -429,13 +469,17 @@
         position: static;
         flex-direction: row;
     }
+    /* 5 个工具要塞进一行，手机上把图标和字压紧一点 */
     .matting-rail button {
-        flex: 1;
+        flex: 1 1 0;
+        min-width: 0;
         flex-direction: row;
-        padding: 7px 4px;
-        gap: 6px;
+        justify-content: center;
+        padding: 7px 2px;
+        gap: 4px;
     }
-    .matting-rail button span { font-size: 11px; }
+    .matting-rail button i { font-size: 15px; }
+    .matting-rail button span { font-size: 10.5px; }
     .mgroup { flex: 1 1 100%; }
     /* 手机上把工具选项栏压成两行：上=动作按钮，下=缩放；按钮收窄字号 */
     .matting-optbar {
