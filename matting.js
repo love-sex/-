@@ -250,35 +250,91 @@
         ctx.drawImage((S.hasMask && S.fg && !S.showCut) ? S.fg : S.src, 0, 0, S.w, S.h);
         if (!S.hasMask) { drawRm(); return; }
         if (S.showCut) {
-            // 显示删除区：不抠掉原图，只用「半透明斜纹」把会被删掉的区域标记出来。
-            // 纯色蒙版会把底下的原图糊成一片，看不到原本长什么样；斜纹既能一眼分辨，
-            // 又留出大量透明间隙，原图细节（反光、纹理、投影）全都看得见。
-            const cut = document.createElement('canvas');
-            cut.width = S.w; cut.height = S.h;
-            const c = cut.getContext('2d');
-            // 条纹按「适应窗口时的屏幕尺度」定，缩放到 100% 也不会变成粗色块
-            const step = Math.max(8, Math.round(20 / (S.baseScale || 1)));
-            const lw = Math.max(1, step * 0.22);
-            c.fillStyle = 'rgba(255,0,170,0.08)';
-            c.fillRect(0, 0, S.w, S.h);
-            // 洋红 + 白两色交替斜纹：背景本身是洋红/粉色时，纯洋红条纹会看不出来，
-            // 加一组白色错位条纹，任何底色上都能明确分辨「这块会被删掉」
-            const stripe = (color, offset) => {
-                c.strokeStyle = color;
-                c.lineWidth = lw;
-                c.beginPath();
-                for (let i = -S.h + offset; i < S.w + S.h; i += step * 2) {
-                    c.moveTo(i, 0);
-                    c.lineTo(i + S.h, S.h);
+            // 显示删除区：原图内容全部保留，只把「将被删掉」的部分做 去色 + 压暗 + 细斜纹，
+            // 再给主体边缘描一圈双色轮廓。不依赖底图配色，任何背景（含粉色/洋红）上都分得清：
+            //   彩色 + 清晰轮廓 = 保留；灰暗 + 斜纹 = 将被删除
+            const tmp = (id) => {
+                if (!S._tmp) S._tmp = {};
+                let cv = S._tmp[id];
+                if (!cv || cv.width !== S.w || cv.height !== S.h) {
+                    cv = document.createElement('canvas');
+                    cv.width = S.w; cv.height = S.h;
+                    S._tmp[id] = cv;
                 }
-                c.stroke();
+                const g = cv.getContext('2d');
+                g.setTransform(1, 0, 0, 1, 0, 0);
+                g.globalCompositeOperation = 'source-over';
+                g.globalAlpha = 1;
+                g.clearRect(0, 0, S.w, S.h);
+                return cv;
             };
-            stripe('rgba(255,0,170,0.62)', 0);
-            stripe('rgba(255,255,255,0.62)', step);
-            // 只保留「会被删掉」的部分：保留区连同斜纹一起抠掉，露出的就是原样
-            c.globalCompositeOperation = 'destination-out';
-            c.drawImage(S.mask, 0, 0, S.w, S.h);
-            ctx.drawImage(cut, 0, 0, S.w, S.h);
+
+            // ① 反向蒙版：白 = 将被删除
+            const inv = tmp('inv');
+            const ic = inv.getContext('2d');
+            ic.fillStyle = '#fff';
+            ic.fillRect(0, 0, S.w, S.h);
+            ic.globalCompositeOperation = 'destination-out';
+            ic.drawImage(S.mask, 0, 0, S.w, S.h);
+
+            // ② 删除区去色 + 压暗：内容仍然看得见（好判断有没有切到主体），但明显「不是成品」
+            const dim = tmp('dim');
+            const dc = dim.getContext('2d');
+            dc.drawImage(S.src, 0, 0, S.w, S.h);
+            dc.globalCompositeOperation = 'saturation';
+            dc.fillStyle = '#808080';
+            dc.fillRect(0, 0, S.w, S.h);
+            dc.globalCompositeOperation = 'multiply';
+            dc.fillStyle = 'rgb(148,148,148)';
+            dc.fillRect(0, 0, S.w, S.h);
+            dc.globalCompositeOperation = 'destination-in';
+            dc.drawImage(inv, 0, 0);
+            dc.globalCompositeOperation = 'source-over';
+            ctx.drawImage(dim, 0, 0);
+
+            // ③ 细斜纹：只当「这是删除区」的符号，间隔大、线细、透明度低，不抢原图细节
+            const hatch = tmp('hatch');
+            const hc = hatch.getContext('2d');
+            const step = Math.max(12, Math.round(34 / (S.baseScale || 1)));
+            hc.strokeStyle = 'rgba(255,255,255,0.2)';
+            hc.lineWidth = Math.max(1, step * 0.08);
+            hc.beginPath();
+            for (let i = -S.h; i < S.w + S.h; i += step) {
+                hc.moveTo(i, 0);
+                hc.lineTo(i + S.h, S.h);
+            }
+            hc.stroke();
+            hc.globalCompositeOperation = 'destination-in';
+            hc.drawImage(inv, 0, 0);
+            hc.globalCompositeOperation = 'source-over';
+            ctx.drawImage(hatch, 0, 0);
+
+            // ④ 主体轮廓：内侧深色 + 外侧白色（双色描边，深浅底图上都有对比）；
+            // 线宽按屏幕尺度换算，缩放后不会变成看不见的细线或糊成一带
+            const rw = Math.max(1, Math.round(1.6 / (S.baseScale || 1)));
+            const shifted = (d) => {
+                const cv = tmp('shift' + d);
+                const g = cv.getContext('2d');
+                const off = [[d, 0], [-d, 0], [0, d], [0, -d]];
+                for (let k = 0; k < off.length; k++) g.drawImage(S.mask, off[k][0], off[k][1], S.w, S.h);
+                return cv;
+            };
+            const u1 = shifted(rw), u2 = shifted(rw * 2);
+            const ring = (id, base, cutAway, color) => {
+                const cv = tmp(id);
+                const g = cv.getContext('2d');
+                g.drawImage(base, 0, 0);
+                g.globalCompositeOperation = 'destination-out';
+                g.drawImage(cutAway, 0, 0);
+                g.globalCompositeOperation = 'source-in';
+                g.fillStyle = color;
+                g.fillRect(0, 0, S.w, S.h);
+                g.globalCompositeOperation = 'source-over';
+                return cv;
+            };
+            ctx.drawImage(ring('ringOuter', u2, u1, 'rgba(255,255,255,0.95)'), 0, 0);
+            ctx.drawImage(ring('ringInner', u1, S.mask, 'rgba(22,18,14,0.55)'), 0, 0);
+            drawRm();   // 涂抹去物的红区也要盖在最上面，否则切到涂抹模式看不见笔迹
             return;
         }
         ctx.globalCompositeOperation = 'destination-in';
@@ -2272,7 +2328,12 @@
         on('#mattingShowCut', () => {
             S.showCut = !S.showCut;
             const b = $('#mattingShowCut');
-            if (b) b.textContent = S.showCut ? '👁 隐藏删除区' : '👁 显示删除区';
+            if (b) {
+                b.textContent = S.showCut ? '▣ 退出删除预览' : '▨ 预览删除区';
+                b.classList.toggle('on', S.showCut);
+            }
+            if (S.showCut) setStatus('删除预览：灰暗 + 斜纹的部分会被删掉，彩色部分保留（轮廓为分界线）');
+            else S._tmp = null;   // 退出预览就把几张全尺寸临时画布放掉（大图省几十 MB）
             render();
         });
 
