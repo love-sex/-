@@ -782,7 +782,7 @@
 
                     <div class="card matting-need-img">
                         <div class="card-title">🪄 魔法橡皮擦</div>
-                        <p class="muted" style="margin:-4px 0 12px;">像 Magic Eraser 一样抹掉照片里的路人、杂物、文字和水印：把模式切到「🪄 涂抹去物」，涂红要移除的内容（略超出边缘 4–6px），再点「移除涂抹区」。<b>AI 补全</b>用 MI-GAN（Picsart 开源，ICCV 2023）在本地重建被涂掉的画面，能补出头发、衣服、砖墙这类真实纹理；<b>本地快速</b>是纯插值，只在天空/墙面/渐变这类平坦背景够用。全部本地推理，图片不上传。</p>
+                        <p class="muted" style="margin:-4px 0 12px;">像 Magic Eraser 一样抹掉照片里的路人、杂物、文字和水印：把模式切到「🪄 涂抹去物」，涂红要移除的内容（一定涂到比目标大一圈，8–10px；文字/水印要把整行都盖住，边缘漏一笔就会留残影），再点「移除涂抹区」。<b>AI 补全</b>用 MI-GAN（Picsart 开源，ICCV 2023）在本地重建被涂掉的画面，能补出头发、衣服、砖墙这类真实纹理；<b>本地快速</b>是纯插值，只在天空/墙面/渐变这类平坦背景够用。全部本地推理，图片不上传。</p>
                         <div class="matting-bar">
                             <button class="btn btn-gold btn-sm" id="mattingInpaint" disabled>✨ 移除涂抹区</button>
                             <button class="btn btn-ghost btn-sm" id="mattingInpaintCmp" disabled>🔍 对比原图</button>
@@ -1411,7 +1411,7 @@ PORTFOLIO</p>
     <script src="script-game.js"></script>
     <script src="script.js?v=20261030"></script>
     <script src="workbench.js?v=20261121d"></script>
-    <script src="matting.js?v=20261122b"></script>
+    <script src="matting.js?v=20261122c"></script>
     <script src="personality.js?v=20261118p"></script>
     <script src="portfolio.js?v=20261029"></script>
     <script src="login-cards.js?v=20261030"></script>

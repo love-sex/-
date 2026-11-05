@@ -1419,7 +1419,9 @@
                 if (m[sy * w + sx]) key[y * size + x] = 1;
             }
         }
-        const mk = dilateMask(key, size, size, 3);
+        // 蒙版再外扩 9px（512 尺度）：给模型留出安全边，否则原物体的高反差边（文字/水印）
+        // 会从蒙版边缘「漏」进输出，留下淡淡的鬼影
+        const mk = dilateMask(key, size, size, 9);
 
         // 4) 组 tensor
         const px = sqc.getImageData(0, 0, size, size).data;
