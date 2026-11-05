@@ -20,7 +20,7 @@
     <!-- 登录界面动效 -->
     <link rel="stylesheet" href="login.css?v=20261030">
     <!-- 抠图工具样式 -->
-    <link rel="stylesheet" href="matting.css?v=20261123b">
+    <link rel="stylesheet" href="matting.css?v=20261123c">
     <link rel="stylesheet" href="personality.css?v=20261118p">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
@@ -817,8 +817,14 @@
                                             <button type="button" data-val="contiguous" class="on">连续</button>
                                             <button type="button" data-val="global">全局</button>
                                         </div>
-                                        <button class="btn btn-ghost btn-sm" id="mattingSelInvert" title="反选（Ctrl+Shift+I）" style="flex:none;padding:5px 6px;">⇄</button>
-                                        <button class="btn btn-ghost btn-sm" id="mattingSelAll" title="全选（Ctrl+A）" style="flex:none;padding:5px 6px;">▣</button>
+                                    </div>
+                                    <div class="mopt-row">
+                                        <button class="btn btn-ghost btn-sm" id="mattingSelInvert" style="flex:1;padding:5px 2px;" title="反选（Ctrl+Shift+I）">⇄ 反选</button>
+                                        <button class="btn btn-ghost btn-sm" id="mattingSelAll" style="flex:1;padding:5px 2px;" title="全选（Ctrl+A）">▣ 全选</button>
+                                    </div>
+                                    <div class="mopt-row">
+                                        <button class="btn btn-ghost btn-sm" id="mattingSelGrow" style="flex:1;padding:5px 2px;" title="选区向外扩 1px">＋ 扩展</button>
+                                        <button class="btn btn-ghost btn-sm" id="mattingSelShrink" style="flex:1;padding:5px 2px;" title="选区向内收 1px">－ 收缩</button>
                                     </div>
                                     <div class="mopt-row">
                                         <label for="mattingSelFeather">羽化</label>
@@ -830,8 +836,8 @@
                                         <button class="btn btn-ghost btn-sm" id="mattingSelShrink" style="flex:1;padding:5px 4px;" title="选区向内收 1px">－ 收缩</button>
                                     </div>
                                     <div class="mopt-row">
-                                        <button class="btn btn-gold btn-sm" id="mattingSelCut" style="flex:1;padding:5px 4px;">✂ 删除选区</button>
-                                        <button class="btn btn-ghost btn-sm" id="mattingSelKeep" style="flex:1;padding:5px 4px;">↩ 恢复选区</button>
+                                        <button class="btn btn-gold btn-sm" id="mattingSelCut" style="flex:1;padding:5px 2px;">✂ 删除选区</button>
+                                        <button class="btn btn-ghost btn-sm" id="mattingSelKeep" style="flex:1;padding:5px 2px;">↩ 恢复选区</button>
                                     </div>
                                     <div class="mopt-row" style="margin-bottom:2px;">
                                         <span class="matting-hint" id="mattingSelInfo" style="font-size:11.5px;">未选区：用点选或套索圈出范围</span>
