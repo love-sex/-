@@ -105,12 +105,16 @@
         shift: 0,         // 移动边缘：>0 外扩、<0 收缩（PS「移动边缘」）
         wandTol: 18,      // 颜色点选（魔术棒）的容差 0-100
         ghost: false,     // 原图残影：恢复主体时用来对齐被删掉的部分
-        cutColor: '#d9463c', // 删除区预览的叠加色（PS 快速蒙版默认红系）
-        cutOp: 0.3,       // 叠加浓度 0-0.8；0 = 纯灰暗预览
+        cutColor: '#d9463c', // 选区的叠加色（PS 快速蒙版默认红系）
+        cutOp: 0.3,       // 选区叠加浓度 0-0.8
+        selMode: 'new',   // 选区模式：new 新建 / add 加选 / sub 减选（Shift、Alt 可临时切换）
+        wandScope: 'contiguous', // 点选范围：连续（只取相连的）/ 全局（全图同色）
+        selFeather: 2,    // 应用选区时柔化几像素
+        selOn: false,     // 当前有没有选区
+        selArea: 0,       // 选区像素数（面板回显）
         bwView: false,    // 黑白蒙版视图（PS 里按 K）
         deepClean: true,  // 清理与背景同色的残留（反光、投影）
         pickKey: null,    // 这张图上「复核后更干净」的模型，换图要清掉
-        showCut: false,
         tracer: null
     };
 
@@ -213,6 +217,15 @@
         S.rmctx = S.rmask.getContext('2d', { willReadFrequently: true });
         S.rmHas = false;
         S.inpaintHist = []; S.cmpOn = false;
+        // 选区画布：alpha=255 表示选中，点选/套索都写这里，最后统一作用到蒙版
+        S.sel = document.createElement('canvas');
+        S.sel.width = w; S.sel.height = h;
+        S.sctx = S.sel.getContext('2d', { willReadFrequently: true });
+        S.selOn = false; S.selArea = 0; S.selDraft = null;
+        S.lassoing = false; S.lassoTick = false;
+        S._sel = null;
+        const selInfo = $('#mattingSelInfo');
+        if (selInfo) selInfo.textContent = '未选区：用点选或套索圈出范围';
         // 缓存原图 RGB，边缘精修时做引导图
         cacheRGB();
     };
@@ -276,7 +289,7 @@
         return true;
     };
 
-    const render = () => {
+    const renderBase = () => {
         if (!S.src) return;
         const ctx = S.vctx;
         ctx.clearRect(0, 0, S.w, S.h);
@@ -286,89 +299,9 @@
         if (cmpRow) cmpRow.classList.toggle('show', !!(S.cmpOn && S.inpaintHist.length));
         // 对比模式优先（不受抠图蒙版影响，否则去掉背景后两边看起来一模一样）
         if (S.cmpOn && drawCompare()) { drawRm(); return; }
-        // 正常预览用「去过底色」的前景图，避免边缘挂一圈背景色；显示删除区时用原图，方便对着改
-        ctx.drawImage((S.hasMask && S.fg && !S.showCut) ? S.fg : S.src, 0, 0, S.w, S.h);
+        // 正常预览用「去过底色」的前景图，避免边缘挂一圈背景色
+        ctx.drawImage((S.hasMask && S.fg) ? S.fg : S.src, 0, 0, S.w, S.h);
         if (!S.hasMask) { drawRm(); return; }
-        if (S.showCut) {
-            // 显示删除区：原图内容全部保留，只把「将被删掉」的部分做 去色 + 压暗 + 叠加色 + 细斜纹，
-            // 再给主体边缘描一圈双色轮廓。不依赖底图配色，任何背景（含粉色/洋红）上都分得清：
-            //   彩色 + 清晰轮廓 = 保留；灰暗 + 斜纹 = 将被删除
-            // ① 反向蒙版：白 = 将被删除
-            const inv = tmpC('inv');
-            const ic = inv.getContext('2d');
-            ic.fillStyle = '#fff';
-            ic.fillRect(0, 0, S.w, S.h);
-            ic.globalCompositeOperation = 'destination-out';
-            ic.drawImage(S.mask, 0, 0, S.w, S.h);
-
-            // ② 删除区去色 + 压暗：内容仍然看得见（好判断有没有切到主体），但明显「不是成品」
-            const dim = tmpC('dim');
-            const dc = dim.getContext('2d');
-            dc.drawImage(S.src, 0, 0, S.w, S.h);
-            dc.globalCompositeOperation = 'saturation';
-            dc.fillStyle = '#808080';
-            dc.fillRect(0, 0, S.w, S.h);
-            dc.globalCompositeOperation = 'multiply';
-            dc.fillStyle = 'rgb(148,148,148)';
-            dc.fillRect(0, 0, S.w, S.h);
-            // 叠加色（PS 快速蒙版思路）：用 color 混合给灰底上色相，浓度用户可调
-            if (S.cutOp > 0 && S.cutColor) {
-                dc.globalCompositeOperation = 'color';
-                dc.globalAlpha = S.cutOp;
-                dc.fillStyle = S.cutColor;
-                dc.fillRect(0, 0, S.w, S.h);
-                dc.globalAlpha = 1;
-            }
-            dc.globalCompositeOperation = 'destination-in';
-            dc.drawImage(inv, 0, 0);
-            dc.globalCompositeOperation = 'source-over';
-            ctx.drawImage(dim, 0, 0);
-
-            // ③ 细斜纹：只当「这是删除区」的符号，间隔大、线细、透明度低，不抢原图细节
-            const hatch = tmpC('hatch');
-            const hc = hatch.getContext('2d');
-            const step = Math.max(12, Math.round(34 / (S.baseScale || 1)));
-            hc.strokeStyle = 'rgba(255,255,255,0.2)';
-            hc.lineWidth = Math.max(1, step * 0.08);
-            hc.beginPath();
-            for (let i = -S.h; i < S.w + S.h; i += step) {
-                hc.moveTo(i, 0);
-                hc.lineTo(i + S.h, S.h);
-            }
-            hc.stroke();
-            hc.globalCompositeOperation = 'destination-in';
-            hc.drawImage(inv, 0, 0);
-            hc.globalCompositeOperation = 'source-over';
-            ctx.drawImage(hatch, 0, 0);
-
-            // ④ 主体轮廓：内侧深色 + 外侧白色（双色描边，深浅底图上都有对比）；
-            // 线宽按屏幕尺度换算，缩放后不会变成看不见的细线或糊成一带
-            const rw = Math.max(1, Math.round(1.6 / (S.baseScale || 1)));
-            const shifted = (d) => {
-                const cv = tmpC('shift' + d);
-                const g = cv.getContext('2d');
-                const off = [[d, 0], [-d, 0], [0, d], [0, -d]];
-                for (let k = 0; k < off.length; k++) g.drawImage(S.mask, off[k][0], off[k][1], S.w, S.h);
-                return cv;
-            };
-            const u1 = shifted(rw), u2 = shifted(rw * 2);
-            const ring = (id, base, cutAway, color) => {
-                const cv = tmpC(id);
-                const g = cv.getContext('2d');
-                g.drawImage(base, 0, 0);
-                g.globalCompositeOperation = 'destination-out';
-                g.drawImage(cutAway, 0, 0);
-                g.globalCompositeOperation = 'source-in';
-                g.fillStyle = color;
-                g.fillRect(0, 0, S.w, S.h);
-                g.globalCompositeOperation = 'source-over';
-                return cv;
-            };
-            ctx.drawImage(ring('ringOuter', u2, u1, 'rgba(255,255,255,0.95)'), 0, 0);
-            ctx.drawImage(ring('ringInner', u1, S.mask, 'rgba(22,18,14,0.55)'), 0, 0);
-            drawRm();   // 涂抹去物的红区也要盖在最上面，否则切到涂抹模式看不见笔迹
-            return;
-        }
         if (S.bwView) {
             // 黑白蒙版视图（PS 里按 K）：白=保留、黑=删除，检查半透明边缘最直观
             // 注意不能在白底上直接 source-in 上黑，那会把整张画布都涂黑；
@@ -408,6 +341,37 @@
         }
         drawRm();
     };
+
+    /* 选区叠加层：半透明叠加色 + 黑白蚁线。两张图缓存在 S._sel 里，
+       只有选区变了才重建，画笔拖动时每帧只是两次 drawImage */
+    const drawSelOverlay = () => {
+        const ctx = S.vctx;
+        if (!ctx) return;
+        if (S.selOn && S._sel) {
+            if (S._sel.tint) ctx.drawImage(S._sel.tint, 0, 0);
+            if (S._sel.ants) ctx.drawImage(S._sel.ants, 0, 0);
+        }
+        // 正在拖的套索：虚线跟着指针走，松手才变成真选区
+        const pts = S.selDraft;
+        if (pts && pts.length > 1) {
+            const px = 1 / Math.max(0.05, (S.baseScale || 1) * (S.zoom || 1));
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(pts[0].x, pts[0].y);
+            for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+            if (pts.length > 2) ctx.lineTo(pts[0].x, pts[0].y);
+            ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+            ctx.lineWidth = Math.max(1, 1.6 * px);
+            ctx.stroke();
+            ctx.setLineDash([6 * px, 4 * px]);
+            ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+            ctx.lineWidth = Math.max(1, 1.1 * px);
+            ctx.stroke();
+            ctx.restore();
+        }
+    };
+
+    const render = () => { renderBase(); drawSelOverlay(); };
 
     /* ---------------- 画布视图：缩放 / 平移 ----------------
        思路：画布用 CSS transform 变换（左上角为原点），图片仍是原始像素分辨率。
@@ -1927,58 +1891,305 @@
         render();
     };
 
-    /* ---------------- 颜色点选（魔术棒） ----------------
-       参考 cut-it-out / 各家网页抠图工具的 Magic Brush：点一下，把「和这一点颜色接近、
-       并且连在一起」的区域整块从蒙版里删掉（Shift 点 = 反向恢复）。
-       比逐个补画笔快得多，尤其适合大片残留底色、白边、纯色背景的图 */
-    const wandSelect = (e, restore) => {
-        if (!S.hasMask || !S.rctx || !S.rgb) return toast('请先点「一键去背景」，再用点选');
+    /* ---------------- 选区（对应 PS 的「选择范围」） ----------------
+       点选（魔术棒）和套索只改「选区」，再点「删除/恢复选区」才真正动蒙版：
+       和 PS 一样能新建 / 加选 / 减选，反选、扩展、收缩、羽化都只作用在选区本身。
+       点选的算法参考 Tamersoul/magic-wand-js：按颜色差生成二值选区；
+       我们另外补了「连续 / 全局」两种范围和套索（PS 的套索工具）。 */
+    const selCache = (id) => {
+        if (!S._sel) S._sel = {};
+        let cv = S._sel[id];
+        if (!cv || cv.width !== S.w || cv.height !== S.h) {
+            cv = document.createElement('canvas');
+            cv.width = S.w; cv.height = S.h;
+            S._sel[id] = cv;
+        }
+        return cv;
+    };
+
+    const hexRGB = (hex) => {
+        const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+        if (!m) return [217, 70, 60];
+        const v = parseInt(m[1], 16);
+        return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+    };
+
+    // 选区一变就重建「叠加色 + 蚁线」两张缓存图，并刷新面板里的面积读数
+    const rebuildSelVisual = () => {
+        const info = $('#mattingSelInfo');
+        if (!S.sel || !S.sctx) return;
+        if (!S.selOn) {
+            S.selArea = 0;
+            if (info) info.textContent = '未选区：用点选或套索圈出范围';
+            return;
+        }
+        const w = S.w, h = S.h, n = w * h;
+        const sd = S.sctx.getImageData(0, 0, w, h).data;
+        const aa = new Uint8ClampedArray(n);
+        let area = 0;
+        for (let j = 0; j < n; j++) {
+            const v = sd[j * 4 + 3];
+            aa[j] = v;
+            if (v > 127) area++;
+        }
+        S.selArea = area;
+        // ① 叠加色：浓度直接乘在 alpha 上
+        const tint = selCache('tint');
+        const tc = tint.getContext('2d');
+        const ti = tc.createImageData(w, h);
+        const col = hexRGB(S.cutColor);
+        const k = Math.max(0, Math.min(1, S.cutOp));
+        const td = ti.data;
+        for (let j = 0; j < n; j++) {
+            const a = aa[j];
+            if (!a) continue;
+            const i = j * 4;
+            td[i] = col[0]; td[i + 1] = col[1]; td[i + 2] = col[2];
+            td[i + 3] = a * k;
+        }
+        tc.putImageData(ti, 0, 0);
+        // ② 蚁线：边界像素画成黑白相间的点（不做动画，缩放后也看得清，不做动画省 rAF）
+        const ants = selCache('ants');
+        const ac = ants.getContext('2d');
+        const ai = ac.createImageData(w, h);
+        const ad = ai.data;
+        for (let y = 0; y < h; y++) {
+            const row = y * w;
+            for (let x = 0; x < w; x++) {
+                const j = row + x;
+                if (aa[j] <= 127) continue;
+                const edge = (x === 0 || aa[j - 1] <= 127) || (x === w - 1 || aa[j + 1] <= 127)
+                    || (y === 0 || aa[j - w] <= 127) || (y === h - 1 || aa[j + w] <= 127);
+                if (!edge) continue;
+                const i = j * 4;
+                const dark = ((((x + y) >> 2) & 1) === 0);
+                ad[i] = ad[i + 1] = ad[i + 2] = dark ? 0 : 255;
+                ad[i + 3] = 235;
+            }
+        }
+        ac.putImageData(ai, 0, 0);
+        if (info) {
+            const pct = (area / n * 100).toFixed(area / n < 0.01 ? 2 : 1);
+            info.textContent = '选区 ' + area.toLocaleString() + ' px · 占画面 ' + pct + '%';
+        }
+    };
+
+    const selClear = (quiet) => {
+        if (S.sctx) S.sctx.clearRect(0, 0, S.w, S.h);
+        S.selOn = false; S.selArea = 0; S.selDraft = null;
+        rebuildSelVisual();
+        render();
+        if (!quiet) setStatus('已取消选区');
+    };
+
+    // Shift = 加选、Alt/右键 = 减选，其余按面板里选的模式
+    const selModeNow = (e) => {
+        if (!e) return S.selMode;
+        if (e.shiftKey) return 'add';
+        if (e.altKey || e.button === 2) return 'sub';
+        return S.selMode;
+    };
+
+    // 把这一批像素并进选区（mode: new 覆盖 / add 并集 / sub 差集）
+    const applyHitToSel = (hit, mode) => {
+        const w = S.w, h = S.h, n = w * h;
+        const img = S.sctx.getImageData(0, 0, w, h);
+        const a = img.data;
+        if (mode === 'new') {
+            for (let j = 0; j < n; j++) a[j * 4 + 3] = 0;
+        }
+        for (let j = 0; j < n; j++) {
+            if (!hit[j]) continue;
+            a[j * 4 + 3] = mode === 'sub' ? 0 : 255;
+        }
+        S.sctx.putImageData(img, 0, 0);
+        S.selOn = true;
+        rebuildSelVisual();
+        render();
+    };
+
+    const wandToSelection = (e) => {
+        if (!S.hasMask || !S.rgb || !S.sctx) return toast('请先点「一键去背景」，再用点选');
         const p = toCanvasXY(e);
         const x0 = Math.round(p.x), y0 = Math.round(p.y);
         if (x0 < 1 || y0 < 1 || x0 >= S.w - 1 || y0 >= S.h - 1) return;
+        const mode = selModeNow(e);
         const w = S.w, h = S.h, n = w * h;
         const d = S.rgb.data;
         const s0 = (y0 * w + x0) * 4;
         const r0 = d[s0], g0 = d[s0 + 1], b0 = d[s0 + 2];
         const thr = Math.max(4, (S.wandTol || 18) * 1.8);   // 容差 1-100 → 颜色距离阈值
         const thr2 = thr * thr;
-        const maxPx = Math.round(n * 0.5);                  // 兜底：最多改一半画面
-        const seen = new Uint8Array(n);
-        const stack = new Int32Array(n);
-        let sp = 0, cnt = 0;
-        const start = y0 * w + x0;
-        seen[start] = 1;
-        stack[sp++] = start;
-        const img = S.rctx.getImageData(0, 0, w, h);
-        const a = img.data;
-        const target = restore ? 255 : 0;
-        const hits = [];
-        while (sp > 0 && cnt < maxPx) {
-            const idx = stack[--sp];
-            const x = idx % w, y = (idx - x) / w;
-            hits.push(idx);
-            cnt++;
-            for (let k = 0; k < 4; k++) {
-                let t = -1;
-                if (k === 0) { if (x > 0) t = idx - 1; }
-                else if (k === 1) { if (x < w - 1) t = idx + 1; }
-                else if (k === 2) { if (y > 0) t = idx - w; }
-                else { if (y < h - 1) t = idx + w; }
-                if (t < 0 || seen[t]) continue;
-                const i = t * 4;
-                const dr = d[i] - r0, dg = d[i + 1] - g0, db = d[i + 2] - b0;
-                if (dr * dr + dg * dg + db * db > thr2) continue;
-                seen[t] = 1;
-                stack[sp++] = t;
+        const hit = new Uint8Array(n);
+        let count = 0;
+        const similar = (t) => {
+            const i = t * 4;
+            const dr = d[i] - r0, dg = d[i + 1] - g0, db = d[i + 2] - b0;
+            return dr * dr + dg * dg + db * db <= thr2;
+        };
+        if (S.wandScope === 'global') {
+            for (let j = 0; j < n; j++) if (similar(j)) { hit[j] = 1; count++; }
+        } else {
+            const seen = new Uint8Array(n);
+            const stack = new Int32Array(n);
+            let sp = 0;
+            const start = y0 * w + x0;
+            seen[start] = 1; hit[start] = 1; stack[sp++] = start; count = 1;
+            while (sp > 0) {
+                const idx = stack[--sp];
+                const x = idx % w, y = (idx - x) / w;
+                for (let k = 0; k < 4; k++) {
+                    let t = -1;
+                    if (k === 0) { if (x > 0) t = idx - 1; }
+                    else if (k === 1) { if (x < w - 1) t = idx + 1; }
+                    else if (k === 2) { if (y > 0) t = idx - w; }
+                    else { if (y < h - 1) t = idx + w; }
+                    if (t < 0 || seen[t] || !similar(t)) continue;
+                    seen[t] = 1; hit[t] = 1; stack[sp++] = t; count++;
+                }
             }
         }
-        if (!hits.length) return;
+        if (!count) return toast('这里没有可选的颜色');
+        applyHitToSel(hit, mode);
+        setStatus('选区' + (mode === 'add' ? '加选' : mode === 'sub' ? '减选' : '新建')
+            + '：' + count.toLocaleString() + ' px（容差 ' + (S.wandTol || 18) + ' · '
+            + (S.wandScope === 'global' ? '全局' : '连续') + '）');
+    };
+
+    // 套索：松手时把这一圈点连成多边形，填成选区
+    const lassoCommit = (mode) => {
+        const pts = S.selDraft;
+        S.selDraft = null;
+        if (!pts || pts.length < 3) { render(); return; }
+        const cv = tmpC('lasso');
+        const g = cv.getContext('2d');
+        g.fillStyle = '#fff';
+        g.beginPath();
+        g.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
+        g.closePath();
+        g.fill();
+        const ld = g.getImageData(0, 0, S.w, S.h).data;
+        const hit = new Uint8Array(S.w * S.h);
+        let count = 0;
+        for (let j = 0; j < hit.length; j++) {
+            if (ld[j * 4 + 3] > 127) { hit[j] = 1; count++; }
+        }
+        if (!count) { render(); return toast('这一圈太小了，再画大一点'); }
+        applyHitToSel(hit, mode);
+        setStatus('套索' + (mode === 'add' ? '加选' : mode === 'sub' ? '减选' : '新建')
+            + '：' + count.toLocaleString() + ' px');
+    };
+
+    // 反选 / 扩展 / 收缩：只改选区，不动蒙版
+    const selInvert = () => {
+        if (!S.selOn) return toast('先用点选或套索圈出范围');
+        const img = S.sctx.getImageData(0, 0, S.w, S.h);
+        const a = img.data;
+        for (let j = 0; j < S.w * S.h; j++) a[j * 4 + 3] = 255 - a[j * 4 + 3];
+        S.sctx.putImageData(img, 0, 0);
+        rebuildSelVisual();
+        render();
+        setStatus('已反选：' + S.selArea.toLocaleString() + ' px');
+    };
+
+    // 全选：整张图都进选区（PS 的 Ctrl+A），后面可以直接「删除选区」清空或「恢复选区」铺满
+    const selAll = () => {
+        if (!S.sctx) return;
+        const img = S.sctx.getImageData(0, 0, S.w, S.h);
+        const a = img.data;
+        for (let j = 0; j < S.w * S.h; j++) a[j * 4 + 3] = 255;
+        S.sctx.putImageData(img, 0, 0);
+        S.selOn = true;
+        rebuildSelVisual();
+        render();
+        setStatus('已全选：' + S.selArea.toLocaleString() + ' px');
+    };
+
+    const selMorph = (dir) => {
+        if (!S.selOn) return toast('先用点选或套索圈出范围');
+        const w = S.w, h = S.h, n = w * h;
+        const sd = S.sctx.getImageData(0, 0, w, h).data;
+        const bin = new Uint8Array(n);
+        for (let j = 0; j < n; j++) bin[j] = sd[j * 4 + 3] > 127 ? 1 : 0;
+        // 3×3 结构元膨胀；收缩 = 先取反、膨胀、再取反
+        const grow = (src) => {
+            const out = new Uint8Array(n);
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    const j = y * w + x;
+                    if (src[j]) { out[j] = 1; continue; }
+                    let on = 0;
+                    for (let dy = -1; dy <= 1 && !on; dy++) {
+                        const yy = y + dy;
+                        if (yy < 0 || yy >= h) continue;
+                        for (let dx = -1; dx <= 1; dx++) {
+                            const xx = x + dx;
+                            if (xx < 0 || xx >= w) continue;
+                            if (src[yy * w + xx]) { on = 1; break; }
+                        }
+                    }
+                    out[j] = on;
+                }
+            }
+            return out;
+        };
+        const inv = (a) => { const o = new Uint8Array(n); for (let j = 0; j < n; j++) o[j] = a[j] ? 0 : 1; return o; };
+        const res = dir > 0 ? grow(bin) : inv(grow(inv(bin)));
+        const img = S.sctx.getImageData(0, 0, w, h);
+        const a = img.data;
+        for (let j = 0; j < n; j++) a[j * 4 + 3] = res[j] ? 255 : 0;
+        S.sctx.putImageData(img, 0, 0);
+        rebuildSelVisual();
+        render();
+        setStatus('选区已' + (dir > 0 ? '扩展' : '收缩') + ' 1px：' + S.selArea.toLocaleString() + ' px');
+    };
+
+    const selFeatherPx = () => {
+        const el = $('#mattingSelFeather');
+        return el ? Math.max(0, Math.min(12, Math.round(Number(el.value) || 0))) : (S.selFeather || 0);
+    };
+
+    // 把选区作用到蒙版：add=true 恢复主体、false 删除
+    const applySelection = (add) => {
+        if (!S.hasMask || !S.rctx) return toast('请先点「一键去背景」');
+        if (!S.selOn || !S.selArea) return toast('先用点选或套索圈出范围');
+        const w = S.w, h = S.h, n = w * h;
+        const feather = selFeatherPx();
+        S.selFeather = feather;
+        let sel = S.sctx.getImageData(0, 0, w, h).data;
+        if (feather > 0) {
+            // 羽化：把选区 alpha 模糊两遍，边界变成渐隐，作用到蒙版上不会留硬边
+            let g = new Float32Array(n);
+            for (let j = 0; j < n; j++) g[j] = sel[j * 4 + 3] / 255;
+            g = boxBlurGray(g, w, h, feather, 2);
+            const img = S.sctx.getImageData(0, 0, w, h);
+            const a = img.data;
+            for (let j = 0; j < n; j++) {
+                const v = g[j];
+                a[j * 4 + 3] = (v < 0 ? 0 : v > 1 ? 1 : v) * 255;
+            }
+            S.sctx.putImageData(img, 0, 0);
+            sel = img.data;
+        }
+        const area = S.selArea;
         pushHistory();
-        for (let k = 0; k < hits.length; k++) a[hits[k] * 4 + 3] = target;
-        S.rctx.putImageData(img, 0, 0);
+        const mi = S.rctx.getImageData(0, 0, w, h);
+        const md = mi.data;
+        let changed = 0;
+        for (let j = 0; j < n; j++) {
+            const k = sel[j * 4 + 3] / 255;
+            if (!k) continue;
+            const cur = md[j * 4 + 3];
+            const next = add ? cur + (255 - cur) * k : cur * (1 - k);
+            if (Math.abs(next - cur) > 0.5) changed++;
+            md[j * 4 + 3] = next;
+        }
+        S.rctx.putImageData(mi, 0, 0);
+        selClear(true);
         refresh();
-        setStatus((restore ? '点选恢复 ' : '点选删除 ') + hits.length.toLocaleString() + ' px（容差 ' + (S.wandTol || 18) + '，Shift+点 = '
-            + (restore ? '删除' : '恢复') + '）');
+        setStatus((add ? '已恢复 ' : '已删除 ') + area.toLocaleString() + ' px（改动 ' + changed.toLocaleString()
+            + ' px，羽化 ' + feather + 'px，可撤销）');
     };
 
     /* ---------------- 补小洞 ----------------
@@ -2110,6 +2321,9 @@
         S.undo = []; S.redo = [];
         if (S.rctx) { S.rctx.globalCompositeOperation = 'source-over'; S.rctx.clearRect(0, 0, S.w, S.h); }
         if (S.mctx) S.mctx.clearRect(0, 0, S.w, S.h);
+        if (S.sctx) S.sctx.clearRect(0, 0, S.w, S.h);
+        S.selOn = false; S.selArea = 0;
+        rebuildSelVisual();
         syncHistoryButtons();
         render();
         setStatus('已恢复到刚上传的原图，可以重新点「一键去背景」，或直接用画笔涂');
@@ -2121,6 +2335,9 @@
         S.inpaintHist = []; S.cmpOn = false;
         if (S.rmctx) S.rmctx.clearRect(0, 0, S.w, S.h);
         S.rmHas = false;
+        if (S.sctx) S.sctx.clearRect(0, 0, S.w, S.h);
+        S.selOn = false; S.selArea = 0; S.selDraft = null;
+        rebuildSelVisual();
         syncRmButtons();
         S.userZoomed = false; S.zoom = 1; S.tx = 0; S.ty = 0;
         const stage = $('#mattingStage');
@@ -2210,8 +2427,8 @@
                 stage.classList.remove('ring-on');
             };
             const syncRing = () => {
-                // 抓手/平移/点选时不留圈；触屏没有悬停概念，也不显示
-                if (!ringPos.has || !S.src || wantPan() || S.mode === 'pan' || S.mode === 'wand') { hideRing(); return; }
+                // 抓手/平移/点选/套索时不留圈；触屏没有悬停概念，也不显示
+                if (!ringPos.has || !S.src || wantPan() || S.mode === 'pan' || S.mode === 'wand' || S.mode === 'lasso') { hideRing(); return; }
                 const d = Math.max(6, S.brush * (S.baseScale || 1) * S.zoom);
                 ring.style.width = d + 'px';
                 ring.style.height = d + 'px';
@@ -2263,11 +2480,23 @@
                     return;
                 }
                 if (S.mode === 'wand') {
-                    // 颜色点选：点一下就整块处理，不需要按住拖动
+                    // 颜色点选：点一下就圈出同色区域（松开鼠标才不需要拖）
                     endPaint();
                     e.preventDefault();
                     if (e.button !== 0 && e.button !== 2) return;
-                    wandSelect(e, e.shiftKey || e.altKey || e.button === 2);
+                    wandToSelection(e);
+                    return;
+                }
+                if (S.mode === 'lasso') {
+                    // 套索：按住拖一圈，松手自动闭合变成选区
+                    endPaint();
+                    e.preventDefault();
+                    if (e.button !== 0 && e.button !== 2) return;
+                    if (!S.hasMask) return toast('请先点「一键去背景」，再用套索圈范围');
+                    S.lassoMode = selModeNow(e);
+                    S.lassoing = true;
+                    S.selDraft = [toCanvasXY(e)];
+                    render();
                     return;
                 }
                 if (S.mode === 'remove') {
@@ -2315,6 +2544,20 @@
                     applyView();
                     return;
                 }
+                if (S.lassoing && S.selDraft) {
+                    const p = toCanvasXY(e);
+                    const last = S.selDraft[S.selDraft.length - 1];
+                    // 太密的点没必要留，既省内存也让虚线更顺
+                    if (!last || Math.abs(p.x - last.x) + Math.abs(p.y - last.y) > 2) {
+                        S.selDraft.push(p);
+                        // 重画整幅图比较贵，压到一帧一次，拖起来才跟手
+                        if (!S.lassoTick) {
+                            S.lassoTick = true;
+                            requestAnimationFrame(() => { S.lassoTick = false; if (S.selDraft) render(); });
+                        }
+                    }
+                    return;
+                }
                 if (!S.painting) return;
                 paintTo(toCanvasXY(e).x, toCanvasXY(e).y);
                 if (S.mode === 'remove') render(); else refresh();
@@ -2326,6 +2569,11 @@
                 if (panFrom) { panFrom = null; updateCursor(); }
                 // 指针离开画布区就把笔尖圈收起来，否则会一直挂在边缘
                 if (e && e.type === 'pointerleave') hideRing();
+                // 套索松手才真正生成选区；pointerleave 不算松手（指针捕获还在）
+                if (S.lassoing && (!e || e.type !== 'pointerleave')) {
+                    S.lassoing = false;
+                    lassoCommit(S.lassoMode || 'new');
+                }
                 endPaint();
             };
             stage.addEventListener('pointerup', release);
@@ -2359,17 +2607,12 @@
                         return;
                     }
                     if (!e.ctrlKey && !e.metaKey && !e.altKey) {
-                        // E 擦除 / R 恢复 / J 涂抹去物 / H 移动；[ ] 画笔大小；Q 删除预览；K 黑白蒙版
-                        const toolKeys = { e: 'erase', r: 'restore', w: 'wand', j: 'remove', h: 'pan' };
+                        // E 擦除 / R 恢复 / W 点选 / L 套索 / J 涂抹去物 / H 移动；[ ] 画笔大小；K 黑白蒙版
+                        const toolKeys = { e: 'erase', r: 'restore', w: 'wand', l: 'lasso', j: 'remove', h: 'pan' };
                         const k = e.key.toLowerCase();
                         if (toolKeys[k]) {
                             const btn = document.querySelector('#mattingMode button[data-val="' + toolKeys[k] + '"]');
                             if (btn) { e.preventDefault(); btn.click(); return; }
-                        }
-                        if (k === 'q') {
-                            e.preventDefault();
-                            toggleShowCut();
-                            return;
                         }
                         if (k === 'k') {
                             e.preventDefault();
@@ -2388,10 +2631,36 @@
                             return;
                         }
                     }
+                    // Ctrl/⌘+D 取消选区、Ctrl/⌘+Shift+I 反选、Enter 删除选区（和 PS 一致）
+                    if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
+                        e.preventDefault();
+                        if (S.selOn) selClear(); else toast('当前没有选区');
+                        return;
+                    }
+                    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'i' || e.key === 'I')) {
+                        e.preventDefault();
+                        selInvert();
+                        return;
+                    }
+                    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'a' || e.key === 'A')) {
+                        e.preventDefault();
+                        selAll();
+                        return;
+                    }
+                    if (e.key === 'Enter' && S.selOn && !e.ctrlKey && !e.metaKey) {
+                        e.preventDefault();
+                        applySelection(false);
+                        return;
+                    }
                     if (e.key === 'Escape' && S.cmpOn) {
                         S.cmpOn = false;
                         render();
                         syncRmButtons();
+                        return;
+                    }
+                    if (e.key === 'Escape' && S.selOn) {
+                        e.preventDefault();
+                        selClear();
                         return;
                     }
                 }
@@ -2432,9 +2701,20 @@
         seg('#mattingMode', (v) => {
             S.mode = v;
             updateCursor();
-            if (v === 'wand') setStatus('点选：点一下删掉「同色且连通」的整块区域（容差在右侧属性面板，Shift/右键点 = 恢复）');
+            if (v === 'wand') setStatus('点选：点一下圈出同色区域（Shift 加选 / Alt 减选），再点「删除选区」或「恢复选区」');
+            if (v === 'lasso') setStatus('套索：按住拖一圈，松手自动闭合（Shift 加选 / Alt 减选）；Esc 取消选区');
             if (v === 'pan') setStatus('可拖动画面：把要修的地方移到眼前；滚轮或 ➕➖ 可缩放');
             if (v === 'remove') setStatus('涂抹去物：把要移除的人/物/文字涂红（略超出边缘 4–6px），再点下方「移除涂抹区」');
+        });
+        seg('#mattingSelMode', (v) => {
+            S.selMode = v;
+            setStatus('选区模式：' + (v === 'new' ? '新建（每次替换掉旧的）' : v === 'add' ? '加选（并进现有选区）' : '减选（从现有选区里扣掉）'));
+        });
+        seg('#mattingWandScope', (v) => {
+            S.wandScope = v;
+            setStatus(v === 'global'
+                ? '点选范围：全局 —— 全图和这一点颜色接近的像素都算，不管连不连在一起'
+                : '点选范围：连续 —— 只取和点击点连在一起的那片');
         });
         seg('#mattingModel', (v) => {
             S.model = v;
@@ -2481,36 +2761,112 @@
             render();
         });
 
-        const rng = (id, key, fmt, map) => {
+        /* 滑块旁边的数值：既能滚轮调（Shift 大步），也能点进去直接键入。
+           原来只是个只读 <span>，调 1px 只能靠拖，想精确到某个值很难 */
+        const numify = (rangeEl, outEl, fmt) => {
+            if (!rangeEl || !outEl) return null;
+            const min = Number(rangeEl.min), max = Number(rangeEl.max);
+            let wrap = outEl;
+            let inp = null, suf = null;
+            if (outEl.tagName !== 'INPUT') {
+                wrap = document.createElement('span');
+                wrap.className = (outEl.className || 'val') + ' numwrap';
+                inp = document.createElement('input');
+                inp.type = 'text';
+                inp.inputMode = 'decimal';
+                inp.autocomplete = 'off';
+                inp.className = 'num';
+                inp.id = outEl.id;          // 原来的 id 留给输入框，外部仍能按老名字拿到它
+                inp.setAttribute('aria-label', outEl.textContent || '数值');
+                suf = document.createElement('i');
+                suf.className = 'suf';
+                wrap.appendChild(inp);
+                wrap.appendChild(suf);
+                outEl.replaceWith(wrap);
+            } else {
+                inp = outEl;
+            }
+            const show = () => {
+                const text = fmt(Number(rangeEl.value));
+                const m = /^([+-]?\d+(?:\.\d+)?)(.*)$/.exec(text);
+                inp.value = m ? m[1] : text;
+                if (suf) suf.textContent = m ? m[2] : '';
+            };
+            const clamp = (v) => Math.min(max, Math.max(min, v));
+            const bigStep = () => Math.max(2, Math.round(Math.abs(max - min) / 20));
+            const commit = (v) => {
+                const num = parseInt(v, 10);
+                if (!isFinite(num)) { show(); return; }
+                const val = clamp(num);
+                if (String(rangeEl.value) !== String(val)) {
+                    rangeEl.value = String(val);
+                    rangeEl.dispatchEvent(new Event('input', { bubbles: true }));
+                    rangeEl.dispatchEvent(new Event('change', { bubbles: true }));
+                } else {
+                    show();
+                }
+            };
+            const wheel = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const step = e.shiftKey ? bigStep() : 1;
+                commit((Number(rangeEl.value) || 0) + (e.deltaY < 0 ? step : -step));
+            };
+            wrap.addEventListener('wheel', wheel, { passive: false });
+            rangeEl.addEventListener('wheel', wheel, { passive: false });
+            inp.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); commit(inp.value); inp.blur(); }
+                else if (e.key === 'Escape') { e.preventDefault(); show(); inp.blur(); }
+                else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const step = e.shiftKey ? bigStep() : 1;
+                    commit((Number(inp.value) || 0) + (e.key === 'ArrowUp' ? step : -step));
+                }
+            });
+            inp.addEventListener('focus', () => inp.select());
+            inp.addEventListener('blur', () => commit(inp.value));
+            show();
+            return { show };
+        };
+
+        const rng = (id, key, fmt, map, opts) => {
             const el = $(id);
             const out = $(id + 'Val');
             if (!el) return;
+            const num = numify(el, out, fmt);
             const sync = () => {
                 const raw = Number(el.value);
                 S[key] = map ? map(raw) : raw;
-                if (out) out.textContent = fmt(raw);
+                if (num) num.show();
             };
             el.oninput = () => { sync(); if (S.syncRing) S.syncRing(); };
-            el.onchange = () => { sync(); if (S.hasMask) refresh(); if (S.syncRing) S.syncRing(); };
+            el.onchange = () => {
+                sync();
+                if (!(opts && opts.noRefresh) && S.hasMask) refresh();
+                if (S.syncRing) S.syncRing();
+            };
             sync();
         };
-        rng('#mattingBrush', 'brush', v => v + ' px');
-        rng('#mattingHard', 'hardness', v => v + '%', v => v / 100);     // 0-100 → 0-1
+        // 画笔大小/硬度/容差都不影响蒙版，标 noRefresh：滚轮连调时不用每次重算一遍
+        rng('#mattingBrush', 'brush', v => v + ' px', null, { noRefresh: true });
+        rng('#mattingHard', 'hardness', v => v + '%', v => v / 100, { noRefresh: true });
         rng('#mattingFeather', 'feather', v => v + ' px');
         rng('#mattingContrast', 'contrast', v => v + '%', v => v / 100); // 0-100 → 0-1
         rng('#mattingSmooth', 'smooth', v => String(v));
         rng('#mattingShift', 'shift', v => (v > 0 ? '+' : '') + v + '%', v => v / 100); // >0 外扩 <0 收缩
-        rng('#mattingWandTol', 'wandTol', v => String(v));   // 颜色点选的容差
+        rng('#mattingWandTol', 'wandTol', v => String(v), null, { noRefresh: true });   // 点选的容差
+        rng('#mattingSelFeather', 'selFeather', v => v + ' px', null, { noRefresh: true });   // 选区羽化：别动蒙版
 
-        // 删除区预览的叠加色 / 浓度（PS 快速蒙版思路）
+        // 选区的叠加色 / 浓度（PS 快速蒙版那一套）
         const cutColor = $('#mattingCutColor'), cutOp = $('#mattingCutOp');
-        if (cutColor) cutColor.oninput = () => { S.cutColor = cutColor.value; if (S.showCut) render(); };
+        const repaintSel = () => { if (S.selOn) { rebuildSelVisual(); render(); } };
+        if (cutColor) cutColor.oninput = () => { S.cutColor = cutColor.value; repaintSel(); };
         if (cutOp) {
-            const opOut = $('#mattingCutOpVal');
+            const num = numify(cutOp, $('#mattingCutOpVal'), v => v + '%');
             cutOp.oninput = () => {
                 S.cutOp = (Number(cutOp.value) || 0) / 100;
-                if (opOut) opOut.textContent = cutOp.value + '%';
-                if (S.showCut) render();
+                if (num) num.show();
+                repaintSel();
             };
         }
 
@@ -2596,19 +2952,13 @@
             render();
             toast('边缘已精修');
         });
-        // 删除区预览开关（按钮 / 快捷键 Q 共用）
-        const toggleShowCut = () => {
-            S.showCut = !S.showCut;
-            const b = $('#mattingShowCut');
-            if (b) {
-                b.textContent = S.showCut ? '▣ 退出删除预览' : '▨ 预览删除区';
-                b.classList.toggle('on', S.showCut);
-            }
-            if (S.showCut) setStatus('删除预览：灰暗 + 斜纹的部分会被删掉，彩色部分保留（轮廓为分界线）');
-            else S._tmp = null;   // 退出预览就把几张全尺寸临时画布放掉（大图省几十 MB）
-            render();
-        };
-        on('#mattingShowCut', toggleShowCut);
+        // 选区操作：反选 / 扩展 / 收缩 / 删除 / 恢复
+        on('#mattingSelInvert', selInvert);
+        on('#mattingSelAll', selAll);
+        on('#mattingSelGrow', () => selMorph(1));
+        on('#mattingSelShrink', () => selMorph(-1));
+        on('#mattingSelCut', () => applySelection(false));
+        on('#mattingSelKeep', () => applySelection(true));
 
         // 原图残影（借 cut-it-out 的 ghost 叠加思路）：恢复主体时对齐被删掉的部分
         const ghostBtn = $('#mattingGhost');
@@ -2636,10 +2986,10 @@
             }, 30);   // 先让状态栏画出来，再跑连通域扫描
         });
 
-        // 点选模式下右键盘不能弹出菜单（右键 = 恢复）
+        // 点选/套索模式下右键不能弹菜单（右键 = 减选）
         [cv, stage].forEach((el) => {
             if (!el) return;
-            el.addEventListener('contextmenu', (e) => { if (S.mode === 'wand') e.preventDefault(); });
+            el.addEventListener('contextmenu', (e) => { if (S.mode === 'wand' || S.mode === 'lasso') e.preventDefault(); });
         });
 
         setNeedImg(false);
@@ -2676,6 +3026,8 @@
         state: S, autoRemove, exportPNG, exportSVG,
         fitView, zoomCenter, zoomAt, centerOn, applyView,
         purgeBgBlobs, shrinkBgEdge, despeckle, cleanBgFlood, postProcess, render,
+        selClear, applySelection, selInvert, selMorph, selAll, rebuildSelVisual,
+        sel: () => ({ on: S.selOn, area: S.selArea, mode: S.selMode, scope: S.wandScope, feather: S.selFeather }),
         view: () => ({ zoom: S.zoom, tx: S.tx, ty: S.ty, baseScale: S.baseScale, mode: S.mode })
     };
 })();

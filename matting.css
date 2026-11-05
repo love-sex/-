@@ -278,12 +278,60 @@
     box-shadow: inset 0 0 0 1px rgba(var(--primary-rgb), 0.28);
 }
 
-/* 「预览删除区」开启后的选中态：不看清就不知道这个开关生效了 */
-#mattingShowCut.on {
-    background: rgba(var(--primary-rgb), 0.16);
-    border-color: rgba(var(--primary-rgb), 0.5);
-    color: var(--primary);
-    box-shadow: inset 0 0 0 1px rgba(var(--primary-rgb), 0.28);
+/* 滑块旁边那个数值：既能滚轮调，也能点进去直接输入（px / % 后缀单独放，输入框里只有数字） */
+.numwrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+}
+
+.numwrap .num {
+    width: 30px;
+    padding: 2px 2px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 11.5px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    cursor: ns-resize;
+}
+
+.numwrap .num:hover {
+    border-color: rgba(var(--primary-rgb), 0.24);
+    background: rgba(255, 255, 255, 0.55);
+}
+
+.numwrap .num:focus {
+    outline: none;
+    border-color: rgba(var(--primary-rgb), 0.55);
+    background: #fff;
+    color: var(--text);
+    cursor: text;
+}
+
+.numwrap .suf {
+    font-style: normal;
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+/* 数值框不能沿用原来「固定 38/54px」的列宽，否则 px/% 后缀会被裁掉 */
+.matting-range .val.numwrap,
+.mopt-row .val.numwrap {
+    flex: 0 0 auto;
+    min-width: 44px;
+}
+
+/* 选区信息行：数值多了会换行，别把面板撑宽 */
+#mattingSelInfo {
+    display: block;
+    line-height: 1.5;
 }
 
 /* ========== PS 式工作区：左工具栏 + 画布 + 右属性面板 ========== */
@@ -380,6 +428,17 @@
     top: 8px;
 }
 
+/* 属性面板现在有四组，比视口高时让它自己滚，不然底部的「清理杂点」永远够不到 */
+@media (min-width: 1101px) {
+    .matting-props {
+        max-height: calc(100vh - 24px);
+        overflow-y: auto;
+        overflow-x: hidden;
+        scrollbar-width: thin;
+        padding-right: 2px;
+    }
+}
+
 .mgroup {
     border: 1px solid rgba(var(--primary-rgb), 0.12);
     border-radius: var(--radius-sm);
@@ -464,7 +523,9 @@
 }
 
 @media (max-width: 560px) {
-    .matting-work { grid-template-columns: 1fr; gap: 10px; }
+    /* minmax(0,1fr) 而不是 1fr：单列时 1fr 的下限是 min-content，
+       画布固定像素宽度会把这个格子顶宽，小屏就会横向溢出 */
+    .matting-work { grid-template-columns: minmax(0, 1fr); gap: 10px; }
     .matting-rail {
         position: static;
         flex-direction: row;

@@ -20,7 +20,7 @@
     <!-- 登录界面动效 -->
     <link rel="stylesheet" href="login.css?v=20261030">
     <!-- 抠图工具样式 -->
-    <link rel="stylesheet" href="matting.css?v=20261122d">
+    <link rel="stylesheet" href="matting.css?v=20261123b">
     <link rel="stylesheet" href="personality.css?v=20261118p">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
@@ -774,7 +774,8 @@
                             <div class="matting-rail matting-need-img" id="mattingMode" role="toolbar" aria-label="工具">
                                 <button type="button" data-val="erase" class="on" title="擦除背景 (E)"><i>🧽</i><span>擦除</span></button>
                                 <button type="button" data-val="restore" title="恢复主体 (R)"><i>🖌️</i><span>恢复</span></button>
-                                <button type="button" data-val="wand" title="颜色点选：点一下删掉同色连通区，Shift+点 = 恢复（W）"><i>🎯</i><span>点选</span></button>
+                                <button type="button" data-val="wand" title="颜色点选：点一下圈出同色区域（Shift 加选 / Alt 减选）（W）"><i>🎯</i><span>点选</span></button>
+                                <button type="button" data-val="lasso" title="套索：按住拖一圈，松手自动闭合（Shift 加选 / Alt 减选）（L）"><i>➰</i><span>套索</span></button>
                                 <button type="button" data-val="remove" title="涂抹去物 (J)"><i>🪄</i><span>去物</span></button>
                                 <button type="button" data-val="pan" title="移动画布 (H)"><i>✋</i><span>移动</span></button>
                             </div>
@@ -783,7 +784,7 @@
                                     <div class="matting-empty" id="mattingEmpty">还没有图片，先上传一张吧</div>
                                     <canvas id="mattingCanvas"></canvas>
                                 </div>
-                                <p class="muted zoom-tip">滚轮缩放 · 空格/中键拖动 · 双指捏合（手机）· 快捷键：E 擦除 / R 恢复 / W 点选 / J 去物 / H 移动 / [ ] 画笔大小 / Q 删除预览 / K 黑白蒙版</p>
+                                <p class="muted zoom-tip">滚轮缩放 · 空格/中键拖动 · 双指捏合（手机）· 快捷键：E 擦除 / R 恢复 / W 点选 / L 套索 / J 去物 / H 移动 / [ ] 画笔大小 / K 黑白蒙版 / Esc 取消选区 / Enter 删除选区</p>
                             </div>
                             <aside class="matting-props" id="mattingProps">
                                 <div class="mgroup matting-need-img">
@@ -798,10 +799,48 @@
                                         <input type="range" id="mattingHard" min="0" max="100" value="60">
                                         <span class="val" id="mattingHardVal">60%</span>
                                     </div>
+                                </div>
+                                <div class="mgroup matting-need-img">
+                                    <div class="mgroup-t">🎯 选区</div>
+                                    <div class="matting-seg" id="mattingSelMode" title="新建：替换当前选区；加选：并进选区（Shift）；减选：从选区里扣掉（Alt）">
+                                        <button type="button" data-val="new" class="on">新建</button>
+                                        <button type="button" data-val="add">加选</button>
+                                        <button type="button" data-val="sub">减选</button>
+                                    </div>
                                     <div class="matting-range">
                                         <label for="mattingWandTol">容差</label>
-                                        <input type="range" id="mattingWandTol" min="1" max="100" value="18" title="颜色点选的容差（点选工具用）">
+                                        <input type="range" id="mattingWandTol" min="1" max="100" value="18" title="点选时判定「同色」的宽容度">
                                         <span class="val" id="mattingWandTolVal">18</span>
+                                    </div>
+                                    <div class="mopt-row">
+                                        <div class="matting-seg" id="mattingWandScope" style="flex:1;" title="连续：只取和点击点相连的区域；全局：全图同色都算">
+                                            <button type="button" data-val="contiguous" class="on">连续</button>
+                                            <button type="button" data-val="global">全局</button>
+                                        </div>
+                                        <button class="btn btn-ghost btn-sm" id="mattingSelInvert" title="反选（Ctrl+Shift+I）" style="flex:none;padding:5px 6px;">⇄</button>
+                                        <button class="btn btn-ghost btn-sm" id="mattingSelAll" title="全选（Ctrl+A）" style="flex:none;padding:5px 6px;">▣</button>
+                                    </div>
+                                    <div class="mopt-row">
+                                        <label for="mattingSelFeather">羽化</label>
+                                        <input type="range" id="mattingSelFeather" min="0" max="12" value="2" title="应用选区时柔化边缘">
+                                        <span class="val" id="mattingSelFeatherVal">2 px</span>
+                                    </div>
+                                    <div class="mopt-row">
+                                        <button class="btn btn-ghost btn-sm" id="mattingSelGrow" style="flex:1;padding:5px 4px;" title="选区向外扩 1px">＋ 扩展</button>
+                                        <button class="btn btn-ghost btn-sm" id="mattingSelShrink" style="flex:1;padding:5px 4px;" title="选区向内收 1px">－ 收缩</button>
+                                    </div>
+                                    <div class="mopt-row">
+                                        <button class="btn btn-gold btn-sm" id="mattingSelCut" style="flex:1;padding:5px 4px;">✂ 删除选区</button>
+                                        <button class="btn btn-ghost btn-sm" id="mattingSelKeep" style="flex:1;padding:5px 4px;">↩ 恢复选区</button>
+                                    </div>
+                                    <div class="mopt-row" style="margin-bottom:2px;">
+                                        <span class="matting-hint" id="mattingSelInfo" style="font-size:11.5px;">未选区：用点选或套索圈出范围</span>
+                                    </div>
+                                    <div class="mopt-row">
+                                        <label for="mattingCutColor">叠加</label>
+                                        <input type="color" id="mattingCutColor" value="#d9463c" title="选区的叠加颜色">
+                                        <input type="range" id="mattingCutOp" min="0" max="80" value="30" title="叠加浓度">
+                                        <span class="val" id="mattingCutOpVal">30%</span>
                                     </div>
                                 </div>
                                 <div class="mgroup matting-need-img">
@@ -814,16 +853,7 @@
                                         <button type="button" data-val="bw" title="黑白蒙版 (K)">黑白</button>
                                     </div>
                                     <div class="mopt-row">
-                                        <button class="btn btn-ghost btn-sm" id="mattingShowCut" style="flex:1;">▨ 预览删除区</button>
-                                    </div>
-                                    <div class="mopt-row">
                                         <button class="btn btn-ghost btn-sm" id="mattingGhost" style="flex:1;" title="把原图淡淡叠在成品上，方便「恢复」时对齐被删掉的部分">👻 原图残影</button>
-                                    </div>
-                                    <div class="mopt-row">
-                                        <label for="mattingCutColor">叠加色</label>
-                                        <input type="color" id="mattingCutColor" value="#d9463c" title="删除区的叠加颜色">
-                                        <input type="range" id="mattingCutOp" min="0" max="80" value="30" title="叠加浓度">
-                                        <span class="val" id="mattingCutOpVal">30%</span>
                                     </div>
                                 </div>
                                 <div class="mgroup matting-need-img">
@@ -1446,7 +1476,7 @@ PORTFOLIO</p>
     <script src="script-game.js"></script>
     <script src="script.js?v=20261030"></script>
     <script src="workbench.js?v=20261121d"></script>
-    <script src="matting.js?v=20261122g"></script>
+    <script src="matting.js?v=20261123b"></script>
     <script src="personality.js?v=20261118p"></script>
     <script src="portfolio.js?v=20261029"></script>
     <script src="login-cards.js?v=20261030"></script>
