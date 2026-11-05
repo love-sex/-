@@ -3,7 +3,8 @@
  * 另含「魔法橡皮擦」：涂抹要移除的人/物/文字，本地重建背景（对齐 magicremover.org/magic-eraser 的交互）
  * 全部在浏览器本地完成，图片不会上传到任何服务器。
  * 引擎：ISNet（MIT，imgly/isnet-general-onnx）+ onnxruntime-web（MIT）
- * 去物：自研 Telea 思路修复（轴向加权插值 + 洞内扩散平滑，参考 OpenCV photo 模块 cv::INPAINT_TELEA）
+ * 去物：MI-GAN（MIT，Picsart-AI-Research/MI-GAN，ICCV 2023）本地 wasm 推理为主，
+ *       失败/离线时回落到自研插值修复（参考 OpenCV photo 模块 cv::INPAINT_TELEA 的思路）
  * 矢量：ImageTracerJS（The Unlicense / 公有领域）
  * ========================================================= */
 (function () {
@@ -36,6 +37,12 @@
             mean: [0.5, 0.5, 0.5], std: [1.0, 1.0, 1.0],
             files: ['isnet_quint8.onnx.part1', 'isnet_quint8.onnx.part2', 'isnet_quint8.onnx.part3']
         }
+    };
+    // 去物（涂抹修复）模型：MI-GAN（Picsart-AI-Research/MI-GAN，ICCV 2023，MIT，706★）
+    // 移动端推理网络，26.8MB，固定 512×512 输入；拆两片以适配 jsDelivr 单文件 20MB 上限
+    const MIGAN = {
+        key: 'migan512', label: 'AI 修复', bytes: 28079181, size: 512,
+        files: ['migan.onnx.part1', 'migan.onnx.part2']
     };
     // 多源兜底：jsDelivr 官方 → fastly 镜像 → gcore 镜像 → 站点自身，慢/失败都自动换下一个
     const SOURCES = [
@@ -83,8 +90,11 @@
         // 涂抹去物（魔法橡皮擦）：独立于抠图蒙版的红色涂抹区
         rmask: null, rmctx: null,
         rmHas: false,        // 是否有未处理的涂抹
-        inpaintPrev: null,   // 上一次擦除前的整图，用于撤销 / 按住对比
-        showCmp: false,      // 按住对比原图中
+        inpaintHist: [],     // 每次擦除前的整图快照（最多 6 张），支持多步撤销 + 前后对比
+        cmpOn: false,        // 前后对比模式
+        cmpPos: 50,          // 对比分割线位置（0-100）
+        removeEngine: 'ai',  // ai（MI-GAN）| local（本地插值）
+        migan: null,         // MI-GAN 会话
         // 画布视图：布局尺寸 = 图片像素 * baseScale，再乘 zoom 得到实际显示大小
         zoom: 1, tx: 0, ty: 0, baseScale: 1, userZoomed: false,
         brush: 40,
@@ -162,7 +172,7 @@
         S.rmask.width = w; S.rmask.height = h;
         S.rmctx = S.rmask.getContext('2d', { willReadFrequently: true });
         S.rmHas = false;
-        S.inpaintPrev = null; S.showCmp = false;
+        S.inpaintHist = []; S.cmpOn = false;
         // 缓存原图 RGB，边缘精修时做引导图
         cacheRGB();
     };
@@ -191,15 +201,53 @@
         ctx.drawImage(tint, 0, 0);
     };
 
+    // 前后对比：左半边画「擦除前」，右半边画「擦除后」，中间一条分割线。
+    // 用像素级分割而不是两层 DOM，缩放/平移天然同步，也不再依赖按住手势（手机上好按）
+    const drawCompare = () => {
+        const ctx = S.vctx;
+        const before = S.inpaintHist[S.inpaintHist.length - 1];
+        if (!before) return false;
+        const cut = Math.max(0, Math.min(S.w, Math.round(S.w * S.cmpPos / 100)));
+        ctx.drawImage(before, 0, 0, S.w, S.h);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(cut, 0, S.w - cut, S.h);
+        ctx.clip();
+        ctx.drawImage(S.src, 0, 0, S.w, S.h);
+        ctx.restore();
+        // 分割线 + 两侧标签
+        ctx.fillStyle = 'rgba(255,255,255,0.92)';
+        ctx.fillRect(cut - 1, 0, 2, S.h);
+        const fs = Math.max(12, Math.round(S.w / 42));
+        ctx.font = '600 ' + fs + 'px system-ui, -apple-system, sans-serif';
+        const pad = Math.round(fs * 0.5);
+        const tag = (txt, x) => {
+            const w = ctx.measureText(txt).width + pad * 2;
+            const h = fs + pad * 1.4;
+            const y = pad * 1.6;
+            ctx.fillStyle = 'rgba(28,24,20,0.6)';
+            ctx.fillRect(x, y, w, h);
+            ctx.fillStyle = '#fff';
+            ctx.fillText(txt, x + pad, y + fs + pad * 0.35);
+            return w;
+        };
+        tag('擦除前', Math.max(pad, cut - Math.max(70, S.w * 0.12)));
+        tag('擦除后', Math.min(S.w - Math.max(70, S.w * 0.12), cut + pad));
+        return true;
+    };
+
     const render = () => {
         if (!S.src) return;
         const ctx = S.vctx;
         ctx.clearRect(0, 0, S.w, S.h);
         ctx.globalCompositeOperation = 'source-over';
+        // 对比模式下才显示分割线滑块
+        const cmpRow = $('#mattingCmpRow');
+        if (cmpRow) cmpRow.classList.toggle('show', !!(S.cmpOn && S.inpaintHist.length));
+        // 对比模式优先（不受抠图蒙版影响，否则去掉背景后两边看起来一模一样）
+        if (S.cmpOn && drawCompare()) { drawRm(); return; }
         // 正常预览用「去过底色」的前景图，避免边缘挂一圈背景色；显示删除区时用原图，方便对着改
-        // 按住「对比」时强制回看擦除前的原图
-        const base = (S.showCmp && S.inpaintPrev) ? S.inpaintPrev : S.src;
-        ctx.drawImage((S.hasMask && S.fg && !S.showCut) ? S.fg : base, 0, 0, S.w, S.h);
+        ctx.drawImage((S.hasMask && S.fg && !S.showCut) ? S.fg : S.src, 0, 0, S.w, S.h);
         if (!S.hasMask) { drawRm(); return; }
         if (S.showCut) {
             // 显示删除区：不抠掉原图，只用「半透明斜纹」把会被删掉的区域标记出来。
@@ -1304,12 +1352,198 @@
         return holes;
     };
 
+    /* ---------------- MI-GAN：AI 图像修复（本地 wasm 推理） ----------------
+       来源：https://github.com/Picsart-AI-Research/MI-GAN （ICCV 2023，MIT）
+       移动端优化的轻量 GAN，输入 image(uint8 NCHW 1×3×512×512) + mask(uint8 1×1×512×512)，
+       输出 uint8 1×3×512×512。对每个涂抹区裁一块带上下文的正方形，缩放到 512 推理，再贴回原图。 */
+    const ensureMigan = async () => {
+        if (S.migan) return S.migan;
+        let buf = await idbGet('model:' + MIGAN.key).catch(() => null);
+        if (buf && buf.byteLength !== MIGAN.bytes) buf = null;
+        if (!buf) {
+            buf = await downloadModel(MIGAN);
+            await idbPut('model:' + MIGAN.key, buf).catch(() => { });
+        }
+        const needWasm = true;
+        const wasmP = needWasm ? loadWasmBinary().catch(() => null) : Promise.resolve(null);
+        const [ort, wasmBuf] = await Promise.all([loadORT(), wasmP]);
+        if (wasmBuf) ort.env.wasm.wasmBinary = wasmBuf;
+        setStatus('正在初始化 AI 修复模型...');
+        S.migan = await withTimeout(ort.InferenceSession.create(new Uint8Array(buf), {
+            executionProviders: ['wasm'],
+            graphOptimizationLevel: 'all'
+        }), 120000, 'AI 修复模型初始化超时，请刷新重试');
+        S.miganSessionKey = MIGAN.key;
+        return S.migan;
+    };
+
+    // 把 work 画布上 m 标记的区域交给 MI-GAN 重建；返回 true 表示成功
+    const runMigan = async (work, m, w, h) => {
+        const sess = await ensureMigan();
+        const ort = S.ort;
+        const size = MIGAN.size;
+
+        // 1) 涂抹区包围盒
+        let minX = w, minY = h, maxX = -1, maxY = -1;
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                if (!m[y * w + x]) continue;
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+        }
+        if (maxX < 0) return false;
+        const bw = maxX - minX + 1, bh = maxY - minY + 1;
+
+        // 2) 裁一块正方形（洞外留 0.9 倍上下文，模型才知道该补什么）
+        const side = Math.max(64, Math.min(Math.round(Math.max(bw, bh) * 1.9), Math.max(w, h)));
+        const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+        const ox = Math.round(cx - side / 2), oy = Math.round(cy - side / 2);
+
+        const sq = document.createElement('canvas');
+        sq.width = size; sq.height = size;
+        const sqc = sq.getContext('2d', { willReadFrequently: true });
+        sqc.imageSmoothingEnabled = true;
+        sqc.imageSmoothingQuality = 'high';
+        sqc.drawImage(work, ox, oy, side, side, 0, 0, size, size);
+
+        // 3) 蒙版按「最近邻」重采样到 512，避免小洞被插值抹掉；再外扩 3px 盖住软边
+        const rm = S.rmctx.getImageData(0, 0, w, h).data;
+        const key = new Uint8Array(size * size);
+        for (let y = 0; y < size; y++) {
+            const sy = Math.floor(oy + (y + 0.5) * side / size);
+            for (let x = 0; x < size; x++) {
+                const sx = Math.floor(ox + (x + 0.5) * side / size);
+                if (sx < 0 || sy < 0 || sx >= w || sy >= h) continue;
+                if (rm[(sy * w + sx) * 4 + 3] > 20) key[y * size + x] = 1;
+            }
+        }
+        const mk = dilateMask(key, size, size, 3);
+
+        // 4) 组 tensor
+        const px = sqc.getImageData(0, 0, size, size).data;
+        const n = size * size;
+        const img = new Uint8Array(n * 3);
+        for (let i = 0; i < n; i++) {
+            img[i] = px[i * 4];
+            img[n + i] = px[i * 4 + 1];
+            img[2 * n + i] = px[i * 4 + 2];
+        }
+        // 实测这个 pipeline 的 mask 是「已知区域」=255、待补区域=0（喂反了会把整张图重画成木纹，
+        // 这就是第一版「AI 补出一片毛刺纹理」的根因）
+        const maskT = new Uint8Array(n);
+        for (let i = 0; i < n; i++) maskT[i] = mk[i] ? 0 : 255;
+
+        const t0 = performance.now();
+        const res = await sess.run({
+            image: new ort.Tensor('uint8', img, [1, 3, size, size]),
+            mask: new ort.Tensor('uint8', maskT, [1, 1, size, size])
+        });
+        const outT = res.result || res[Object.keys(res)[0]];
+        const od = outT.data;
+        const scaled = outT.dims && outT.dims[1] === 3;
+
+        // 5) 还原成 512 画布
+        const outp = document.createElement('canvas');
+        outp.width = size; outp.height = size;
+        const opc = outp.getContext('2d');
+        const oi = opc.createImageData(size, size);
+        for (let i = 0; i < n; i++) {
+            if (scaled) {
+                oi.data[i * 4] = od[i]; oi.data[i * 4 + 1] = od[n + i]; oi.data[i * 4 + 2] = od[2 * n + i];
+            } else {
+                oi.data[i * 4] = od[i * 3]; oi.data[i * 4 + 1] = od[i * 3 + 1]; oi.data[i * 4 + 2] = od[i * 3 + 2];
+            }
+            oi.data[i * 4 + 3] = 255;
+        }
+        opc.putImageData(oi, 0, 0);
+
+        // 6) 贴回：按涂抹 alpha 混合（软边自然过渡，画笔外的像素一律不动）
+        const pat = document.createElement('canvas');
+        pat.width = w; pat.height = h;
+        pat.getContext('2d').drawImage(outp, ox, oy, side, side);
+
+        const bx = Math.max(0, minX - 6), by = Math.max(0, minY - 6);
+        const bxx = Math.min(w, maxX + 7), byy = Math.min(h, maxY + 7);
+        const cw = bxx - bx, chh = byy - by;
+        if (cw <= 0 || chh <= 0) return false;
+        const wc = work.getContext('2d', { willReadFrequently: true });
+        const dst = wc.getImageData(bx, by, cw, chh);
+        const src = pat.getContext('2d').getImageData(bx, by, cw, chh).data;
+        const d = dst.data;
+
+        // 融合权重：涂抹 alpha → 二值 → 外扩 3px（盖掉物体残留的一圈边）→ 3×3 均值软化边缘
+        const kk = new Float32Array(cw * chh);
+        for (let y = 0; y < chh; y++) {
+            for (let x = 0; x < cw; x++) {
+                const a = rm[((by + y) * w + (bx + x)) * 4 + 3] / 255;
+                kk[y * cw + x] = a > 0.06 ? 1 : 0;
+            }
+        }
+        const dil = (srcA, radius) => {
+            let cur = srcA;
+            for (let r = 0; r < radius; r++) {
+                const out = new Float32Array(cur);
+                for (let y = 0; y < chh; y++) {
+                    for (let x = 0; x < cw; x++) {
+                        const i = y * cw + x;
+                        if (cur[i] > 0) continue;
+                        const l = x > 0 && cur[i - 1] > 0;
+                        const rr = x < cw - 1 && cur[i + 1] > 0;
+                        const u = y > 0 && cur[i - cw] > 0;
+                        const dn = y < chh - 1 && cur[i + cw] > 0;
+                        if (l || rr || u || dn) out[i] = 1;
+                    }
+                }
+                cur = out;
+            }
+            return cur;
+        };
+        const dil2 = dil(kk, 3);
+        // 3×3 均值：让贴补区域的边界过渡成 1px 渐变而不是硬切线
+        const soft = new Float32Array(cw * chh);
+        for (let y = 0; y < chh; y++) {
+            for (let x = 0; x < cw; x++) {
+                let sum = 0, n = 0;
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        const xx = x + dx, yy = y + dy;
+                        if (xx < 0 || yy < 0 || xx >= cw || yy >= chh) continue;
+                        sum += dil2[yy * cw + xx]; n++;
+                    }
+                }
+                soft[y * cw + x] = sum / n;
+            }
+        }
+        for (let y = 0; y < chh; y++) {
+            for (let x = 0; x < cw; x++) {
+                const k = soft[y * cw + x];
+                if (k <= 0.02) continue;
+                const q = (y * cw + x) * 4;
+                d[q] = d[q] * (1 - k) + src[q] * k;
+                d[q + 1] = d[q + 1] * (1 - k) + src[q + 1] * k;
+                d[q + 2] = d[q + 2] * (1 - k) + src[q + 2] * k;
+            }
+        }
+        wc.putImageData(dst, bx, by);
+        return { ms: Math.round(performance.now() - t0), side, scale: size / side };
+    };
+
     const syncRmButtons = () => {
         const dis = (id, d) => { const el = $(id); if (el) el.disabled = d; };
-        dis('#mattingInpaint', !S.rmHas);
+        const n = S.inpaintHist.length;
+        dis('#mattingInpaint', !S.rmHas || !!S.busy);
         dis('#mattingInpaintClear', !S.rmHas);
-        dis('#mattingInpaintUndo', !S.inpaintPrev);
-        dis('#mattingInpaintCmp', !S.inpaintPrev);
+        // 撤销 / 对比 常开：按钮永远可点，没东西可撤时给 toast 提示，
+        // 比灰掉更明确（灰按钮点了毫无反应的体验最差）
+        dis('#mattingInpaintUndo', false);
+        dis('#mattingInpaintCmp', false);
+        const u = $('#mattingInpaintUndo');
+        if (u) u.textContent = n > 1 ? '↩ 撤销擦除 (' + n + ')' : '↩ 撤销擦除';
+        const c = $('#mattingInpaintCmp');
+        if (c) c.classList.toggle('on', !!S.cmpOn);
     };
 
     const clearRm = (silent) => {
@@ -1322,45 +1556,80 @@
     const doInpaint = async () => {
         if (!S.src) return toast('请先上传图片');
         if (!S.rmHas) return toast('先在图上涂抹要移除的区域（模式切到「🪄 涂抹去物」）');
-        // 权威画布：当前显示像素（可能已被上一轮擦除过）
+        if (S.busy) return toast('正在处理，稍等一下');
         const work = document.createElement('canvas');
         work.width = S.w; work.height = S.h;
         const wc = work.getContext('2d', { willReadFrequently: true });
         wc.drawImage(S.src, 0, 0, S.w, S.h);
-        // 擦除前快照：撤销 / 按住对比都要用
-        const prev = document.createElement('canvas');
-        prev.width = S.w; prev.height = S.h;
-        prev.getContext('2d').drawImage(work, 0, 0);
         const rm = S.rmctx.getImageData(0, 0, S.w, S.h).data;
         const m0 = new Uint8Array(S.w * S.h);
         let n = 0;
         for (let i = 0; i < m0.length; i++) { if (rm[i * 4 + 3] > 20) { m0[i] = 1; n++; } }
         if (!n) return toast('涂抹区是空的');
-        setStatus('正在重建背景（本地修复，图大稍等）...');
-        await sleep(30);
-        const im = wc.getImageData(0, 0, S.w, S.h);
-        const t0 = performance.now();
-        inpaintTelea(im.data, dilateMask(m0, S.w, S.h, 2), S.w, S.h);
-        wc.putImageData(im, 0, 0);
-        S.inpaintPrev = prev;
-        S.src = work;                 // 之后的一切（精修/导出/再去背景）都用修复后的图
-        cacheRGB();
-        clearRm(true);
-        if (S.hasMask) scheduleFg(); else render();
+
+        S.busy = true;
         syncRmButtons();
-        const sec = ((performance.now() - t0) / 1000).toFixed(1);
-        setStatus('已移除 ' + n.toLocaleString() + ' px（' + sec + 's）。复杂纹理可分小块多次擦，效果更稳。');
-        toast('已移除涂抹区');
+        const t0 = performance.now();
+        let engine = 'local';
+        let note = '';
+        try {
+            if (S.removeEngine === 'ai') {
+                setProgress(0.05);
+                setStatus('AI 正在补全...（首次使用需下载 27MB 模型，之后缓存在本地秒开）');
+                await sleep(30);
+                try {
+                    const r = await runMigan(work, m0, S.w, S.h);
+                    if (r) { engine = 'ai'; note = ' · AI ' + r.ms + 'ms · ' + (r.scale > 1 ? '放大 ' + r.scale.toFixed(1) + '×' : '原尺寸'); }
+                    else { note = ' · 涂抹区太小，已用本地修复'; }
+                } catch (err) {
+                    console.warn('[migan]', err);
+                    note = ' · AI 模型不可用（' + (err && err.message ? err.message.slice(0, 40) : '未知错误') + '），已用本地修复';
+                }
+            }
+            if (engine === 'local') {
+                setStatus(S.removeEngine === 'ai' ? 'AI 不可用，改用本地修复...' : '本地修复中，图大稍等...');
+                await sleep(20);
+                const im = wc.getImageData(0, 0, S.w, S.h);
+                inpaintTelea(im.data, dilateMask(m0, S.w, S.h, 2), S.w, S.h);
+                wc.putImageData(im, 0, 0);
+            }
+            // 擦除前快照：撤销 / 前后对比都靠它（work 已被改写，所以从 S.src 重画）
+            const before = document.createElement('canvas');
+            before.width = S.w; before.height = S.h;
+            before.getContext('2d').drawImage(S.src, 0, 0, S.w, S.h);
+            S.inpaintHist.push(before);
+            if (S.inpaintHist.length > 6) S.inpaintHist.shift();
+
+            S.src = work;
+            cacheRGB();
+            clearRm(true);
+            if (S.hasMask) scheduleFg(); else render();
+            syncRmButtons();
+            const sec = ((performance.now() - t0) / 1000).toFixed(1);
+            setStatus('已移除 ' + n.toLocaleString() + ' px（' + sec + 's' + note + '）。可点「对比原图」看前后差异。');
+            toast(engine === 'ai' ? 'AI 已补齐背景' : '已移除涂抹区');
+        } catch (e) {
+            setStatus('修复失败：' + (e && e.message ? e.message : e));
+            toast('修复失败，请重试');
+        } finally {
+            setProgress(null);
+            S.busy = false;
+            syncRmButtons();
+        }
     };
 
     const undoInpaint = () => {
-        if (!S.inpaintPrev) return;
-        S.src = S.inpaintPrev;
-        S.inpaintPrev = null;
+        if (S.busy) return toast('正在处理，稍等一下');
+        if (!S.inpaintHist.length) return toast('还没有擦除记录，先涂抹并点「移除涂抹区」');
+        const prev = S.inpaintHist.pop();
+        S.src = prev;
         cacheRGB();
+        if (!S.inpaintHist.length) S.cmpOn = false;
         if (S.hasMask) scheduleFg(); else render();
         syncRmButtons();
-        toast('已撤销上次擦除');
+        const left = S.inpaintHist.length;
+        toast(left ? '已撤销这次擦除，还可撤销 ' + left + ' 步' : '已撤销到擦除前的原图');
+        setStatus(left ? '已撤销一次擦除，还能继续撤销 ' + left + ' 步' : '已回到擦除前的样子');
     };
 
     /* ---------------- 载入图片 ---------------- */
@@ -1619,7 +1888,7 @@
 
     const reset = () => {
         S.src = null; S.hasMask = false; S.fg = null; S.bgColor = undefined; S.pickKey = null; S.undo = []; S.redo = [];
-        S.inpaintPrev = null; S.showCmp = false;
+        S.inpaintHist = []; S.cmpOn = false;
         if (S.rmctx) S.rmctx.clearRect(0, 0, S.w, S.h);
         S.rmHas = false;
         syncRmButtons();
@@ -1811,6 +2080,20 @@
                 return !!sec && sec.offsetParent !== null;
             };
             window.addEventListener('keydown', (e) => {
+                // 涂抹去物模式下 Ctrl/⌘+Z = 撤销擦除；Esc 退出对比
+                if (S.src && viewVisible() && !isTyping(e.target)) {
+                    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z') && S.mode === 'remove') {
+                        e.preventDefault();
+                        undoInpaint();
+                        return;
+                    }
+                    if (e.key === 'Escape' && S.cmpOn) {
+                        S.cmpOn = false;
+                        render();
+                        syncRmButtons();
+                        return;
+                    }
+                }
                 if (e.code !== 'Space' || isTyping(e.target) || !S.src || !viewVisible()) return;
                 if (!S.spaceDown) { S.spaceDown = true; updateCursor(); }
                 e.preventDefault();
@@ -1904,14 +2187,44 @@
         on('#mattingInpaint', doInpaint);
         on('#mattingInpaintUndo', undoInpaint);
         on('#mattingInpaintClear', () => { if (!S.rmHas) return; clearRm(); toast('已清除涂抹'); });
+        // 前后对比：点一下开/关（配合下方滑块调分割线位置），不再依赖「按住」——手机上按不住、也没有反馈
+        const cmpRow = $('#mattingCmpRow');
+        const cmpPos = $('#mattingCmpPos');
+        const syncCmp = () => {
+            if (cmpRow) cmpRow.classList.toggle('show', !!S.cmpOn);
+            if (cmpPos) cmpPos.value = String(S.cmpPos);
+            syncRmButtons();
+        };
         const cmpBtn = $('#mattingInpaintCmp');
         if (cmpBtn) {
-            cmpBtn.onpointerdown = () => { if (!S.inpaintPrev) return; S.showCmp = true; render(); };
-            const cmpUp = () => { if (S.showCmp) { S.showCmp = false; render(); } };
-            cmpBtn.onpointerup = cmpUp;
-            cmpBtn.onpointerleave = cmpUp;
-            cmpBtn.onpointercancel = cmpUp;
+            cmpBtn.onclick = () => {
+                if (!S.inpaintHist.length) return toast('先擦除一次，再来对比前后');
+                S.cmpOn = !S.cmpOn;
+                syncCmp();
+                render();
+                toast(S.cmpOn ? '对比中：左=擦除前，右=擦除后' : '已退出对比');
+            };
         }
+        if (cmpPos) {
+            cmpPos.oninput = () => { S.cmpPos = Number(cmpPos.value) || 0; if (S.cmpOn) render(); };
+        }
+
+        // 补全引擎：AI（MI-GAN）/ 本地快速
+        seg('#mattingEngine', (v) => {
+            S.removeEngine = v;
+            try { localStorage.setItem('mattingRemoveEngine', v); } catch (e) { }
+            setStatus(v === 'ai'
+                ? '补全引擎：AI（MI-GAN 512，首次需下载 27MB，之后本地缓存秒开）'
+                : '补全引擎：本地快速（纯 JS 插值+平滑，适合纯色/渐变背景）');
+        });
+        try {
+            const savedEngine = localStorage.getItem('mattingRemoveEngine');
+            if (savedEngine === 'ai' || savedEngine === 'local') {
+                S.removeEngine = savedEngine;
+                $$('#mattingEngine button').forEach(b => b.classList.toggle('on', b.dataset.val === savedEngine));
+            }
+        } catch (e) { }
+        syncCmp();
         syncRmButtons();
         on('#mattingUndo', undo);
         on('#mattingRedo', redo);
