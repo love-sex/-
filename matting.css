@@ -563,3 +563,88 @@
     #mattingMode { display: flex; width: 100%; }
     #mattingMode button { flex: 1 1 auto; padding: 6px 8px; font-size: 11.5px; }
 }
+
+/* ==========================================================
+   抠图页布局：其它页面是 680~860px 的窄栏，抠图要被挤死；
+   单独放宽到 1560，上传/去背景两张卡并排，工作区吃掉剩下的宽度。
+   ========================================================== */
+.view[data-view="matting"] .view-content { max-width: 1560px; }
+
+.matting-setup {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 14px;
+    align-items: start;
+    margin-bottom: 14px;
+}
+
+.matting-setup > .card { margin-bottom: 0; }
+
+/* 只有桌面才三栏并排；窄屏还是原来的堆叠方式 */
+@media (min-width: 1101px) {
+    .matting-work {
+        grid-template-columns: 64px minmax(0, 1fr) 252px;
+        gap: 16px;
+    }
+    .matting-rail { gap: 7px; }
+    .matting-rail button { padding: 9px 2px 7px; }
+    .matting-rail button i { font-size: 18px; }
+    .matting-rail button span { font-size: 11px; }
+    .matting-props { gap: 12px; }
+    .mgroup { padding: 12px 13px 6px; }
+    .mgroup-t { font-size: 12.5px; margin-bottom: 11px; }
+    .mgroup .matting-range { margin-bottom: 11px; }
+    .mgroup .matting-range > label { flex-basis: 54px; font-size: 12.5px; }
+}
+
+/* ---------- 笔刷库 ---------- */
+.brush-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+    max-height: 86px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.brush-chip {
+    position: relative;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    padding: 0;
+    border: 1px solid rgba(var(--primary-rgb), 0.18);
+    border-radius: 9px;
+    background-color: #fff;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 26px 26px;
+    cursor: pointer;
+}
+
+.brush-chip:hover { border-color: rgba(var(--primary-rgb), 0.42); }
+
+.brush-chip.on {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(201, 163, 90, 0.22);
+}
+
+/* 圆头软笔刷的示意（不成位图，省内存） */
+.brush-chip.round {
+    background-image: radial-gradient(circle at 50% 50%, #6b5638 0 30%, rgba(107, 86, 56, 0.55) 46%, rgba(107, 86, 56, 0) 70%);
+    background-size: 40px 40px;
+}
+
+.brush-tip-note {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.45;
+}
+
+/* 把 .abr / 图片直接拖到笔刷列表上 */
+.brush-list.drop-hover {
+    outline: 1px dashed var(--accent);
+    outline-offset: 2px;
+    border-radius: 8px;
+}

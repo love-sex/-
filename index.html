@@ -20,7 +20,7 @@
     <!-- 登录界面动效 -->
     <link rel="stylesheet" href="login.css?v=20261030">
     <!-- 抠图工具样式 -->
-    <link rel="stylesheet" href="matting.css?v=20261123c">
+    <link rel="stylesheet" href="matting.css?v=20261123e">
     <link rel="stylesheet" href="personality.css?v=20261118p">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
@@ -719,6 +719,7 @@
                         <h2 class="page-title">✂️ 抠图</h2>
                     </div>
 
+                    <div class="matting-setup">
                     <div class="card">
                         <div class="card-title">📤 上传图片</div>
                         <p class="muted" style="margin:-4px 0 12px;">支持 JPG / PNG / WebP，可以直接拖拽进来，也可以 Ctrl+V 粘贴。图片只在你自己的浏览器里处理，不会上传到任何服务器。</p>
@@ -749,6 +750,7 @@
                         <button class="btn btn-gold btn-block" id="mattingAutoBtn">✨ 一键去背景</button>
                         <div class="matting-progress" id="mattingProgress" style="display:none;"><i id="mattingProgressBar"></i></div>
                         <div class="muted" id="mattingStatus" style="margin-top:10px;"></div>
+                    </div>
                     </div>
 
                     <div class="card" id="mattingWork">
@@ -789,6 +791,12 @@
                             <aside class="matting-props" id="mattingProps">
                                 <div class="mgroup matting-need-img">
                                     <div class="mgroup-t">🖌 画笔</div>
+                                    <div class="brush-list" id="mattingBrushList" role="listbox" aria-label="笔刷库"></div>
+                                    <div class="mopt-row">
+                                        <button class="btn btn-ghost btn-sm" id="mattingBrushAdd" style="flex:1;padding:5px 2px;" title="把笔刷拖进面板也行：支持 Photoshop 的 .abr（v6/7/9/10，8/16/1 位，raw 与 RLE 压缩），也支持 PNG/JPG/WebP 笔尖图片">＋ 导入笔刷</button>
+                                        <button class="btn btn-ghost btn-sm" id="mattingBrushDel" style="flex:none;padding:5px 7px;" title="删除当前笔刷">🗑</button>
+                                    </div>
+                                    <input type="file" id="mattingBrushFile" accept=".abr,image/png,image/jpeg,image/webp,image/gif,image/bmp" multiple hidden>
                                     <div class="matting-range">
                                         <label for="mattingBrush">大小</label>
                                         <input type="range" id="mattingBrush" min="1" max="300" value="40">
@@ -798,6 +806,14 @@
                                         <label for="mattingHard">硬度</label>
                                         <input type="range" id="mattingHard" min="0" max="100" value="60">
                                         <span class="val" id="mattingHardVal">60%</span>
+                                    </div>
+                                    <div class="matting-range">
+                                        <label for="mattingSpacing">间距</label>
+                                        <input type="range" id="mattingSpacing" min="5" max="100" value="25" title="笔尖之间的间隔，占画笔大小的百分比（PS 的 Spacing）">
+                                        <span class="val" id="mattingSpacingVal">25%</span>
+                                    </div>
+                                    <div class="mopt-row">
+                                        <span class="brush-tip-note" id="mattingBrushTip">圆头软笔刷：大小 / 硬度可调</span>
                                     </div>
                                 </div>
                                 <div class="mgroup matting-need-img">
@@ -830,10 +846,6 @@
                                         <label for="mattingSelFeather">羽化</label>
                                         <input type="range" id="mattingSelFeather" min="0" max="12" value="2" title="应用选区时柔化边缘">
                                         <span class="val" id="mattingSelFeatherVal">2 px</span>
-                                    </div>
-                                    <div class="mopt-row">
-                                        <button class="btn btn-ghost btn-sm" id="mattingSelGrow" style="flex:1;padding:5px 4px;" title="选区向外扩 1px">＋ 扩展</button>
-                                        <button class="btn btn-ghost btn-sm" id="mattingSelShrink" style="flex:1;padding:5px 4px;" title="选区向内收 1px">－ 收缩</button>
                                     </div>
                                     <div class="mopt-row">
                                         <button class="btn btn-gold btn-sm" id="mattingSelCut" style="flex:1;padding:5px 2px;">✂ 删除选区</button>
@@ -1482,7 +1494,7 @@ PORTFOLIO</p>
     <script src="script-game.js"></script>
     <script src="script.js?v=20261030"></script>
     <script src="workbench.js?v=20261121d"></script>
-    <script src="matting.js?v=20261123b"></script>
+    <script src="matting.js?v=20261123e"></script>
     <script src="personality.js?v=20261118p"></script>
     <script src="portfolio.js?v=20261029"></script>
     <script src="login-cards.js?v=20261030"></script>

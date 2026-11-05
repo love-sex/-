@@ -112,6 +112,12 @@
         selFeather: 2,    // 应用选区时柔化几像素
         selOn: false,     // 当前有没有选区
         selArea: 0,       // 选区像素数（面板回显）
+        // 笔刷库：brushIdx = -1 表示圆头软笔刷，其它是导入的笔尖（.abr / 图片）
+        brushes: [],
+        brushIdx: -1,
+        tip: null,
+        spacing: 0.25,    // 笔尖间距，占画笔大小的比例（PS 的 Spacing）
+        tipSeq: 1,
         bwView: false,    // 黑白蒙版视图（PS 里按 K）
         deepClean: true,  // 清理与背景同色的残留（反光、投影）
         pickKey: null,    // 这张图上「复核后更干净」的模型，换图要清掉
@@ -384,7 +390,9 @@
         const vw = st.clientWidth;
         if (!vw) return;
         const h = Math.round(vw * S.h / S.w);
-        st.style.height = Math.max(220, Math.min(640, h)) + 'px';
+        // 桌面放宽后画布也该大一点，但别把整个窗口顶爆（上限 76vh / 780px）
+        const capH = Math.min(780, Math.round((window.innerHeight || 900) * 0.76));
+        st.style.height = Math.max(240, Math.min(capH, h)) + 'px';
     };
 
     const clampView = () => {
@@ -416,7 +424,8 @@
         sizeStage();
         const vw = st.clientWidth, vh = st.clientHeight;
         if (!vw || !vh) return;
-        S.baseScale = Math.min(vw / S.w, vh / S.h, 1);
+        // 小图也铺满工作区（PS 的 fit on screen 会放大），最多放大 1.6 倍免得糊
+        S.baseScale = Math.min(vw / S.w, vh / S.h, 1.6);
         cv.style.width = Math.round(S.w * S.baseScale) + 'px';
         cv.style.height = Math.round(S.h * S.baseScale) + 'px';
         if (!keepZoom) S.zoom = 1;
@@ -463,7 +472,7 @@
         sizeStage();
         const vw = st.clientWidth, vh = st.clientHeight;
         if (!vw || !vh) return;
-        const nb = Math.min(vw / S.w, vh / S.h, 1);
+        const nb = Math.min(vw / S.w, vh / S.h, 1.6);
         S.baseScale = nb;
         cv.style.width = Math.round(S.w * nb) + 'px';
         cv.style.height = Math.round(S.h * nb) + 'px';
@@ -522,9 +531,319 @@
         render();
     };
 
+    /* ---------------- 笔刷库（PS .abr / 图片笔尖） ----------------
+       浏览器里没有 PS 的笔刷引擎，这里只做「笔尖位图」这一层：
+       - .abr：按记录特征扫描出 depth/comp/bounds 自洽的笔尖。v1/v2 的 preamble 是 10 字节，
+         v6/7/9/10 子版本 1/2 又是 264/301 字节，硬编码偏移在各种导出器上都会错位，
+         所以这里不猜结构，直接校验「尺寸 + 位深 + 压缩 + 数据长度」四个条件同时成立。
+       - 图片：取透明通道；没有透明通道（JPG/实心 PNG）就按 PS 灰度笔尖的约定取亮度反相。
+       - 笔尖统一存成 alpha 数组，画的时候按当前画笔大小缩放成白色精灵再贴（擦除用 destination-out，
+         所以颜色无所谓，只看 alpha）。 */
+    const TIP_MAX = 1024;      // 单支笔尖最大边长，超出降采样（大笔刷几十 MB 会爆内存）
+    const TIP_LIMIT = 60;      // 笔刷库上限
+
+    const readAscii = (buf, off, len) => {
+        let s = '';
+        for (let i = 0; i < len && off + i < buf.length; i++) {
+            const c = buf[off + i];
+            if (!c) break;
+            s += String.fromCharCode(c);
+        }
+        return s;
+    };
+
+    const tipThumb = (alpha, w, h) => {
+        const N = 48;
+        const c = document.createElement('canvas');
+        c.width = N; c.height = N;
+        const cx = c.getContext('2d');
+        const img = cx.createImageData(N, N);
+        const d = img.data;
+        for (let y = 0; y < N; y++) {
+            const sy = Math.min(h - 1, Math.floor(y * h / N));
+            for (let x = 0; x < N; x++) {
+                const sx = Math.min(w - 1, Math.floor(x * w / N));
+                const o = (y * N + x) * 4;
+                d[o] = 74; d[o + 1] = 59; d[o + 2] = 40; d[o + 3] = alpha[sy * w + sx];
+            }
+        }
+        cx.putImageData(img, 0, 0);
+        return c.toDataURL('image/png');
+    };
+
+    const shrinkAlpha = (alpha, w, h, max) => {
+        if (Math.max(w, h) <= max) return { alpha, w, h };
+        const k = max / Math.max(w, h);
+        const nw = Math.max(1, Math.round(w * k));
+        const nh = Math.max(1, Math.round(h * k));
+        const out = new Uint8ClampedArray(nw * nh);
+        for (let y = 0; y < nh; y++) {
+            const sy = Math.min(h - 1, Math.floor(y * h / nh));
+            for (let x = 0; x < nw; x++) {
+                const sx = Math.min(w - 1, Math.floor(x * w / nw));
+                out[y * nw + x] = alpha[sy * w + sx];
+            }
+        }
+        return { alpha: out, w: nw, h: nh };
+    };
+
+    const abrVersionOk = (v) => v === 1 || v === 2 || (v >= 6 && v <= 10);
+
+    // 一条笔尖记录：bounds(4×int32) + depth(u16) + compress(u8) + 位图
+    const abrRecordAt = (dv, buf, off) => {
+        if (off + 19 > buf.length) return null;
+        const top = dv.getInt32(off), left = dv.getInt32(off + 4);
+        const bottom = dv.getInt32(off + 8), right = dv.getInt32(off + 12);
+        const w = right - left, h = bottom - top;
+        if (w < 12 || h < 12 || w > 8192 || h > 8192) return null;
+        if (w * h < 256 || w * h > 16000000) return null;
+        if (w / h > 8 || h / w > 8) return null;
+        const depth = dv.getUint16(off + 16), comp = buf[off + 18];
+        if (depth !== 1 && depth !== 8 && depth !== 16) return null;
+        if (comp !== 0 && comp !== 1) return null;      // 2/3（zip）暂不支持，跳过
+        const rowBytes = depth === 1 ? Math.ceil(w / 8) : depth === 16 ? w * 2 : w;
+        const dataOff = off + 19;
+        let dataLen;
+        if (comp === 0) {
+            dataLen = rowBytes * h;
+        } else {
+            if (dataOff + h * 2 > buf.length) return null;
+            dataLen = h * 2;
+            for (let y = 0; y < h; y++) dataLen += dv.getUint16(dataOff + y * 2);
+        }
+        if (dataLen <= 0 || dataOff + dataLen > buf.length) return null;
+        return { w, h, depth, comp, dataOff, dataLen, end: dataOff + dataLen };
+    };
+
+    const abrDecode = (dv, buf, rec) => {
+        const { w, h, depth, comp, dataOff } = rec;
+        const rowBytes = depth === 1 ? Math.ceil(w / 8) : depth === 16 ? w * 2 : w;
+        const rows = new Uint8Array(rowBytes * h);
+        if (comp === 0) {
+            rows.set(buf.subarray(dataOff, dataOff + rowBytes * h));
+        } else {
+            // PackBits：先 h 个 u16 行长，再逐行解压
+            let p = dataOff + h * 2;
+            for (let y = 0; y < h; y++) {
+                const rowLen = dv.getUint16(dataOff + y * 2);
+                let q = p, o = 0;
+                const qEnd = Math.min(buf.length, p + rowLen);
+                while (q < qEnd && o < rowBytes) {
+                    let n = buf[q++];
+                    if (n > 127) n -= 256;
+                    if (n === -128) continue;
+                    if (n < 0) {
+                        const cnt = -n + 1;
+                        const v = buf[q++];
+                        for (let k = 0; k < cnt && o < rowBytes; k++) rows[y * rowBytes + o++] = v;
+                    } else {
+                        const cnt = n + 1;
+                        for (let k = 0; k < cnt && o < rowBytes && q < qEnd; k++) rows[y * rowBytes + o++] = buf[q++];
+                    }
+                }
+                p = qEnd;
+            }
+        }
+        const alpha = new Uint8ClampedArray(w * h);
+        if (depth === 8) {
+            alpha.set(rows);
+        } else if (depth === 16) {
+            for (let i = 0; i < w * h; i++) alpha[i] = rows[i * 2];    // 大端：高字节就是 8 位灰度
+        } else {
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    alpha[y * w + x] = (rows[y * rowBytes + (x >> 3)] >> (7 - (x & 7))) & 1 ? 255 : 0;
+                }
+            }
+        }
+        return alpha;
+    };
+
+    const abrTips = (arrayBuffer) => {
+        const buf = new Uint8Array(arrayBuffer);
+        const dv = new DataView(arrayBuffer);
+        let p = 0;
+        if (readAscii(buf, 0, 4) === '8BPS') p = 4;
+        if (buf.length < p + 4) throw new Error('文件太小，不像 .abr');
+        const major = dv.getUint16(p);
+        if (!abrVersionOk(major)) throw new Error('不认识的 .abr 版本（' + major + '）');
+        const out = [];
+        let last = 0;
+        for (let off = p + 4; off + 19 <= buf.length && out.length < 40; off++) {
+            if (off < last) continue;
+            const rec = abrRecordAt(dv, buf, off);
+            if (!rec) continue;
+            out.push({ alpha: abrDecode(dv, buf, rec), w: rec.w, h: rec.h });
+            last = rec.end;
+        }
+        return out;
+    };
+
+    const tipFromImage = async (file) => {
+        const url = URL.createObjectURL(file);
+        try {
+            const img = await new Promise((res, rej) => {
+                const im = new Image();
+                im.onload = () => res(im);
+                im.onerror = () => rej(new Error('图片解码失败'));
+                im.src = url;
+            });
+            const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+            if (!w || !h) throw new Error('拿不到图片尺寸');
+            const c = document.createElement('canvas');
+            c.width = w; c.height = h;
+            const cx = c.getContext('2d', { willReadFrequently: true });
+            cx.drawImage(img, 0, 0);
+            const d = cx.getImageData(0, 0, w, h).data;
+            const alpha = new Uint8ClampedArray(w * h);
+            let transparent = false;
+            for (let i = 0; i < w * h; i++) {
+                const a = d[i * 4 + 3];
+                if (a < 250) transparent = true;
+                alpha[i] = a;
+            }
+            if (!transparent) {
+                for (let i = 0; i < w * h; i++) {
+                    const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2];
+                    alpha[i] = 255 - Math.round(r * 0.299 + g * 0.587 + b * 0.114);
+                }
+            }
+            return { alpha, w, h };
+        } finally {
+            URL.revokeObjectURL(url);
+        }
+    };
+
+    const addTip = (alpha, w, h, name) => {
+        if (!alpha || !(w > 0) || !(h > 0)) return null;
+        const t = shrinkAlpha(alpha, w, h, TIP_MAX);
+        const tip = {
+            id: 'tip' + (S.tipSeq++),
+            name: name || '笔刷',
+            w: t.w, h: t.h,
+            alpha: t.alpha,
+            thumb: tipThumb(t.alpha, t.w, t.h)
+        };
+        S.brushes.push(tip);
+        while (S.brushes.length > TIP_LIMIT) S.brushes.shift();
+        return tip;
+    };
+
+    const selectBrush = (i) => {
+        S.brushIdx = i >= 0 && i < S.brushes.length ? i : -1;
+        S.tip = S.brushIdx >= 0 ? S.brushes[S.brushIdx] : null;
+        renderBrushList();
+        const note = $('#mattingBrushTip');
+        if (note) {
+            note.textContent = S.tip
+                ? S.tip.name + ' · ' + S.tip.w + '×' + S.tip.h + ' px（硬度只对圆头生效）'
+                : '圆头软笔刷：大小 / 硬度可调';
+        }
+        if (S.syncRing) S.syncRing();
+    };
+
+    function renderBrushList() {
+        const box = $('#mattingBrushList');
+        if (!box) return;
+        box.innerHTML = '';
+        const add = (tip, idx) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'brush-chip' + (idx < 0 ? ' round' : '') + (S.brushIdx === idx ? ' on' : '');
+            b.title = idx < 0 ? '圆头软笔刷（默认）' : tip.name + '（' + tip.w + '×' + tip.h + '）';
+            b.setAttribute('role', 'option');
+            b.setAttribute('aria-selected', S.brushIdx === idx ? 'true' : 'false');
+            if (idx >= 0) b.style.backgroundImage = 'url("' + tip.thumb + '")';
+            b.onclick = () => selectBrush(idx);
+            box.appendChild(b);
+        };
+        add(null, -1);
+        S.brushes.forEach((t, i) => add(t, i));
+    }
+
+    const looksAbr = (buf, name) => /\.abr$/i.test(name || '') ||
+        readAscii(buf, 0, 4) === '8BPS' || readAscii(buf, 4, 4) === '8BIM';
+
+    const importBrushes = async (files) => {
+        const list = Array.from(files || []);
+        if (!list.length || !S.hasMask) return;
+        let added = 0;
+        const bad = [];
+        for (const f of list) {
+            try {
+                const ab = await f.arrayBuffer();
+                const buf = new Uint8Array(ab);
+                if (looksAbr(buf, f.name)) {
+                    const tips = abrTips(ab);
+                    if (!tips.length) throw new Error('没扫到位图笔尖（可能是纯计算笔刷，或用了 zip 压缩）');
+                    const base = f.name.replace(/\.abr$/i, '');
+                    tips.forEach((t, i) => {
+                        if (addTip(t.alpha, t.w, t.h, base + (tips.length > 1 ? ' #' + (i + 1) : ''))) added++;
+                    });
+                } else {
+                    const t = await tipFromImage(f);
+                    if (addTip(t.alpha, t.w, t.h, f.name.replace(/\.[^.]+$/, ''))) added++;
+                }
+            } catch (err) {
+                bad.push(f.name + '：' + (err && err.message ? err.message : '读不出来'));
+            }
+        }
+        renderBrushList();
+        if (added) {
+            selectBrush(S.brushes.length - 1);      // 导入完直接用最新的这支
+            setStatus('笔刷已导入 ' + added + ' 支' + (bad.length ? '（' + bad.length + ' 个失败：' + bad[0] + '）' : ''));
+        } else {
+            setStatus('笔刷没导入成功：' + (bad[0] || '格式不支持'));
+        }
+    };
+
+    // 笔尖精灵：白色 + 笔尖 alpha，按画笔大小缩放，缓存当前尺寸
+    const tipSprite = (tip, size) => {
+        const s = Math.max(1, Math.round(size));
+        if (tip._sp && tip._spSize === s) return tip._sp;
+        const k = s / Math.max(tip.w, tip.h);
+        const dw = Math.max(1, Math.round(tip.w * k));
+        const dh = Math.max(1, Math.round(tip.h * k));
+        const c = document.createElement('canvas');
+        c.width = dw; c.height = dh;
+        const cx = c.getContext('2d');
+        const img = cx.createImageData(dw, dh);
+        const d = img.data;
+        for (let y = 0; y < dh; y++) {
+            const sy = Math.min(tip.h - 1, Math.floor(y * tip.h / dh));
+            for (let x = 0; x < dw; x++) {
+                const sx = Math.min(tip.w - 1, Math.floor(x * tip.w / dw));
+                const o = (y * dw + x) * 4;
+                d[o] = 255; d[o + 1] = 255; d[o + 2] = 255;
+                d[o + 3] = tip.alpha[sy * tip.w + sx];
+            }
+        }
+        cx.putImageData(img, 0, 0);
+        tip._sp = { canvas: c, w: dw, h: dh };
+        tip._spSize = s;
+        return tip._sp;
+    };
+
+    const stampTip = (ctx, x, y, op) => {
+        const sp = tipSprite(S.tip, S.brush);
+        ctx.globalCompositeOperation = op;
+        ctx.drawImage(sp.canvas, Math.round(x - sp.w / 2), Math.round(y - sp.h / 2));
+        ctx.globalCompositeOperation = 'source-over';
+    };
+
     /* ---------------- 画笔 ---------------- */
     const paintDot = (x, y) => {
         const r = S.brush;
+        // 导入的笔尖：直接贴缩放后的位图；圆头才走下面的径向渐变
+        if (S.tip) {
+            if (S.mode === 'remove') {
+                stampTip(S.rmctx, x, y, 'source-over');
+                S.rmHas = true;
+                return;
+            }
+            stampTip(S.rctx, x, y, S.mode === 'restore' ? 'source-over' : 'destination-out');
+            return;
+        }
         const inner = Math.max(0.02, Math.min(0.98, S.hardness));
         const g = () => {
             const gg = S.rmctx.createRadialGradient(x, y, 0, x, y, r);
@@ -570,9 +889,17 @@
         const from = S.last || { x, y };
         const dx = x - from.x, dy = y - from.y;
         const dist = Math.hypot(dx, dy);
-        const step = Math.max(1, S.brush / 6);
-        const n = Math.max(1, Math.ceil(dist / step));
-        for (let i = 1; i <= n; i++) paintDot(from.x + dx * (i / n), from.y + dy * (i / n));
+        if (dist < 0.01) return;
+        const step = Math.max(1, S.brush * (S.tip ? S.spacing : 1 / 6));
+        // 间距要跨段累积：否则每来一个 pointermove 都会硬落一个笔尖，间距拉大也没缝
+        const acc = S.stampAcc || 0;
+        const total = acc + dist;
+        const n = Math.floor(total / step);
+        for (let i = 1; i <= n; i++) {
+            const k = (i * step - acc) / dist;
+            if (k > 0 && k <= 1) paintDot(from.x + dx * k, from.y + dy * k);
+        }
+        S.stampAcc = total - n * step;
         S.last = { x, y };
     };
     const toCanvasXY = (e) => {
@@ -2504,6 +2831,7 @@
                     S.painting = true;
                     const p = toCanvasXY(e);
                     S.last = p;
+                    S.stampAcc = 0;
                     paintDot(p.x, p.y);
                     render();
                     return;
@@ -2514,6 +2842,7 @@
                 pushHistory();
                 const p = toCanvasXY(e);
                 S.last = p;
+                S.stampAcc = 0;
                 paintDot(p.x, p.y);
                 refresh();
             });
@@ -2856,6 +3185,43 @@
         rng('#mattingShift', 'shift', v => (v > 0 ? '+' : '') + v + '%', v => v / 100); // >0 外扩 <0 收缩
         rng('#mattingWandTol', 'wandTol', v => String(v), null, { noRefresh: true });   // 点选的容差
         rng('#mattingSelFeather', 'selFeather', v => v + ' px', null, { noRefresh: true });   // 选区羽化：别动蒙版
+        rng('#mattingSpacing', 'spacing', v => v + '%', v => v / 100, { noRefresh: true });   // 笔尖间距
+
+        /* ---------------- 笔刷库：导入 / 删除 / 拖进来 ---------------- */
+        const brushFile = $('#mattingBrushFile');
+        const brushAdd = $('#mattingBrushAdd');
+        if (brushAdd) brushAdd.onclick = () => { if (brushFile) brushFile.click(); };
+        if (brushFile) {
+            brushFile.onchange = (e) => {
+                importBrushes(e.target.files);
+                e.target.value = '';       // 允许再选同一个文件
+            };
+        }
+        const brushDel = $('#mattingBrushDel');
+        if (brushDel) {
+            brushDel.onclick = () => {
+                if (S.brushIdx < 0) return toast('默认的圆头笔刷不能删');
+                const name = S.brushes[S.brushIdx].name;
+                S.brushes.splice(S.brushIdx, 1);
+                selectBrush(-1);
+                setStatus('已删除笔刷「' + name + '」');
+            };
+        }
+        const bl = $('#mattingBrushList');
+        if (bl) {
+            bl.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                bl.classList.add('drop-hover');
+            });
+            bl.addEventListener('dragleave', () => bl.classList.remove('drop-hover'));
+            bl.addEventListener('drop', (e) => {
+                e.preventDefault();
+                bl.classList.remove('drop-hover');
+                if (e.dataTransfer && e.dataTransfer.files.length) importBrushes(e.dataTransfer.files);
+            });
+        }
+        renderBrushList();
+        selectBrush(-1);
 
         // 选区的叠加色 / 浓度（PS 快速蒙版那一套）
         const cutColor = $('#mattingCutColor'), cutOp = $('#mattingCutOp');
@@ -3027,6 +3393,9 @@
         fitView, zoomCenter, zoomAt, centerOn, applyView,
         purgeBgBlobs, shrinkBgEdge, despeckle, cleanBgFlood, postProcess, render,
         selClear, applySelection, selInvert, selMorph, selAll, rebuildSelVisual,
+        abrTips, addTip, selectBrush, importBrushes, renderBrushList,
+        brushes: () => S.brushes.map(t => ({ name: t.name, w: t.w, h: t.h })),
+        brush: () => ({ idx: S.brushIdx, spacing: S.spacing, tip: S.tip ? S.tip.name : null }),
         sel: () => ({ on: S.selOn, area: S.selArea, mode: S.selMode, scope: S.wandScope, feather: S.selFeather }),
         view: () => ({ zoom: S.zoom, tx: S.tx, ty: S.ty, baseScale: S.baseScale, mode: S.mode })
     };
