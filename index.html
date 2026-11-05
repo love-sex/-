@@ -20,7 +20,7 @@
     <!-- 登录界面动效 -->
     <link rel="stylesheet" href="login.css?v=20261030">
     <!-- 抠图工具样式 -->
-    <link rel="stylesheet" href="matting.css?v=20261123f">
+    <link rel="stylesheet" href="matting.css?v=20261124b">
     <link rel="stylesheet" href="personality.css?v=20261118p">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
@@ -721,6 +721,33 @@
 
                     <div class="matting-setup">
                     <div class="card">
+                        <div class="card-title">🆕 新建画布</div>
+                        <p class="muted" style="margin:-4px 0 10px;">不依赖上传，直接开一张空白画布，再往里贴图、画图层。</p>
+                        <div class="nc-presets">
+                            <button type="button" class="nc-chip" data-w="1080" data-h="1080">1080²</button>
+                            <button type="button" class="nc-chip" data-w="1920" data-h="1080">16:9</button>
+                            <button type="button" class="nc-chip" data-w="800" data-h="800">800²</button>
+                            <button type="button" class="nc-chip" data-w="512" data-h="512">512²</button>
+                        </div>
+                        <div class="nc-row">
+                            <label for="ncW">宽</label><input type="number" id="ncW" value="1080" min="16" max="2400" step="1">
+                            <label for="ncH">高</label><input type="number" id="ncH" value="1080" min="16" max="2400" step="1">
+                        </div>
+                        <div class="nc-row">
+                            <label for="ncBg">背景</label>
+                            <select id="ncBg">
+                                <option value="transparent">透明</option>
+                                <option value="#ffffff">白色</option>
+                                <option value="#0d0d0d">黑色</option>
+                                <option value="#f2e7d5">米色</option>
+                                <option value="custom">自定义…</option>
+                            </select>
+                            <input type="color" id="ncColor" value="#7ea6d8" title="自定义底色">
+                        </div>
+                        <button class="btn btn-primary btn-block" id="ncCreate">创建画布</button>
+                    </div>
+
+                    <div class="card">
                         <div class="card-title">📤 上传图片</div>
                         <p class="muted" style="margin:-4px 0 12px;">支持 JPG / PNG / WebP，可以直接拖拽进来，也可以 Ctrl+V 粘贴。图片只在你自己的浏览器里处理，不会上传到任何服务器。</p>
                         <input type="file" id="mattingFile" accept="image/*" hidden>
@@ -790,11 +817,18 @@
                             </div>
                             <aside class="matting-props" id="mattingProps">
                                 <div class="mgroup matting-need-img">
-                                    <div class="mgroup-t">🖌 画笔</div>
+                                    <div class="mgroup-t">🖌 画笔 <span class="mgroup-hint brush-pickall" id="mattingBrushPickAll" role="button" tabindex="0" title="全选 / 取消全选（勾选后可批量删除、分组）">☐ 全选</span></div>
                                     <div class="brush-list" id="mattingBrushList" role="listbox" aria-label="笔刷库"></div>
                                     <div class="mopt-row">
-                                        <button class="btn btn-ghost btn-sm" id="mattingBrushAdd" style="flex:1;padding:5px 2px;" title="把笔刷拖进面板也行：支持 Photoshop 的 .abr（v6/7/9/10，8/16/1 位，raw 与 RLE 压缩），也支持 PNG/JPG/WebP 笔尖图片">＋ 导入笔刷</button>
-                                        <button class="btn btn-ghost btn-sm" id="mattingBrushDel" style="flex:none;padding:5px 7px;" title="删除当前笔刷">🗑</button>
+                                        <button class="btn btn-ghost btn-sm" id="mattingBrushAdd" style="flex:1;padding:5px 2px;" title="也可以把笔刷文件直接拖到上面的列表里：支持 Photoshop 的 .abr（v1/v2/v6/7/9/10，1/8/16 位，raw 与 RLE），也支持 PNG/JPG/WebP 笔尖图片">＋ 导入笔刷</button>
+                                        <button class="btn btn-ghost btn-sm" id="mattingBrushGrp" style="flex:none;padding:5px 6px;" title="把勾选的笔刷建成一个分组" disabled>🗂</button>
+                                        <button class="btn btn-ghost btn-sm" id="mattingBrushDel" style="flex:none;padding:5px 6px;" title="删除勾选的笔刷（没勾就删当前这一支）">🗑</button>
+                                    </div>
+                                    <div class="brush-groupbar" id="mattingBrushGroupBar" hidden>
+                                        <input type="text" id="mattingBrushGroupName" maxlength="14" placeholder="分组名，如 纹理 / 毛发">
+                                        <button class="btn btn-gold btn-sm" id="mattingBrushGroupOk">建组</button>
+                                        <button class="btn btn-ghost btn-sm" id="mattingBrushGroupCancel">取消</button>
+                                        <button class="btn btn-ghost btn-sm" id="mattingBrushMoveOut" title="把勾选的笔刷移出分组（回到未分组）">移出</button>
                                     </div>
                                     <input type="file" id="mattingBrushFile" accept=".abr,image/png,image/jpeg,image/webp,image/gif,image/bmp" multiple hidden>
                                     <div class="matting-range">
@@ -814,6 +848,41 @@
                                     </div>
                                     <div class="mopt-row">
                                         <span class="brush-tip-note" id="mattingBrushTip">圆头软笔刷：大小 / 硬度可调</span>
+                                    </div>
+                                </div>
+                                <div class="mgroup matting-need-img">
+                                    <div class="mgroup-t">🗂 图层 <span class="mgroup-hint" id="lyrHint"></span></div>
+                                    <div class="lyr-tools">
+                                        <button type="button" id="lyrAdd" title="新建空图层（空层用来放贴图 / 做编组）">＋</button>
+                                        <button type="button" id="lyrImg" title="贴图：把图片作为新图层放进来">🖼</button>
+                                        <button type="button" id="lyrDup" title="复制当前图层">⧉</button>
+                                        <button type="button" id="lyrGroup" title="把当前图层编组">🗀</button>
+                                        <button type="button" id="lyrMerge" title="向下合并">⤓</button>
+                                        <button type="button" id="lyrUp" title="图层上移">↑</button>
+                                        <button type="button" id="lyrDown" title="图层下移">↓</button>
+                                        <button type="button" id="lyrDel" title="删除当前图层">🗑</button>
+                                    </div>
+                                    <input type="file" id="lyrFile" accept="image/*" hidden>
+                                    <div class="lyr-list" id="lyrList" role="listbox" aria-label="图层列表"></div>
+                                    <div class="matting-range">
+                                        <label for="lyrOpacity">不透明</label>
+                                        <input type="range" id="lyrOpacity" min="0" max="100" value="100" title="当前图层的不透明度">
+                                        <span class="val" id="lyrOpacityVal">100%</span>
+                                    </div>
+                                    <div class="mopt-row">
+                                        <label for="lyrBlend" style="flex:none;font-size:12px;color:var(--ink-soft);">混合</label>
+                                        <select id="lyrBlend" class="lyr-blend">
+                                            <option value="source-over">正常</option>
+                                            <option value="multiply">正片叠底</option>
+                                            <option value="screen">滤色</option>
+                                            <option value="overlay">叠加</option>
+                                            <option value="soft-light">柔光</option>
+                                            <option value="darken">变暗</option>
+                                            <option value="lighten">变亮</option>
+                                        </select>
+                                    </div>
+                                    <div class="mopt-row">
+                                        <span class="brush-tip-note">双击名字改名 · 右键组解散 · 眼睛整组显隐</span>
                                     </div>
                                 </div>
                                 <div class="mgroup matting-need-img">
@@ -1494,7 +1563,7 @@ PORTFOLIO</p>
     <script src="script-game.js"></script>
     <script src="script.js?v=20261030"></script>
     <script src="workbench.js?v=20261121d"></script>
-    <script src="matting.js?v=20261123f"></script>
+    <script src="matting.js?v=20261124b"></script>
     <script src="personality.js?v=20261118p"></script>
     <script src="portfolio.js?v=20261029"></script>
     <script src="login-cards.js?v=20261030"></script>

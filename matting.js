@@ -118,10 +118,159 @@
         tip: null,
         spacing: 0.25,    // 笔尖间距，占画笔大小的比例（PS 的 Spacing）
         tipSeq: 1,
+        // 笔刷库分组与多选：brushSel 存勾选的笔刷 id，brushGroups 是分组名数组
+        brushSel: [],
+        brushGroups: [],
+        brushOpen: {},     // 分组折叠状态 {组名: true=收起}
+        // 文档 / 图层：tree 是图层树（0 = 最底层），组节点可以再套组
+        tree: [],
+        activeId: '',
+        layerSeq: 1,
+        groupSeq: 1,
+        _actSprite: null,
         bwView: false,    // 黑白蒙版视图（PS 里按 K）
         deepClean: true,  // 清理与背景同色的残留（反光、投影）
         pickKey: null,    // 这张图上「复核后更干净」的模型，换图要清掉
         tracer: null
+    };
+
+    /* ================= 文档 / 图层 =================
+       一张画布 = 一个文档，文档里是一棵图层树（组可以再套组）。
+       所有抠图工具作用的都是「活动图层」：S.src / S.mask / S.rctx 这些字段用
+       defineProperty 代理到活动图层上，所以原来那几千行读写单图状态的代码一行都不用改，
+       切图层只是换一个被代理的对象。
+       渲染分两条路：只有一个普通图层时走原来的单图管线（像素输出和以前完全一致），
+       多图层/带组时才走逐层合成，这样已有的测试和手感都不会被改坏。 */
+    const LAYER_FIELDS = ['src', 'raw', 'rctx', 'mask', 'mctx', 'rgb', 'fg', 'bgColor', 'hasMask', 'rmask', 'rmctx', 'rmHas', 'inpaintHist'];
+    const BLEND_MODES = [
+        ['source-over', '正常'], ['multiply', '正片叠底'], ['screen', '滤色'],
+        ['overlay', '叠加'], ['soft-light', '柔光'], ['darken', '变暗'], ['lighten', '变亮']
+    ];
+
+    const mkCv = (w, h) => {
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(w) || 1);
+        c.height = Math.max(1, Math.round(h) || 1);
+        return c;
+    };
+    const ctx2d = (c) => c.getContext('2d', { willReadFrequently: true });
+
+    const makeLayer = (name, opts) => {
+        const o = opts || {};
+        const raw = mkCv(S.w, S.h), mask = mkCv(S.w, S.h), rmask = mkCv(S.w, S.h);
+        S.layerSeq++;
+        return {
+            kind: 'layer', id: 'L' + (S.layerSeq - 1), name: name || ('图层 ' + (S.layerSeq - 1)),
+            visible: true, opacity: 1, blend: 'source-over',
+            src: o.src || null,
+            raw, rctx: ctx2d(raw), mask, mctx: ctx2d(mask),
+            rgb: null, fg: null, bgColor: undefined,
+            hasMask: !!o.hasMask,
+            rmask, rmctx: ctx2d(rmask), rmHas: false, inpaintHist: [],
+            _rev: 1
+        };
+    };
+
+    // 树遍历：只到图层（组递归进去）
+    const walkLayers = (fn, list) => {
+        (list || S.tree).forEach((n) => {
+            if (n.kind === 'group') walkLayers(fn, n.children);
+            else fn(n);
+        });
+    };
+    const nodeById = (id) => {
+        if (!id) return null;
+        let hit = null;
+        const walk = (arr) => arr.some((n) => {
+            if (n.id === id) { hit = n; return true; }
+            return n.kind === 'group' && walk(n.children);
+        });
+        walk(S.tree);
+        return hit;
+    };
+    const layerById = (id) => { const n = nodeById(id); return n && n.kind === 'layer' ? n : null; };
+    const actLayer = () => layerById(S.activeId) || (S.tree[0] && S.tree[0].kind === 'layer' ? S.tree[0] : null);
+    const activeNode = () => nodeById(S.activeId);
+    // 包含某节点的数组（顶层树或某个组的 children）
+    const siblingList = (id) => {
+        let out = null;
+        const walk = (arr) => arr.some((n) => {
+            if (n.id === id) { out = arr; return true; }
+            return n.kind === 'group' && walk(n.children);
+        });
+        walk(S.tree);
+        return out || S.tree;
+    };
+    const bumpLayer = (L) => { if (L) L._rev = (L._rev || 0) + 1; };
+
+    // 把单图字段代理到活动图层
+    LAYER_FIELDS.forEach((k) => {
+        Object.defineProperty(S, k, {
+            configurable: true,
+            get() {
+                const a = actLayer();
+                if (a) return a[k];
+                return k === 'hasMask' ? false : (k === 'inpaintHist' ? [] : null);
+            },
+            set(v) { const a = actLayer(); if (a) a[k] = v; }
+        });
+    });
+
+    const layerRootVisible = () => true;
+
+    // 逐层合成：组的可见性向下传递，组不透明度乘到子层上
+    const composeDoc = (ctx, opts) => {
+        const a0 = ctx.globalAlpha, o0 = ctx.globalCompositeOperation;
+        const walk = (arr, gA, gVis) => {
+            for (const n of arr) {
+                if (n.kind === 'group') {
+                    walk(n.children, gA * (n.opacity == null ? 1 : n.opacity), gVis && n.visible !== false);
+                    continue;
+                }
+                if (n.visible === false || !gVis) continue;
+                const sp = layerSprite(n);
+                if (!sp) continue;
+                ctx.globalAlpha = Math.max(0, Math.min(1, (n.opacity == null ? 1 : n.opacity) * gA));
+                ctx.globalCompositeOperation = n.blend || 'source-over';
+                ctx.drawImage(sp, 0, 0, S.w, S.h);
+            }
+        };
+        walk(S.tree, 1, true);
+        ctx.globalAlpha = a0;
+        ctx.globalCompositeOperation = o0;
+    };
+
+    // 单图层且没有组/混合/透明度 → 走原来的单图渲染（完全等价，省一次离屏合成）
+    const simpleDoc = () => {
+        const n = S.tree.length === 1 ? S.tree[0] : null;
+        return !!n && n.kind === 'layer' && n.id === S.activeId && n.visible !== false
+            && (n.opacity == null || n.opacity === 1)
+            && (!n.blend || n.blend === 'source-over');
+    };
+
+    // 图层可见像素：src 按 mask 剪裁；活动图层不缓存（正在画），其它层按 _rev 缓存
+    const layerSprite = (L) => {
+        if (!L || !L.src) return null;
+        if (!L.hasMask) return L.src;
+        const isAct = L.id === S.activeId;
+        let c = isAct ? S._actSprite : L._sp;
+        if (!c || c.width !== S.w || c.height !== S.h) {
+            c = mkCv(S.w, S.h);
+            if (isAct) S._actSprite = c; else L._sp = c;
+            L._spRev = -1;
+        }
+        if (!isAct && L._spRev === L._rev) return c;
+        const x = c.getContext('2d');
+        x.setTransform(1, 0, 0, 1, 0, 0);
+        x.globalAlpha = 1;
+        x.globalCompositeOperation = 'source-over';
+        x.clearRect(0, 0, S.w, S.h);
+        x.drawImage(L.fg || L.src, 0, 0, S.w, S.h);
+        x.globalCompositeOperation = 'destination-in';
+        x.drawImage(L.mask, 0, 0, S.w, S.h);
+        x.globalCompositeOperation = 'source-over';
+        if (!isAct) L._spRev = L._rev;
+        return c;
     };
 
     /* ---------------- 有图 / 无图 的界面状态 ----------------
@@ -206,41 +355,40 @@
     };
 
     /* ---------------- 画布 ---------------- */
+    // 换尺寸 = 开新文档：视图/选区是文档级的，蒙版与像素按图层各存一份
     const setupCanvases = (w, h) => {
         S.w = w; S.h = h;
         S.view = $('#mattingCanvas');
         S.view.width = w; S.view.height = h;
         S.vctx = S.view.getContext('2d');
-        S.raw = document.createElement('canvas');
-        S.raw.width = w; S.raw.height = h;
-        S.rctx = S.raw.getContext('2d', { willReadFrequently: true });
-        S.mask = document.createElement('canvas');
-        S.mask.width = w; S.mask.height = h;
-        S.mctx = S.mask.getContext('2d', { willReadFrequently: true });
-        // 涂抹去物蒙版（魔法橡皮擦）：白色笔触，alpha 即涂抹强度
-        S.rmask = document.createElement('canvas');
-        S.rmask.width = w; S.rmask.height = h;
-        S.rmctx = S.rmask.getContext('2d', { willReadFrequently: true });
-        S.rmHas = false;
-        S.inpaintHist = []; S.cmpOn = false;
         // 选区画布：alpha=255 表示选中，点选/套索都写这里，最后统一作用到蒙版
-        S.sel = document.createElement('canvas');
-        S.sel.width = w; S.sel.height = h;
-        S.sctx = S.sel.getContext('2d', { willReadFrequently: true });
+        S.sel = mkCv(w, h);
+        S.sctx = ctx2d(S.sel);
         S.selOn = false; S.selArea = 0; S.selDraft = null;
         S.lassoing = false; S.lassoTick = false;
         S._sel = null;
         const selInfo = $('#mattingSelInfo');
         if (selInfo) selInfo.textContent = '未选区：用点选或套索圈出范围';
-        // 缓存原图 RGB，边缘精修时做引导图
-        cacheRGB();
+        // 文档 = 新图层树 + 一个空图层；S.src/S.mask 等字段随后写到这个图层上
+        S.tree = [];
+        S.layerSeq = 1;
+        S.groupSeq = 1;
+        const first = makeLayer('图层 1');
+        S.tree.push(first);
+        S.activeId = first.id;
+        S._actSprite = null;
+        S.undo = []; S.redo = [];
+        S.cmpOn = false;
+        S.rmHas = false;
+        S.inpaintHist = [];
+        syncHistoryButtons();
+        renderLayerPanel();
     };
 
-    // 把当前 S.src 画到 (w,h) 并缓存像素（引导滤波 + 修复算法共用）
+    // 把当前活动图层的 src 画到 (w,h) 并缓存像素（引导滤波 + 修复算法共用）
     const cacheRGB = () => {
-        if (!S.w || !S.h) return;
-        const g = document.createElement('canvas');
-        g.width = S.w; g.height = S.h;
+        if (!S.w || !S.h || !S.src) { S.rgb = null; return; }
+        const g = mkCv(S.w, S.h);
         const gc = g.getContext('2d', { willReadFrequently: true });
         gc.drawImage(S.src, 0, 0, S.w, S.h);
         S.rgb = gc.getImageData(0, 0, S.w, S.h);
@@ -295,9 +443,32 @@
         return true;
     };
 
-    const renderBase = () => {
+    const hasAnyPixels = () => {
+        const walk = (arr) => arr.some((n) => (n.kind === 'group' ? walk(n.children) : !!n.src));
+        return walk(S.tree);
+    };
+
+    // 原图残影：把活动图层被删掉的部分浅浅显出来，方便恢复时对齐
+    const drawGhost = () => {
         if (!S.src) return;
         const ctx = S.vctx;
+        const gc0 = tmpC('ghost');
+        const gc = gc0.getContext('2d');
+        gc.drawImage(S.src, 0, 0, S.w, S.h);
+        gc.globalCompositeOperation = 'destination-out';
+        if (S.mask) gc.drawImage(S.mask, 0, 0, S.w, S.h);
+        gc.globalCompositeOperation = 'source-over';
+        ctx.save();
+        ctx.globalAlpha = 0.24;
+        ctx.drawImage(gc0, 0, 0);
+        ctx.restore();
+    };
+
+    const renderBase = () => {
+        const ctx = S.vctx;
+        if (!ctx || !S.w || !S.h) return;
+        // 活动图层可能是刚建的空图层，但下面还有别的图层要显示
+        if (!S.src && !hasAnyPixels()) return;
         ctx.clearRect(0, 0, S.w, S.h);
         ctx.globalCompositeOperation = 'source-over';
         // 对比模式下才显示分割线滑块
@@ -305,6 +476,30 @@
         if (cmpRow) cmpRow.classList.toggle('show', !!(S.cmpOn && S.inpaintHist.length));
         // 对比模式优先（不受抠图蒙版影响，否则去掉背景后两边看起来一模一样）
         if (S.cmpOn && drawCompare()) { drawRm(); return; }
+        // 多图层 / 组 / 混合：逐层合成
+        if (!simpleDoc()) {
+            if (S.bwView && S.hasMask) {
+                // 黑白蒙版视图只看活动图层的蒙版（PS 里也是逐层的）
+                const mt = tmpC('bwMask');
+                const mc = mt.getContext('2d');
+                mc.drawImage(S.mask, 0, 0, S.w, S.h);
+                mc.globalCompositeOperation = 'source-in';
+                mc.fillStyle = '#0d0d0d';
+                mc.fillRect(0, 0, S.w, S.h);
+                mc.globalCompositeOperation = 'source-over';
+                const bw = tmpC('bw');
+                const bc = bw.getContext('2d');
+                bc.fillStyle = '#fff';
+                bc.fillRect(0, 0, S.w, S.h);
+                bc.drawImage(mt, 0, 0);
+                ctx.drawImage(bw, 0, 0);
+                return;
+            }
+            composeDoc(ctx);
+            if (S.ghost) drawGhost();
+            drawRm();
+            return;
+        }
         // 正常预览用「去过底色」的前景图，避免边缘挂一圈背景色
         ctx.drawImage((S.hasMask && S.fg) ? S.fg : S.src, 0, 0, S.w, S.h);
         if (!S.hasMask) { drawRm(); return; }
@@ -333,18 +528,7 @@
         ctx.globalCompositeOperation = 'source-over';
         // 原图残影：只在「被删掉」的区域淡淡显出原图，主体本身保持像素原样，
         // 这样补头发、衣角时能对着淡影对齐（借 cut-it-out 的 ghost 叠加）
-        if (S.ghost) {
-            const gc0 = tmpC('ghost');
-            const gc = gc0.getContext('2d');
-            gc.drawImage(S.src, 0, 0, S.w, S.h);
-            gc.globalCompositeOperation = 'destination-out';
-            gc.drawImage(S.mask, 0, 0, S.w, S.h);
-            gc.globalCompositeOperation = 'source-over';
-            ctx.save();
-            ctx.globalAlpha = 0.24;
-            ctx.drawImage(gc0, 0, 0);
-            ctx.restore();
-        }
+        if (S.ghost) drawGhost();
         drawRm();
     };
 
@@ -487,27 +671,69 @@
     };
     const wantPan = () => S.mode === 'pan' || S.spaceDown;
 
-    /* ---------------- 蒙版历史（只存单通道灰度，省内存） ---------------- */
-    const snapshot = () => {
-        const d = S.rctx.getImageData(0, 0, S.w, S.h).data;
+    /* ---------------- 历史（蒙版存单通道灰度；结构变更才整份快照） ----------------
+       条目两种：{t:'mask', id, data} 像素级（画笔/选区/后处理，几十 KB 一条）；
+                 {t:'doc', snap} 结构级（新建/删除/编组/合并，克隆整棵树，条数限死） */
+    const maskBytes = (L) => {
+        const d = L.rctx.getImageData(0, 0, S.w, S.h).data;
         const g = new Uint8Array(S.w * S.h);
         for (let i = 0, j = 0; j < g.length; i += 4, j++) g[j] = d[i + 3];
         return g;
     };
-    const applySnapshot = (g) => {
-        const im = S.rctx.createImageData(S.w, S.h);
+    const writeMask = (L, g) => {
+        const im = L.rctx.createImageData(S.w, S.h);
         const d = im.data;
         for (let i = 0, j = 0; j < g.length; i += 4, j++) {
             d[i] = d[i + 1] = d[i + 2] = 255;
             d[i + 3] = g[j];
         }
-        S.rctx.putImageData(im, 0, 0);
-        postProcess({ refine: false, feather: S.feather, contrast: S.contrast });
+        L.rctx.putImageData(im, 0, 0);
+        L.hasMask = true;
+        bumpLayer(L);
+    };
+    const snapshot = () => { const L = actLayer(); return L ? maskBytes(L) : null; };
+    const cloneCanvas = (c) => {
+        if (!c) return null;
+        const n = mkCv(c.width, c.height);
+        n.getContext('2d').drawImage(c, 0, 0);
+        return n;
+    };
+    const cloneLayer = (L) => ({
+        kind: 'layer', id: L.id, name: L.name, visible: L.visible, opacity: L.opacity, blend: L.blend,
+        src: cloneCanvas(L.src), raw: cloneCanvas(L.raw), mask: cloneCanvas(L.mask), rmask: cloneCanvas(L.rmask),
+        fg: cloneCanvas(L.fg), rgb: null, bgColor: L.bgColor, hasMask: L.hasMask, rmHas: L.rmHas,
+        inpaintHist: (L.inpaintHist || []).map((c) => cloneCanvas(c)), _rev: 1, _sp: null, _spRev: -1
+    });
+    const cloneNode = (n) => (n.kind === 'group'
+        ? { kind: 'group', id: n.id, name: n.name, visible: n.visible, opacity: n.opacity, collapsed: n.collapsed, children: n.children.map(cloneNode) }
+        : cloneLayer(n));
+    const captureDoc = () => ({ active: S.activeId, tree: S.tree.map(cloneNode) });
+    const adoptLayer = (L) => Object.assign(L, { rctx: ctx2d(L.raw), mctx: ctx2d(L.mask), rmctx: ctx2d(L.rmask), _sp: null, _spRev: -1 });
+    const adoptNode = (n) => (n.kind === 'group' ? Object.assign(n, { children: n.children.map(adoptNode) }) : adoptLayer(n));
+    const firstLayerId = () => {
+        let id = '';
+        walkLayers((L) => { if (!id) id = L.id; });
+        return id;
+    };
+    const restoreDoc = (snap) => {
+        S.tree = snap.tree.map(adoptNode);
+        S.activeId = layerById(snap.active) ? snap.active : firstLayerId();
+        S._actSprite = null;
+        S.rmHas = false;
+        cacheRGB();
     };
     const pushHistory = () => {
-        if (!S.hasMask) return;
-        S.undo.push(snapshot());
-        if (S.undo.length > 10) S.undo.shift();
+        const L = actLayer();
+        if (!L || !S.hasMask) return;
+        S.undo.push({ t: 'mask', id: L.id, data: maskBytes(L) });
+        if (S.undo.length > 12) S.undo.shift();
+        S.redo.length = 0;
+        syncHistoryButtons();
+    };
+    // 结构变更（增删图层、编组、合并、可见性、位置）→ 整份快照，条数少一点
+    const pushDocHistory = () => {
+        S.undo.push({ t: 'doc', snap: captureDoc() });
+        if (S.undo.length > 8) S.undo.shift();
         S.redo.length = 0;
         syncHistoryButtons();
     };
@@ -518,17 +744,417 @@
     };
     const undo = () => {
         if (!S.undo.length) return;
-        S.redo.push(snapshot());
-        applySnapshot(S.undo.pop());
+        const e = S.undo.pop();
+        if (e.t === 'mask') {
+            const L = layerById(e.id);
+            if (!L) { syncHistoryButtons(); return; }
+            S.redo.push({ t: 'mask', id: e.id, data: maskBytes(L) });
+            if (e.id !== S.activeId) { S.activeId = e.id; S._actSprite = null; cacheRGB(); }
+            writeMask(L, e.data);
+            postProcess({ refine: false, feather: S.feather, contrast: S.contrast });
+        } else {
+            S.redo.push({ t: 'doc', snap: captureDoc() });
+            restoreDoc(e.snap);
+        }
         syncHistoryButtons();
         render();
+        renderLayerPanel();
     };
     const redo = () => {
         if (!S.redo.length) return;
-        S.undo.push(snapshot());
-        applySnapshot(S.redo.pop());
+        const e = S.redo.pop();
+        if (e.t === 'mask') {
+            const L = layerById(e.id);
+            if (!L) { syncHistoryButtons(); return; }
+            S.undo.push({ t: 'mask', id: e.id, data: maskBytes(L) });
+            if (e.id !== S.activeId) { S.activeId = e.id; S._actSprite = null; cacheRGB(); }
+            writeMask(L, e.data);
+            postProcess({ refine: false, feather: S.feather, contrast: S.contrast });
+        } else {
+            S.undo.push({ t: 'doc', snap: captureDoc() });
+            restoreDoc(e.snap);
+        }
         syncHistoryButtons();
         render();
+        renderLayerPanel();
+    };
+
+    /* ---------------- 图层操作 ---------------- */
+    const countLayers = () => { let n = 0; walkLayers(() => n++); return n; };
+    const insertNode = (node, refId) => {
+        const list = siblingList(refId);
+        const i = list.findIndex((n) => n.id === refId);
+        list.splice(i < 0 ? list.length : i + 1, 0, node);
+    };
+    const pruneEmptyGroups = () => {
+        const prune = (arr) => {
+            for (let i = arr.length - 1; i >= 0; i--) {
+                const n = arr[i];
+                if (n.kind !== 'group') continue;
+                prune(n.children);
+                if (!n.children.length) arr.splice(i, 1);
+            }
+        };
+        prune(S.tree);
+    };
+    const selectLayer = (id) => {
+        const L = layerById(id);
+        if (!L) return;
+        S.activeId = id;
+        S._actSprite = null;
+        if (!S.rgb) cacheRGB();
+        render();
+        renderLayerPanel();
+    };
+
+    const fileToBitmap = async (file) => {
+        const buf = await file.arrayBuffer();
+        if (window.createImageBitmap) return await createImageBitmap(new Blob([buf], { type: file.type }));
+        return await new Promise((res, rej) => {
+            const url = URL.createObjectURL(file);
+            const im = new Image();
+            im.onload = () => { URL.revokeObjectURL(url); res(im); };
+            im.onerror = () => { URL.revokeObjectURL(url); rej(new Error('图片解析失败')); };
+            im.src = url;
+        });
+    };
+
+    const lyrNew = () => {
+        if (!S.w) return;
+        pushDocHistory();
+        const L = makeLayer('');
+        insertNode(L, S.activeId);
+        selectLayer(L.id);
+        setStatus('已新建空图层「' + L.name + '」：用 🖼 贴图 往这层放图片，也可以拿它当编组/合并的单位');
+    };
+    const lyrDup = () => {
+        const cur = activeNode();
+        if (!cur || cur.kind !== 'layer') return;
+        pushDocHistory();
+        const L = adoptLayer(cloneLayer(cur));
+        L.id = 'L' + (++S.layerSeq);
+        L.name = cur.name + ' 副本';
+        insertNode(L, cur.id);
+        selectLayer(L.id);
+        setStatus('已复制图层');
+    };
+    const lyrDel = () => {
+        const cur = activeNode();
+        if (!cur || cur.kind !== 'layer') return;
+        if (countLayers() <= 1) return toast('至少要留一个图层');
+        pushDocHistory();
+        const list = siblingList(cur.id);
+        const i = list.indexOf(cur);
+        list.splice(i, 1);
+        pruneEmptyGroups();
+        const next = list[Math.min(i, list.length - 1)];
+        S.activeId = next && next.kind === 'layer' ? next.id : firstLayerId();
+        S._actSprite = null;
+        cacheRGB();
+        render();
+        renderLayerPanel();
+        setStatus('已删除图层「' + cur.name + '」');
+    };
+    const lyrMove = (dir) => {
+        const cur = activeNode();
+        if (!cur) return;
+        const list = siblingList(cur.id);
+        const i = list.indexOf(cur);
+        const j = i + dir;
+        if (i < 0 || j < 0 || j >= list.length) return toast(dir > 0 ? '已经在最上面了' : '已经在最下面了');
+        pushDocHistory();
+        list.splice(i, 1);
+        list.splice(j, 0, cur);
+        render();
+        renderLayerPanel();
+    };
+    const lyrGroup = () => {
+        const cur = activeNode();
+        if (!cur) return;
+        pushDocHistory();
+        const list = siblingList(cur.id);
+        const i = list.indexOf(cur);
+        S.groupSeq++;
+        const g = { kind: 'group', id: 'G' + S.groupSeq, name: '组 ' + S.groupSeq, visible: true, opacity: 1, collapsed: false, children: [cur] };
+        list.splice(i, 1, g);
+        render();
+        renderLayerPanel();
+        setStatus('已编组：' + g.name + '（点组名前的箭头折叠，点眼睛整组显隐）');
+    };
+    const lyrUngroup = (id) => {
+        const g = nodeById(id);
+        if (!g || g.kind !== 'group') return;
+        pushDocHistory();
+        const list = siblingList(g.id);
+        const i = list.indexOf(g);
+        list.splice(i, 1, ...g.children);
+        render();
+        renderLayerPanel();
+        setStatus('已解散分组');
+    };
+    // 向下合并：把两层按各自的蒙版/不透明度/混合画成一张，替换掉下层
+    const lyrMerge = () => {
+        const cur = activeNode();
+        if (!cur || cur.kind !== 'layer') return;
+        const list = siblingList(cur.id);
+        const i = list.indexOf(cur);
+        const below = list[i - 1];
+        if (!below) return toast('下面没有图层可以合并');
+        if (below.kind === 'group') return toast('下面是分组，先展开分组再和里面的图层合并');
+        pushDocHistory();
+        const c = mkCv(S.w, S.h);
+        const x = c.getContext('2d');
+        const put = (n) => {
+            const sp = layerSprite(n);
+            if (!sp) return;
+            x.globalAlpha = n.opacity == null ? 1 : n.opacity;
+            x.globalCompositeOperation = n.blend || 'source-over';
+            x.drawImage(sp, 0, 0, S.w, S.h);
+        };
+        if (below.visible !== false) put(below);
+        if (cur.visible !== false) put(cur);
+        x.globalAlpha = 1;
+        x.globalCompositeOperation = 'source-over';
+        below.src = c;
+        below.fg = null;
+        below.hasMask = true;
+        below.opacity = 1;
+        below.blend = 'source-over';
+        below.rctx.clearRect(0, 0, S.w, S.h);
+        below.rctx.fillStyle = '#fff';
+        below.rctx.fillRect(0, 0, S.w, S.h);
+        below.mctx.clearRect(0, 0, S.w, S.h);
+        below.mctx.fillStyle = '#fff';
+        below.mctx.fillRect(0, 0, S.w, S.h);
+        bumpLayer(below);
+        list.splice(i, 1);
+        S.activeId = below.id;
+        S._actSprite = null;
+        cacheRGB();
+        render();
+        renderLayerPanel();
+        setStatus('已合并到「' + below.name + '」');
+    };
+    const lyrToggle = (id) => {
+        const n = nodeById(id);
+        if (!n) return;
+        pushDocHistory();
+        n.visible = n.visible === false;
+        render();
+        renderLayerPanel();
+    };
+    const lyrCollapse = (id) => {
+        const n = nodeById(id);
+        if (!n || n.kind !== 'group') return;
+        n.collapsed = !n.collapsed;
+        renderLayerPanel();
+    };
+    const lyrRename = (id, name) => {
+        const n = nodeById(id);
+        if (!n) return;
+        const v = String(name || '').trim().slice(0, 24);
+        if (!v || v === n.name) return renderLayerPanel();
+        pushDocHistory();
+        n.name = v;
+        renderLayerPanel();
+    };
+    const lyrOpacity = (v) => {
+        const n = activeNode();
+        if (!n || n.kind !== 'layer') return;
+        n.opacity = Math.max(0, Math.min(1, v / 100));
+        bumpLayer(n);
+        if (n.id === S.activeId) S._actSprite = null;
+        render();
+    };
+    const lyrBlend = (mode) => {
+        const n = activeNode();
+        if (!n || n.kind !== 'layer') return;
+        n.blend = mode || 'source-over';
+        bumpLayer(n);
+        render();
+    };
+
+    const layerThumbURL = (L) => {
+        const N = 40;
+        const c = mkCv(N, N);
+        const x = c.getContext('2d');
+        x.fillStyle = '#fff';
+        x.fillRect(0, 0, N, N);
+        x.fillStyle = '#e8e2d8';
+        for (let yy = 0; yy < N; yy += 8) {
+            for (let xx = 0; xx < N; xx += 8) if (((xx + yy) / 8) % 2) x.fillRect(xx, yy, 8, 8);
+        }
+        const sp = L.src ? layerSprite(L) : null;
+        if (sp) {
+            const k = Math.min(N / S.w, N / S.h);
+            const dw = S.w * k, dh = S.h * k;
+            x.drawImage(sp, (N - dw) / 2, (N - dh) / 2, dw, dh);
+        }
+        return c.toDataURL();
+    };
+
+    let renderLayerPanel = () => { };
+    const buildLayerRow = (n, depth, isGroup) => {
+        const row = document.createElement('div');
+        row.className = 'lyr-row' + (isGroup ? ' is-group' : '') + (n.id === S.activeId ? ' on' : '') + (n.visible === false ? ' off' : '');
+        row.style.paddingLeft = (6 + depth * 14) + 'px';
+        row.dataset.id = n.id;
+        const eye = document.createElement('button');
+        eye.type = 'button';
+        eye.className = 'lyr-eye';
+        eye.title = n.visible === false ? '显示这一层' : '隐藏这一层';
+        eye.textContent = n.visible === false ? '🚫' : '👁';
+        eye.onclick = (e) => { e.stopPropagation(); lyrToggle(n.id); };
+        row.appendChild(eye);
+        if (isGroup) {
+            const caret = document.createElement('button');
+            caret.type = 'button';
+            caret.className = 'lyr-caret';
+            caret.textContent = n.collapsed ? '▸' : '▾';
+            caret.title = n.collapsed ? '展开' : '折叠';
+            caret.onclick = (e) => { e.stopPropagation(); lyrCollapse(n.id); };
+            row.appendChild(caret);
+            const t = document.createElement('span');
+            t.className = 'lyr-name';
+            t.textContent = '🗀 ' + n.name;
+            t.title = '双击改名；右键解散分组';
+            row.appendChild(t);
+            const cnt = document.createElement('span');
+            cnt.className = 'lyr-count';
+            cnt.textContent = '(' + n.children.length + ')';
+            row.appendChild(cnt);
+            row.ondblclick = () => startRename(row, t, n);
+            row.oncontextmenu = (e) => { e.preventDefault(); lyrUngroup(n.id); };
+        } else {
+            const img = document.createElement('img');
+            img.className = 'lyr-thumb';
+            img.alt = '';
+            img.src = layerThumbURL(n);
+            row.appendChild(img);
+            const t = document.createElement('span');
+            t.className = 'lyr-name';
+            t.textContent = n.name;
+            t.title = '双击改名';
+            row.appendChild(t);
+            row.ondblclick = () => startRename(row, t, n);
+        }
+        row.onclick = () => { if (!isGroup) selectLayer(n.id); };
+        return row;
+    };
+    const startRename = (row, span, n) => {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'lyr-rename';
+        inp.value = n.name;
+        span.replaceWith(inp);
+        inp.focus();
+        inp.select();
+        const done = (ok) => {
+            const v = inp.value;
+            inp.remove();
+            span.textContent = (n.kind === 'group' ? '🗀 ' : '') + n.name;
+            row.insertBefore(span, row.querySelector('.lyr-count'));
+            if (ok) lyrRename(n.id, v);
+        };
+        inp.onkeydown = (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); done(true); }
+            else if (e.key === 'Escape') { e.preventDefault(); done(false); }
+        };
+        inp.onblur = () => done(true);
+        inp.onclick = (e) => e.stopPropagation();
+    };
+    renderLayerPanel = () => {
+        const box = $('#lyrList');
+        if (!box) return;
+        box.innerHTML = '';
+        if (!S.tree.length) return;
+        const walk = (arr, depth) => {
+            for (let i = arr.length - 1; i >= 0; i--) {   // 数组 0 = 最底层，界面从上往下显示
+                const n = arr[i];
+                if (n.kind === 'group') {
+                    box.appendChild(buildLayerRow(n, depth, true));
+                    if (!n.collapsed) walk(n.children, depth + 1);
+                } else {
+                    box.appendChild(buildLayerRow(n, depth, false));
+                }
+            }
+        };
+        walk(S.tree, 0);
+        const cur = activeNode();
+        const op = $('#lyrOpacity'), opv = $('#lyrOpacityVal'), bl = $('#lyrBlend');
+        if (cur && cur.kind === 'layer') {
+            const v = Math.round((cur.opacity == null ? 1 : cur.opacity) * 100);
+            if (op) op.value = String(v);
+            if (opv) opv.textContent = v + '%';
+            if (bl) bl.value = cur.blend || 'source-over';
+        }
+        const hint = $('#lyrHint');
+        if (hint) hint.textContent = '(' + countLayers() + ' 层)';
+    };
+
+    /* ---------------- 新建画布 / 贴图成层 ---------------- */
+    const DOC_MAX = 2400;
+    const newCanvasDoc = (w, h, bg) => {
+        const W = Math.max(16, Math.min(DOC_MAX, Math.round(Number(w) || 1080)));
+        const H = Math.max(16, Math.min(DOC_MAX, Math.round(Number(h) || 1080)));
+        setupCanvases(W, H);
+        S.natural = [W, H];
+        S.name = '新建画布';
+        S.pickKey = null;
+        S.bgColor = undefined;
+        const L = actLayer();
+        const c = mkCv(W, H);
+        const x = c.getContext('2d');
+        const solid = bg && bg !== 'transparent';
+        if (solid) { x.fillStyle = bg; x.fillRect(0, 0, W, H); }
+        L.src = c;
+        L.fg = null;
+        L.name = solid ? '背景' : '图层 1';
+        L.hasMask = true;
+        L.rctx.fillStyle = '#fff';
+        L.rctx.fillRect(0, 0, W, H);
+        L.mctx.fillStyle = '#fff';
+        L.mctx.fillRect(0, 0, W, H);
+        S.hasMask = true;
+        cacheRGB();
+        const stage = $('#mattingStage');
+        if (stage) {
+            stage.classList.remove('is-empty');
+            stage.dataset.wheelLock = '1';
+        }
+        const empty = $('#mattingEmpty');
+        if (empty) empty.style.display = 'none';
+        setNeedImg(true);
+        S.userZoomed = false;
+        render();
+        renderLayerPanel();
+        fitView(false);
+        syncHistoryButtons();
+        syncRmButtons();
+        setStatus('已新建 ' + W + '×' + H + (solid ? ' 画布（' + bg + ' 底色）' : ' 透明画布') + '，可以直接画，也可以用「＋ 贴图」加图层');
+        toast('画布已创建');
+    };
+    const addImageLayer = async (file) => {
+        if (!file) return;
+        if (!/^image\//.test(file.type || '')) return toast('请选择图片文件');
+        if (!S.w) return newCanvasDoc(1080, 1080, 'transparent');
+        setStatus('正在把图片加为新图层...');
+        let bmp;
+        try { bmp = await fileToBitmap(file); } catch (e) { return toast('图片解析失败：' + e.message); }
+        pushDocHistory();
+        const c = mkCv(S.w, S.h);
+        const x = c.getContext('2d');
+        x.imageSmoothingQuality = 'high';
+        const k = Math.min(S.w / bmp.width, S.h / bmp.height);
+        const dw = bmp.width * k, dh = bmp.height * k;
+        x.drawImage(bmp, (S.w - dw) / 2, (S.h - dh) / 2, dw, dh);
+        const L = makeLayer((file.name || '图片').replace(/\.[^.]+$/, '').slice(0, 16), { src: c });
+        insertNode(L, S.activeId);
+        selectLayer(L.id);
+        cacheRGB();
+        render();
+        renderLayerPanel();
+        setStatus('已添加图层「' + L.name + '」，抠图只作用在这一层，下面的图层不受影响');
     };
 
     /* ---------------- 笔刷库（PS .abr / 图片笔尖） ----------------
@@ -722,10 +1348,15 @@
             name: name || '笔刷',
             w: t.w, h: t.h,
             alpha: t.alpha,
-            thumb: tipThumb(t.alpha, t.w, t.h)
+            thumb: tipThumb(t.alpha, t.w, t.h),
+            group: ''
         };
         S.brushes.push(tip);
-        while (S.brushes.length > TIP_LIMIT) S.brushes.shift();
+        while (S.brushes.length > TIP_LIMIT) {
+            const gone = S.brushes.shift();
+            const gi = S.brushSel.indexOf(gone.id);
+            if (gi >= 0) S.brushSel.splice(gi, 1);
+        }
         return tip;
     };
 
@@ -742,23 +1373,145 @@
         if (S.syncRing) S.syncRing();
     };
 
+    /* ---- 勾选 / 分组 / 批量删除 ---- */
+    const brushPicked = (id) => S.brushSel.indexOf(id) >= 0;
+    const brushPickCount = () => S.brushSel.length;
+    const brushTogglePick = (id) => {
+        const i = S.brushSel.indexOf(id);
+        if (i >= 0) S.brushSel.splice(i, 1); else S.brushSel.push(id);
+        renderBrushList();
+        syncBrushTools();
+    };
+    const brushClearPick = () => { S.brushSel = []; renderBrushList(); syncBrushTools(); };
+    const brushDelete = () => {
+        const ids = S.brushSel.length ? S.brushSel.slice() : (S.tip ? [S.tip.id] : []);
+        if (!ids.length) return toast('先勾选要删的笔刷（圆头默认笔刷不能删）');
+        const names = ids.map((id) => (S.brushes.find((b) => b.id === id) || {}).name).filter(Boolean);
+        S.brushes = S.brushes.filter((b) => ids.indexOf(b.id) < 0);
+        // 分组空了就顺手清掉
+        S.brushGroups = S.brushGroups.filter((g) => S.brushes.some((b) => b.group === g));
+        S.brushSel = [];
+        S.brushIdx = -1;
+        S.tip = null;
+        renderBrushList();
+        selectBrush(-1);
+        syncBrushTools();
+        setStatus('已删除 ' + names.length + ' 支笔刷' + (names.length === 1 ? '：' + names[0] : ''));
+    };
+    const brushGroupSelected = (name) => {
+        const g = String(name || '').trim().slice(0, 14);
+        if (!g) return toast('先给分组起个名字');
+        const ids = S.brushSel.slice();
+        if (!ids.length) return toast('先在笔刷左上角勾选，再点「分组」');
+        if (S.brushGroups.indexOf(g) < 0) S.brushGroups.push(g);
+        S.brushes.forEach((b) => { if (ids.indexOf(b.id) >= 0) b.group = g; });
+        S.brushSel = [];
+        S.brushOpen[g] = false;
+        renderBrushList();
+        syncBrushTools();
+        setStatus('已把 ' + ids.length + ' 支笔刷放进「' + g + '」');
+    };
+    const brushMoveOut = (g) => {
+        const ids = S.brushSel.slice();
+        const targets = ids.length ? S.brushes.filter((b) => ids.indexOf(b.id) >= 0) : S.brushes.filter((b) => b.group === g);
+        targets.forEach((b) => { b.group = ''; });
+        S.brushGroups = S.brushGroups.filter((x) => S.brushes.some((b) => b.group === x));
+        S.brushSel = [];
+        renderBrushList();
+        syncBrushTools();
+        setStatus('已移出分组 ' + targets.length + ' 支');
+    };
+    const brushDropGroup = (g) => {
+        // 把一个分组整个删掉（笔刷退回未分组）
+        S.brushes.forEach((b) => { if (b.group === g) b.group = ''; });
+        S.brushGroups = S.brushGroups.filter((x) => x !== g);
+        renderBrushList();
+        syncBrushTools();
+        setStatus('已删除分组「' + g + '」，里面的笔刷回到未分组');
+    };
+    const toggleBrushGroup = (g) => {
+        S.brushOpen[g] = !S.brushOpen[g];
+        renderBrushList();
+    };
+    const syncBrushTools = () => {
+        const n = brushPickCount();
+        const del = $('#mattingBrushDel');
+        const grp = $('#mattingBrushGrp');
+        if (del) {
+            del.textContent = n ? '🗑 删除 ' + n : '🗑 删除';
+            del.classList.toggle('danger', n > 0);
+        }
+        if (grp) grp.disabled = n === 0;
+        const pick = $('#mattingBrushPickAll');
+        if (pick) pick.textContent = n ? '☑ 已选 ' + n : '☐ 全选';
+    };
+
     function renderBrushList() {
         const box = $('#mattingBrushList');
         if (!box) return;
         box.innerHTML = '';
-        const add = (tip, idx) => {
-            const b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'brush-chip' + (idx < 0 ? ' round' : '') + (S.brushIdx === idx ? ' on' : '');
-            b.title = idx < 0 ? '圆头软笔刷（默认）' : tip.name + '（' + tip.w + '×' + tip.h + '）';
+        const chip = (tip, idx) => {
+            const b = document.createElement('div');
+            b.className = 'brush-chip' + (idx < 0 ? ' round' : '') + (S.brushIdx === idx ? ' on' : '')
+                + (idx >= 0 && brushPicked(tip.id) ? ' picked' : '');
+            b.title = idx < 0 ? '圆头软笔刷（默认，不能删）' : tip.name + '（' + tip.w + '×' + tip.h + '）';
             b.setAttribute('role', 'option');
             b.setAttribute('aria-selected', S.brushIdx === idx ? 'true' : 'false');
+            b.dataset.id = idx >= 0 ? tip.id : 'round';
             if (idx >= 0) b.style.backgroundImage = 'url("' + tip.thumb + '")';
+            if (idx >= 0) {
+                const ck = document.createElement('button');
+                ck.type = 'button';
+                ck.className = 'brush-ck';
+                ck.title = '勾选（可多选后批量删除/分组）';
+                ck.textContent = brushPicked(tip.id) ? '✓' : '';
+                ck.onclick = (e) => { e.stopPropagation(); brushTogglePick(tip.id); };
+                b.appendChild(ck);
+            }
             b.onclick = () => selectBrush(idx);
-            box.appendChild(b);
+            return b;
         };
-        add(null, -1);
-        S.brushes.forEach((t, i) => add(t, i));
+        // 默认圆头永远在最前
+        box.appendChild(chip(null, -1));
+        const norm = (s) => (s || '').trim();
+        S.brushGroups = S.brushGroups.filter((g) => S.brushes.some((b) => norm(b.group) === g));
+        // 未分组
+        const loose = S.brushes.map((t, i) => ({ t, i })).filter((x) => !norm(x.t.group));
+        if (loose.length || !S.brushGroups.length) {
+            loose.forEach((x) => box.appendChild(chip(x.t, x.i)));
+        }
+        // 各分组
+        S.brushGroups.forEach((g) => {
+            const head = document.createElement('div');
+            head.className = 'brush-group-h';
+            head.dataset.group = g;
+            const arrow = document.createElement('button');
+            arrow.type = 'button';
+            arrow.className = 'brush-group-arrow';
+            arrow.textContent = S.brushOpen[g] ? '▸' : '▾';
+            arrow.title = S.brushOpen[g] ? '展开' : '收起';
+            arrow.onclick = (e) => { e.stopPropagation(); toggleBrushGroup(g); };
+            head.appendChild(arrow);
+            const nm = document.createElement('span');
+            nm.className = 'brush-group-name';
+            const items = S.brushes.filter((b) => norm(b.group) === g);
+            nm.textContent = g + ' (' + items.length + ')';
+            head.appendChild(nm);
+            const del = document.createElement('button');
+            del.type = 'button';
+            del.className = 'brush-group-del';
+            del.textContent = '✕';
+            del.title = '删除这个分组（笔刷退回未分组）';
+            del.onclick = (e) => { e.stopPropagation(); brushDropGroup(g); };
+            head.appendChild(del);
+            // 组头本身就是放置区：把勾选的移进这个组
+            head.ondblclick = () => { if (brushPickCount()) { S.brushSel.slice().forEach((id) => { const b = S.brushes.find((x) => x.id === id); if (b) b.group = g; }); S.brushSel = []; renderBrushList(); syncBrushTools(); } };
+            box.appendChild(head);
+            if (!S.brushOpen[g]) {
+                items.forEach((t) => box.appendChild(chip(t, S.brushes.indexOf(t))));
+            }
+        });
+        syncBrushTools();
     }
 
     const looksAbr = (buf, name) => /\.abr$/i.test(name || '') ||
@@ -2084,15 +2837,17 @@
 
         S.natural = [bmp.width, bmp.height];
         const scale = Math.min(1, MAX_SIDE / Math.max(bmp.width, bmp.height));
+        // 先建文档/图层，再往活动图层里填 src（S.src 现在是活动图层的代理字段）
+        setupCanvases(Math.max(1, Math.round(bmp.width * scale)), Math.max(1, Math.round(bmp.height * scale)));
         S.src = bmp;
         S.fg = null;
         S.bgColor = undefined;      // 换图要重新估背景色
         S.pickKey = null;           // 换图重新判断哪个模型更合适
         S.name = file.name || '图片';
-        setupCanvases(Math.max(1, Math.round(bmp.width * scale)), Math.max(1, Math.round(bmp.height * scale)));
+        if (actLayer()) actLayer().name = S.name.replace(/\.[^.]+$/, '').slice(0, 18) || '图层 1';
         S.hasMask = false;
-        S.undo = []; S.redo = [];
-        syncHistoryButtons();
+        cacheRGB();
+        renderLayerPanel();
         const stage = $('#mattingStage');
         if (stage) {
             stage.classList.remove('is-empty');
@@ -2120,14 +2875,12 @@
     };
 
     const exportPNG = () => {
-        if (!S.hasMask) return toast('请先完成去背景');
+        if (!hasAnyPixels()) return toast('画布还是空的，先上传图片或新建画布');
         setStatus('正在导出透明 PNG...');
-        const c = document.createElement('canvas');
-        c.width = S.w; c.height = S.h;
+        const c = mkCv(S.w, S.h);
         const x = c.getContext('2d');
-        x.drawImage(S.fg || S.src, 0, 0, S.w, S.h);
-        x.globalCompositeOperation = 'destination-in';
-        x.drawImage(S.mask, 0, 0, S.w, S.h);
+        // 导出的是整张画布（图层按顺序合成，隐藏的层不导出）
+        composeDoc(x, true);
         c.toBlob((blob) => {
             if (!blob) return toast('导出失败');
             const url = URL.createObjectURL(blob);
@@ -2152,6 +2905,7 @@
 
     const exportSVG = async () => {
         if (!S.hasMask) return toast('请先完成去背景');
+        if (!S.src) return toast('当前图层没有像素，先切到有内容的图层');
         setStatus('正在生成矢量图...');
         let tracer;
         try { tracer = await loadTracer(); } catch (e) { return toast(e.message); }
@@ -2682,6 +3436,11 @@
         setStatus('');
         const pv = $('#mattingVecPreview');
         if (pv) { pv.innerHTML = ''; pv.style.display = 'none'; }
+        // 图层树一起清掉，否则「重新上传」后旧图层还挂在面板里
+        S.tree = [];
+        S.activeId = '';
+        S._actSprite = null;
+        renderLayerPanel();
         syncHistoryButtons();
     };
 
@@ -3187,7 +3946,7 @@
         rng('#mattingSelFeather', 'selFeather', v => v + ' px', null, { noRefresh: true });   // 选区羽化：别动蒙版
         rng('#mattingSpacing', 'spacing', v => v + '%', v => v / 100, { noRefresh: true });   // 笔尖间距
 
-        /* ---------------- 笔刷库：导入 / 删除 / 拖进来 ---------------- */
+        /* ---------------- 笔刷库：导入 / 勾选 / 分组 / 拖进来 ---------------- */
         const brushFile = $('#mattingBrushFile');
         const brushAdd = $('#mattingBrushAdd');
         if (brushAdd) brushAdd.onclick = () => { if (brushFile) brushFile.click(); };
@@ -3198,13 +3957,40 @@
             };
         }
         const brushDel = $('#mattingBrushDel');
-        if (brushDel) {
-            brushDel.onclick = () => {
-                if (S.brushIdx < 0) return toast('默认的圆头笔刷不能删');
-                const name = S.brushes[S.brushIdx].name;
-                S.brushes.splice(S.brushIdx, 1);
-                selectBrush(-1);
-                setStatus('已删除笔刷「' + name + '」');
+        if (brushDel) brushDel.onclick = () => brushDelete();
+        const brushPickAll = $('#mattingBrushPickAll');
+        if (brushPickAll) {
+            brushPickAll.onclick = () => {
+                if (brushPickCount()) return brushClearPick();
+                S.brushSel = S.brushes.map((b) => b.id);
+                renderBrushList();
+                syncBrushTools();
+            };
+        }
+        // 分组条：点「🗂 分组」展开，输入名字回车即建组并移入勾选项
+        const grpBar = $('#mattingBrushGroupBar');
+        const grpName = $('#mattingBrushGroupName');
+        const grpOpen = (on) => {
+            if (!grpBar) return;
+            grpBar.hidden = on === false;
+            if (on !== false && grpName) {
+                grpName.value = '分组 ' + (S.brushGroups.length + 1);
+                grpName.focus();
+                grpName.select();
+            }
+        };
+        const brushGrp = $('#mattingBrushGrp');
+        if (brushGrp) brushGrp.onclick = () => { if (!brushPickCount()) return toast('先在笔刷左上角勾选几支，再分组'); grpOpen(true); };
+        const grpOk = $('#mattingBrushGroupOk');
+        if (grpOk) grpOk.onclick = () => { brushGroupSelected(grpName ? grpName.value : ''); grpOpen(false); };
+        const grpCancel = $('#mattingBrushGroupCancel');
+        if (grpCancel) grpCancel.onclick = () => grpOpen(false);
+        const grpMoveOut = $('#mattingBrushMoveOut');
+        if (grpMoveOut) grpMoveOut.onclick = () => { brushMoveOut(''); grpOpen(false); };
+        if (grpName) {
+            grpName.onkeydown = (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); brushGroupSelected(grpName.value); grpOpen(false); }
+                else if (e.key === 'Escape') { e.preventDefault(); grpOpen(false); }
             };
         }
         const bl = $('#mattingBrushList');
@@ -3222,6 +4008,58 @@
         }
         renderBrushList();
         selectBrush(-1);
+
+        /* ---------------- 图层面板 ---------------- */
+        const bind2 = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
+        bind2('#lyrAdd', () => lyrNew());
+        bind2('#lyrImg', () => { const f = $('#lyrFile'); if (f) f.click(); });
+        const lyrFile = $('#lyrFile');
+        if (lyrFile) {
+            lyrFile.onchange = (e) => {
+                const f = e.target.files && e.target.files[0];
+                if (f) addImageLayer(f);
+                e.target.value = '';
+            };
+        }
+        bind2('#lyrDup', () => lyrDup());
+        bind2('#lyrGroup', () => lyrGroup());
+        bind2('#lyrMerge', () => lyrMerge());
+        bind2('#lyrUp', () => lyrMove(1));
+        bind2('#lyrDown', () => lyrMove(-1));
+        bind2('#lyrDel', () => lyrDel());
+        const lyrOp = $('#lyrOpacity');
+        if (lyrOp) {
+            lyrOp.oninput = () => {
+                lyrOpacity(Number(lyrOp.value) || 0);
+                const v = $('#lyrOpacityVal');
+                if (v) v.textContent = Math.round(Number(lyrOp.value) || 0) + '%';
+            };
+        }
+        const lyrBl = $('#lyrBlend');
+        if (lyrBl) lyrBl.onchange = () => { lyrBlend(lyrBl.value); renderLayerPanel(); };
+
+        /* ---------------- 新建画布 ---------------- */
+        const ncCreate = $('#ncCreate');
+        if (ncCreate) {
+            ncCreate.onclick = () => {
+                const w = Number(($('#ncW') || {}).value || 1080);
+                const h = Number(($('#ncH') || {}).value || 1080);
+                const sel = $('#ncBg'), col = $('#ncColor');
+                let bg = sel ? sel.value : 'transparent';
+                if (bg === 'custom') bg = col ? col.value : '#ffffff';
+                newCanvasDoc(w, h, bg);
+            };
+        }
+        $$('.nc-chip').forEach((b) => {
+            b.onclick = () => {
+                const w = $('#ncW'), h = $('#ncH');
+                if (w) w.value = b.dataset.w;
+                if (h) h.value = b.dataset.h;
+                $$('.nc-chip').forEach((x) => x.classList.toggle('on', x === b));
+            };
+        });
+        const ncColor = $('#ncColor');
+        if (ncColor) ncColor.oninput = () => { const sel = $('#ncBg'); if (sel) sel.value = 'custom'; };
 
         // 选区的叠加色 / 浓度（PS 快速蒙版那一套）
         const cutColor = $('#mattingCutColor'), cutOp = $('#mattingCutOp');
@@ -3394,8 +4232,21 @@
         purgeBgBlobs, shrinkBgEdge, despeckle, cleanBgFlood, postProcess, render,
         selClear, applySelection, selInvert, selMorph, selAll, rebuildSelVisual,
         abrTips, addTip, selectBrush, importBrushes, renderBrushList,
-        brushes: () => S.brushes.map(t => ({ name: t.name, w: t.w, h: t.h })),
+        brushes: () => S.brushes.map(t => ({ id: t.id, name: t.name, w: t.w, h: t.h, group: t.group || '' })),
         brush: () => ({ idx: S.brushIdx, spacing: S.spacing, tip: S.tip ? S.tip.name : null }),
+        brushSel: () => S.brushSel.slice(),
+        brushGroups: () => S.brushGroups.slice(),
+        brushTogglePick, brushDelete, brushGroupSelected, brushMoveOut, brushDropGroup,
+        newCanvasDoc, addImageLayer, layerThumbURL,
+        composite: () => { const c = mkCv(S.w, S.h); composeDoc(c.getContext('2d'), true); return c.toDataURL('image/png'); },
+        lyrNew, lyrDup, lyrDel, lyrMove, lyrGroup, lyrUngroup, lyrMerge,
+        lyrToggle, lyrCollapse, lyrRename, lyrOpacity, lyrBlend, selectLayer,
+        renderLayerPanel,
+        doc: () => ({
+            w: S.w, h: S.h, active: S.activeId,
+            layers: (() => { const out = []; walkLayers((L) => out.push({ id: L.id, name: L.name, visible: L.visible !== false, opacity: L.opacity == null ? 1 : L.opacity, blend: L.blend || 'source-over', hasMask: !!L.hasMask, hasSrc: !!L.src, group: (() => { let g = ''; const walk = (arr, name) => arr.some((n) => { if (n.kind === 'group') { if (n.children.indexOf(L) >= 0) { g = n.name; return true; } return walk(n.children, n.name); } return n === L; }); walk(S.tree, ''); return g; })() })); return out; })(),
+            groups: (() => { const out = []; const walk = (arr) => arr.forEach((n) => { if (n.kind === 'group') { out.push({ id: n.id, name: n.name, visible: n.visible !== false, collapsed: !!n.collapsed, count: n.children.length }); walk(n.children); } }); walk(S.tree); return out; })()
+        }),
         sel: () => ({ on: S.selOn, area: S.selArea, mode: S.selMode, scope: S.wandScope, feather: S.selFeather }),
         view: () => ({ zoom: S.zoom, tx: S.tx, ty: S.ty, baseScale: S.baseScale, mode: S.mode })
     };
