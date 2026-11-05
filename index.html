@@ -20,7 +20,7 @@
     <!-- 登录界面动效 -->
     <link rel="stylesheet" href="login.css?v=20261030">
     <!-- 抠图工具样式 -->
-    <link rel="stylesheet" href="matting.css?v=20261122b">
+    <link rel="stylesheet" href="matting.css?v=20261122c">
     <link rel="stylesheet" href="personality.css?v=20261118p">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
@@ -751,38 +751,102 @@
                         <div class="muted" id="mattingStatus" style="margin-top:10px;"></div>
                     </div>
 
-                    <div class="card matting-need-img">
-                        <div class="card-title">🖌 画笔修补</div>
-                        <p class="muted" style="margin:-4px 0 12px;">擦除：抹掉多余的背景；恢复：把误删的主体补回来。先选模式，再在图上拖动，松手后可以撤销。选「移动画布」可拖动画面；任何模式下按住空格也能临时平移。</p>
-                        <div class="matting-seg" id="mattingMode">
-                            <button type="button" data-val="erase" class="on">🧽 擦除背景</button>
-                            <button type="button" data-val="restore">🖌 恢复主体</button>
-                            <button type="button" data-val="remove">🪄 涂抹去物</button>
-                            <button type="button" data-val="pan">✋ 移动画布</button>
+                    <div class="card" id="mattingWork">
+                        <div class="card-title zoom-head">
+                            <span>🎨 工作区</span>
+                            <div class="matting-optbar">
+                                <button class="btn btn-ghost btn-sm" id="mattingUndo" disabled>↩ 撤销</button>
+                                <button class="btn btn-ghost btn-sm" id="mattingRedo" disabled>↪ 重做</button>
+                                <button class="btn btn-ghost btn-sm" id="mattingKeepAll">全部保留</button>
+                                <button class="btn btn-ghost btn-sm" id="mattingCutAll">全部删除</button>
+                                <button class="btn btn-ghost btn-sm" id="mattingRefineApply">✨ 边缘精修</button>
+                                <span class="matting-optsep" aria-hidden="true"></span>
+                                <div class="zoom-bar">
+                                    <button class="zbtn" id="mattingZoomOut" type="button" title="缩小">➖</button>
+                                    <span class="zval" id="mattingZoomVal">100%</span>
+                                    <button class="zbtn" id="mattingZoomIn" type="button" title="放大">➕</button>
+                                    <button class="btn btn-ghost btn-sm" id="mattingZoomFit" type="button">适应窗口</button>
+                                    <button class="btn btn-ghost btn-sm" id="mattingZoom100" type="button">1:1</button>
+                                </div>
+                            </div>
                         </div>
-                        <div style="height:12px;"></div>
-                        <div class="matting-range">
-                            <label for="mattingBrush">画笔大小</label>
-                            <input type="range" id="mattingBrush" min="1" max="300" value="40">
-                            <span class="val" id="mattingBrushVal">40 px</span>
-                        </div>
-                        <div class="matting-range">
-                            <label for="mattingHard">画笔硬度</label>
-                            <input type="range" id="mattingHard" min="0" max="100" value="60">
-                            <span class="val" id="mattingHardVal">60%</span>
-                        </div>
-                        <div class="matting-bar">
-                            <button class="btn btn-ghost btn-sm" id="mattingUndo" disabled>↩ 撤销</button>
-                            <button class="btn btn-ghost btn-sm" id="mattingRedo" disabled>↪ 重做</button>
-                            <button class="btn btn-ghost btn-sm" id="mattingKeepAll">全部保留</button>
-                            <button class="btn btn-ghost btn-sm" id="mattingCutAll">全部删除</button>
-                            <button class="btn btn-ghost btn-sm" id="mattingRefineApply">✨ 边缘精修</button>
+                        <div class="matting-work">
+                            <div class="matting-rail matting-need-img" id="mattingMode" role="toolbar" aria-label="工具">
+                                <button type="button" data-val="erase" class="on" title="擦除背景 (E)"><i>🧽</i><span>擦除</span></button>
+                                <button type="button" data-val="restore" title="恢复主体 (R)"><i>🖌️</i><span>恢复</span></button>
+                                <button type="button" data-val="remove" title="涂抹去物 (J)"><i>🪄</i><span>去物</span></button>
+                                <button type="button" data-val="pan" title="移动画布 (H)"><i>✋</i><span>移动</span></button>
+                            </div>
+                            <div class="matting-center">
+                                <div class="matting-stage is-empty" id="mattingStage">
+                                    <div class="matting-empty" id="mattingEmpty">还没有图片，先上传一张吧</div>
+                                    <canvas id="mattingCanvas"></canvas>
+                                </div>
+                                <p class="muted zoom-tip">滚轮缩放 · 空格/中键拖动 · 双指捏合（手机）· 快捷键：E 擦除 / R 恢复 / J 去物 / H 移动 / [ ] 画笔大小 / Q 删除预览 / K 黑白蒙版</p>
+                            </div>
+                            <aside class="matting-props" id="mattingProps">
+                                <div class="mgroup matting-need-img">
+                                    <div class="mgroup-t">🖌 画笔</div>
+                                    <div class="matting-range">
+                                        <label for="mattingBrush">大小</label>
+                                        <input type="range" id="mattingBrush" min="1" max="300" value="40">
+                                        <span class="val" id="mattingBrushVal">40 px</span>
+                                    </div>
+                                    <div class="matting-range">
+                                        <label for="mattingHard">硬度</label>
+                                        <input type="range" id="mattingHard" min="0" max="100" value="60">
+                                        <span class="val" id="mattingHardVal">60%</span>
+                                    </div>
+                                </div>
+                                <div class="mgroup matting-need-img">
+                                    <div class="mgroup-t">👁 视图</div>
+                                    <div class="matting-seg" id="mattingBg">
+                                        <button type="button" data-val="checker" class="on">透明</button>
+                                        <button type="button" data-val="white">白底</button>
+                                        <button type="button" data-val="black">黑底</button>
+                                        <button type="button" data-val="gray">灰底</button>
+                                        <button type="button" data-val="bw" title="黑白蒙版 (K)">黑白</button>
+                                    </div>
+                                    <div class="mopt-row">
+                                        <button class="btn btn-ghost btn-sm" id="mattingShowCut" style="flex:1;">▨ 预览删除区</button>
+                                    </div>
+                                    <div class="mopt-row">
+                                        <label for="mattingCutColor">叠加色</label>
+                                        <input type="color" id="mattingCutColor" value="#d9463c" title="删除区的叠加颜色">
+                                        <input type="range" id="mattingCutOp" min="0" max="80" value="30" title="叠加浓度">
+                                        <span class="val" id="mattingCutOpVal">30%</span>
+                                    </div>
+                                </div>
+                                <div class="mgroup matting-need-img">
+                                    <div class="mgroup-t">✨ 边缘</div>
+                                    <div class="matting-range">
+                                        <label for="mattingFeather">羽化</label>
+                                        <input type="range" id="mattingFeather" min="0" max="6" value="1">
+                                        <span class="val" id="mattingFeatherVal">1 px</span>
+                                    </div>
+                                    <div class="matting-range">
+                                        <label for="mattingContrast">净化</label>
+                                        <input type="range" id="mattingContrast" min="0" max="100" value="40">
+                                        <span class="val" id="mattingContrastVal">40%</span>
+                                    </div>
+                                    <div class="matting-range">
+                                        <label for="mattingSmooth">平滑</label>
+                                        <input type="range" id="mattingSmooth" min="0" max="10" value="0">
+                                        <span class="val" id="mattingSmoothVal">0</span>
+                                    </div>
+                                    <div class="matting-range">
+                                        <label for="mattingShift">移动边缘</label>
+                                        <input type="range" id="mattingShift" min="-50" max="50" value="0">
+                                        <span class="val" id="mattingShiftVal">0</span>
+                                    </div>
+                                </div>
+                            </aside>
                         </div>
                     </div>
 
                     <div class="card matting-need-img">
                         <div class="card-title">🪄 魔法橡皮擦</div>
-                        <p class="muted" style="margin:-4px 0 12px;">像 Magic Eraser 一样抹掉照片里的路人、杂物、文字和水印：把模式切到「🪄 涂抹去物」，涂红要移除的内容（一定涂到比目标大一圈，8–10px；文字/水印要把整行都盖住，边缘漏一笔就会留残影），再点「移除涂抹区」。<b>AI 补全</b>用 MI-GAN（Picsart 开源，ICCV 2023）在本地重建被涂掉的画面，能补出头发、衣服、砖墙这类真实纹理；<b>本地快速</b>是纯插值，只在天空/墙面/渐变这类平坦背景够用。全部本地推理，图片不上传。</p>
+                        <p class="muted" style="margin:-4px 0 12px;">像 Magic Eraser 一样抹掉照片里的路人、杂物、文字和水印：左边工具切到「🪄 去物」，涂红要移除的内容（一定涂到比目标大一圈，8–10px；文字/水印要把整行都盖住，边缘漏一笔就会留残影），再点「移除涂抹区」。<b>AI 补全</b>用 MI-GAN（Picsart 开源，ICCV 2023）在本地重建被涂掉的画面，能补出头发、衣服、砖墙这类真实纹理；<b>本地快速</b>是纯插值，只在天空/墙面/渐变这类平坦背景够用。全部本地推理，图片不上传。</p>
                         <div class="matting-bar">
                             <button class="btn btn-gold btn-sm" id="mattingInpaint" disabled>✨ 移除涂抹区</button>
                             <button class="btn btn-ghost btn-sm" id="mattingInpaintCmp" disabled>🔍 对比原图</button>
@@ -801,47 +865,6 @@
                             <input type="range" id="mattingCmpPos" min="0" max="100" value="50" aria-label="前后对比分割线">
                             <span class="matting-cmpbar-tip">左=擦除前 · 右=擦除后（Esc 退出）</span>
                         </div>
-                    </div>
-
-                    <div class="card matting-need-img">
-                        <div class="card-title">🖼 边缘与预览</div>
-                        <div class="matting-range">
-                            <label for="mattingFeather">边缘羽化</label>
-                            <input type="range" id="mattingFeather" min="0" max="6" value="1">
-                            <span class="val" id="mattingFeatherVal">1 px</span>
-                        </div>
-                        <div class="matting-range">
-                            <label for="mattingContrast">边缘净化</label>
-                            <input type="range" id="mattingContrast" min="0" max="100" value="40">
-                            <span class="val" id="mattingContrastVal">40%</span>
-                        </div>
-                        <div class="matting-bar">
-                            <div class="matting-seg" id="mattingBg">
-                                <button type="button" data-val="checker" class="on">透明</button>
-                                <button type="button" data-val="white">白底</button>
-                                <button type="button" data-val="black">黑底</button>
-                                <button type="button" data-val="gray">灰底</button>
-                            </div>
-                            <button class="btn btn-ghost btn-sm" id="mattingShowCut">👁 显示删除区</button>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-title zoom-head">
-                            <span>🎨 画布</span>
-                            <div class="zoom-bar">
-                                <button class="zbtn" id="mattingZoomOut" type="button" title="缩小">➖</button>
-                                <span class="zval" id="mattingZoomVal">100%</span>
-                                <button class="zbtn" id="mattingZoomIn" type="button" title="放大">➕</button>
-                                <button class="btn btn-ghost btn-sm" id="mattingZoomFit" type="button">适应窗口</button>
-                                <button class="btn btn-ghost btn-sm" id="mattingZoom100" type="button">1:1</button>
-                            </div>
-                        </div>
-                        <div class="matting-stage is-empty" id="mattingStage">
-                            <div class="matting-empty" id="mattingEmpty">还没有图片，先上传一张吧</div>
-                            <canvas id="mattingCanvas"></canvas>
-                        </div>
-                        <p class="muted zoom-tip">滚轮缩放 · 空格/中键拖动 · 双指捏合（手机）· 放大后用画笔精细修补</p>
                     </div>
 
                     <div class="card matting-need-img">
@@ -1411,7 +1434,7 @@ PORTFOLIO</p>
     <script src="script-game.js"></script>
     <script src="script.js?v=20261030"></script>
     <script src="workbench.js?v=20261121d"></script>
-    <script src="matting.js?v=20261122d"></script>
+    <script src="matting.js?v=20261122e"></script>
     <script src="personality.js?v=20261118p"></script>
     <script src="portfolio.js?v=20261029"></script>
     <script src="login-cards.js?v=20261030"></script>

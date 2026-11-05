@@ -101,10 +101,34 @@
         hardness: 0.6,
         feather: 1,
         contrast: 0.4,
+        smooth: 0,        // 边缘平滑：blur 后再锐化，圆掉锯齿状凹凸（PS「平滑」）
+        shift: 0,         // 移动边缘：>0 外扩、<0 收缩（PS「移动边缘」）
+        cutColor: '#d9463c', // 删除区预览的叠加色（PS 快速蒙版默认红系）
+        cutOp: 0.3,       // 叠加浓度 0-0.8；0 = 纯灰暗预览
+        bwView: false,    // 黑白蒙版视图（PS 里按 K）
         deepClean: true,  // 清理与背景同色的残留（反光、投影）
         pickKey: null,    // 这张图上「复核后更干净」的模型，换图要清掉
         showCut: false,
         tracer: null
+    };
+
+    /* ---------------- 全尺寸临时画布池 ----------------
+       删除区预览 / 黑白蒙版每帧要合成好几层，画布复用（同尺寸不重建）；
+       退出预览时 S._tmp = null 整体释放，大图能省几十 MB */
+    const tmpC = (id) => {
+        if (!S._tmp) S._tmp = {};
+        let cv = S._tmp[id];
+        if (!cv || cv.width !== S.w || cv.height !== S.h) {
+            cv = document.createElement('canvas');
+            cv.width = S.w; cv.height = S.h;
+            S._tmp[id] = cv;
+        }
+        const g = cv.getContext('2d');
+        g.setTransform(1, 0, 0, 1, 0, 0);
+        g.globalCompositeOperation = 'source-over';
+        g.globalAlpha = 1;
+        g.clearRect(0, 0, S.w, S.h);
+        return cv;
     };
 
     /* ---------------- IndexedDB：缓存 42MB 模型，第二次打开秒开 ---------------- */
@@ -250,27 +274,11 @@
         ctx.drawImage((S.hasMask && S.fg && !S.showCut) ? S.fg : S.src, 0, 0, S.w, S.h);
         if (!S.hasMask) { drawRm(); return; }
         if (S.showCut) {
-            // 显示删除区：原图内容全部保留，只把「将被删掉」的部分做 去色 + 压暗 + 细斜纹，
+            // 显示删除区：原图内容全部保留，只把「将被删掉」的部分做 去色 + 压暗 + 叠加色 + 细斜纹，
             // 再给主体边缘描一圈双色轮廓。不依赖底图配色，任何背景（含粉色/洋红）上都分得清：
             //   彩色 + 清晰轮廓 = 保留；灰暗 + 斜纹 = 将被删除
-            const tmp = (id) => {
-                if (!S._tmp) S._tmp = {};
-                let cv = S._tmp[id];
-                if (!cv || cv.width !== S.w || cv.height !== S.h) {
-                    cv = document.createElement('canvas');
-                    cv.width = S.w; cv.height = S.h;
-                    S._tmp[id] = cv;
-                }
-                const g = cv.getContext('2d');
-                g.setTransform(1, 0, 0, 1, 0, 0);
-                g.globalCompositeOperation = 'source-over';
-                g.globalAlpha = 1;
-                g.clearRect(0, 0, S.w, S.h);
-                return cv;
-            };
-
             // ① 反向蒙版：白 = 将被删除
-            const inv = tmp('inv');
+            const inv = tmpC('inv');
             const ic = inv.getContext('2d');
             ic.fillStyle = '#fff';
             ic.fillRect(0, 0, S.w, S.h);
@@ -278,7 +286,7 @@
             ic.drawImage(S.mask, 0, 0, S.w, S.h);
 
             // ② 删除区去色 + 压暗：内容仍然看得见（好判断有没有切到主体），但明显「不是成品」
-            const dim = tmp('dim');
+            const dim = tmpC('dim');
             const dc = dim.getContext('2d');
             dc.drawImage(S.src, 0, 0, S.w, S.h);
             dc.globalCompositeOperation = 'saturation';
@@ -287,13 +295,21 @@
             dc.globalCompositeOperation = 'multiply';
             dc.fillStyle = 'rgb(148,148,148)';
             dc.fillRect(0, 0, S.w, S.h);
+            // 叠加色（PS 快速蒙版思路）：用 color 混合给灰底上色相，浓度用户可调
+            if (S.cutOp > 0 && S.cutColor) {
+                dc.globalCompositeOperation = 'color';
+                dc.globalAlpha = S.cutOp;
+                dc.fillStyle = S.cutColor;
+                dc.fillRect(0, 0, S.w, S.h);
+                dc.globalAlpha = 1;
+            }
             dc.globalCompositeOperation = 'destination-in';
             dc.drawImage(inv, 0, 0);
             dc.globalCompositeOperation = 'source-over';
             ctx.drawImage(dim, 0, 0);
 
             // ③ 细斜纹：只当「这是删除区」的符号，间隔大、线细、透明度低，不抢原图细节
-            const hatch = tmp('hatch');
+            const hatch = tmpC('hatch');
             const hc = hatch.getContext('2d');
             const step = Math.max(12, Math.round(34 / (S.baseScale || 1)));
             hc.strokeStyle = 'rgba(255,255,255,0.2)';
@@ -313,7 +329,7 @@
             // 线宽按屏幕尺度换算，缩放后不会变成看不见的细线或糊成一带
             const rw = Math.max(1, Math.round(1.6 / (S.baseScale || 1)));
             const shifted = (d) => {
-                const cv = tmp('shift' + d);
+                const cv = tmpC('shift' + d);
                 const g = cv.getContext('2d');
                 const off = [[d, 0], [-d, 0], [0, d], [0, -d]];
                 for (let k = 0; k < off.length; k++) g.drawImage(S.mask, off[k][0], off[k][1], S.w, S.h);
@@ -321,7 +337,7 @@
             };
             const u1 = shifted(rw), u2 = shifted(rw * 2);
             const ring = (id, base, cutAway, color) => {
-                const cv = tmp(id);
+                const cv = tmpC(id);
                 const g = cv.getContext('2d');
                 g.drawImage(base, 0, 0);
                 g.globalCompositeOperation = 'destination-out';
@@ -335,6 +351,26 @@
             ctx.drawImage(ring('ringOuter', u2, u1, 'rgba(255,255,255,0.95)'), 0, 0);
             ctx.drawImage(ring('ringInner', u1, S.mask, 'rgba(22,18,14,0.55)'), 0, 0);
             drawRm();   // 涂抹去物的红区也要盖在最上面，否则切到涂抹模式看不见笔迹
+            return;
+        }
+        if (S.bwView) {
+            // 黑白蒙版视图（PS 里按 K）：白=保留、黑=删除，检查半透明边缘最直观
+            // 注意不能在白底上直接 source-in 上黑，那会把整张画布都涂黑；
+            // 先在透明层把蒙版染黑（保留 alpha），再正常叠到白底上
+            const mt = tmpC('bwMask');
+            const mc = mt.getContext('2d');
+            mc.drawImage(S.mask, 0, 0, S.w, S.h);
+            mc.globalCompositeOperation = 'source-in';
+            mc.fillStyle = '#0d0d0d';
+            mc.fillRect(0, 0, S.w, S.h);
+            mc.globalCompositeOperation = 'source-over';
+            const bw = tmpC('bw');
+            const bc = bw.getContext('2d');
+            bc.fillStyle = '#fff';
+            bc.fillRect(0, 0, S.w, S.h);
+            bc.drawImage(mt, 0, 0);
+            ctx.drawImage(bw, 0, 0);
+            drawRm();
             return;
         }
         ctx.globalCompositeOperation = 'destination-in';
@@ -683,11 +719,23 @@
         }
 
         if (opts.refine && S.rgb) m = guidedFilter(m, S.rgb.data, w, h, 3, 1e-4);
+        // 平滑（PS「平滑」）：先 blur 掉锯齿状的小凹凸，后面净化步骤会把边缘重新收紧
+        const smooth = opts.smooth === undefined ? (S.smooth || 0) : opts.smooth;
+        if (smooth > 0) m = boxBlurGray(m, w, h, Math.round(smooth) + 1, 2);
         if (opts.feather > 0) m = boxBlurGray(m, w, h, Math.round(opts.feather), 2);
         if (opts.contrast > 0) {
             const k = 1 + opts.contrast * 3;
             for (let j = 0; j < n; j++) {
                 const v = (m[j] - 0.5) * k + 0.5;
+                m[j] = v < 0 ? 0 : v > 1 ? 1 : v;
+            }
+        }
+        // 移动边缘（PS「Shift Edge」）：>0 外扩、<0 收缩，中点按 (m+t)/(1+t) 单调平移，不产生硬阶
+        const shift = opts.shift === undefined ? (S.shift || 0) : opts.shift;
+        if (shift !== 0) {
+            const t = shift;
+            for (let j = 0; j < n; j++) {
+                const v = (m[j] + t) / (1 + t);
                 m[j] = v < 0 ? 0 : v > 1 ? 1 : v;
             }
         }
@@ -2141,12 +2189,42 @@
                 return !!sec && sec.offsetParent !== null;
             };
             window.addEventListener('keydown', (e) => {
-                // 涂抹去物模式下 Ctrl/⌘+Z = 撤销擦除；Esc 退出对比
+                // 涂抹去物模式下 Ctrl/⌘+Z = 撤销擦除；Esc 退出对比；PS 式单键工具切换
                 if (S.src && viewVisible() && !isTyping(e.target)) {
                     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z') && S.mode === 'remove') {
                         e.preventDefault();
                         undoInpaint();
                         return;
+                    }
+                    if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+                        // E 擦除 / R 恢复 / J 涂抹去物 / H 移动；[ ] 画笔大小；Q 删除预览；K 黑白蒙版
+                        const toolKeys = { e: 'erase', r: 'restore', j: 'remove', h: 'pan' };
+                        const k = e.key.toLowerCase();
+                        if (toolKeys[k]) {
+                            const btn = document.querySelector('#mattingMode button[data-val="' + toolKeys[k] + '"]');
+                            if (btn) { e.preventDefault(); btn.click(); return; }
+                        }
+                        if (k === 'q') {
+                            e.preventDefault();
+                            toggleShowCut();
+                            return;
+                        }
+                        if (k === 'k') {
+                            e.preventDefault();
+                            const bwBtn = document.querySelector('#mattingBg button[data-val="bw"]');
+                            if (bwBtn) bwBtn.click();
+                            return;
+                        }
+                        if (k === '[' || k === ']') {
+                            e.preventDefault();
+                            const b = $('#mattingBrush');
+                            if (b) {
+                                const step = S.brush >= 100 ? 20 : (S.brush >= 40 ? 10 : 4);
+                                b.value = Math.max(1, Math.min(300, S.brush + (k === ']' ? step : -step)));
+                                b.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                            return;
+                        }
                     }
                     if (e.key === 'Escape' && S.cmpOn) {
                         S.cmpOn = false;
@@ -2220,9 +2298,24 @@
         }
         seg('#mattingBg', (v) => {
             const st = $('#mattingStage');
-            if (!st) return;
-            st.classList.remove('tp-white', 'tp-black', 'tp-gray');
-            if (v !== 'checker') st.classList.add('tp-' + v);
+            const applyBg = (bg) => {
+                if (!st) return;
+                st.classList.remove('tp-white', 'tp-black', 'tp-gray');
+                if (bg !== 'checker') st.classList.add('tp-' + bg);
+            };
+            if (v === 'bw') {
+                // 黑白蒙版是「视图开关」不是底色：再点一次退出，恢复上次的底色
+                S.bwView = !S.bwView;
+                if (!S.bwView) {
+                    applyBg(S.lastBg || 'checker');
+                    $$('#mattingBg button').forEach(b => b.classList.toggle('on', b.dataset.val === (S.lastBg || 'checker')));
+                }
+            } else {
+                S.bwView = false;
+                S.lastBg = v;
+                applyBg(v);
+            }
+            render();
         });
 
         const rng = (id, key, fmt, map) => {
@@ -2242,6 +2335,20 @@
         rng('#mattingHard', 'hardness', v => v + '%', v => v / 100);     // 0-100 → 0-1
         rng('#mattingFeather', 'feather', v => v + ' px');
         rng('#mattingContrast', 'contrast', v => v + '%', v => v / 100); // 0-100 → 0-1
+        rng('#mattingSmooth', 'smooth', v => String(v));
+        rng('#mattingShift', 'shift', v => (v > 0 ? '+' : '') + v + '%', v => v / 100); // >0 外扩 <0 收缩
+
+        // 删除区预览的叠加色 / 浓度（PS 快速蒙版思路）
+        const cutColor = $('#mattingCutColor'), cutOp = $('#mattingCutOp');
+        if (cutColor) cutColor.oninput = () => { S.cutColor = cutColor.value; if (S.showCut) render(); };
+        if (cutOp) {
+            const opOut = $('#mattingCutOpVal');
+            cutOp.oninput = () => {
+                S.cutOp = (Number(cutOp.value) || 0) / 100;
+                if (opOut) opOut.textContent = cutOp.value + '%';
+                if (S.showCut) render();
+            };
+        }
 
         const on = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
         on('#mattingAutoBtn', autoRemove);
@@ -2325,7 +2432,8 @@
             render();
             toast('边缘已精修');
         });
-        on('#mattingShowCut', () => {
+        // 删除区预览开关（按钮 / 快捷键 Q 共用）
+        const toggleShowCut = () => {
             S.showCut = !S.showCut;
             const b = $('#mattingShowCut');
             if (b) {
@@ -2335,7 +2443,8 @@
             if (S.showCut) setStatus('删除预览：灰暗 + 斜纹的部分会被删掉，彩色部分保留（轮廓为分界线）');
             else S._tmp = null;   // 退出预览就把几张全尺寸临时画布放掉（大图省几十 MB）
             render();
-        });
+        };
+        on('#mattingShowCut', toggleShowCut);
 
         $$('.matting-need-img').forEach(el => el.style.display = 'none');
 
