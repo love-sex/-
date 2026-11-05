@@ -1410,14 +1410,13 @@
         sqc.drawImage(work, ox, oy, side, side, 0, 0, size, size);
 
         // 3) 蒙版按「最近邻」重采样到 512，避免小洞被插值抹掉；再外扩 3px 盖住软边
-        const rm = S.rmctx.getImageData(0, 0, w, h).data;
         const key = new Uint8Array(size * size);
         for (let y = 0; y < size; y++) {
             const sy = Math.floor(oy + (y + 0.5) * side / size);
             for (let x = 0; x < size; x++) {
                 const sx = Math.floor(ox + (x + 0.5) * side / size);
                 if (sx < 0 || sy < 0 || sx >= w || sy >= h) continue;
-                if (rm[(sy * w + sx) * 4 + 3] > 20) key[y * size + x] = 1;
+                if (m[sy * w + sx]) key[y * size + x] = 1;
             }
         }
         const mk = dilateMask(key, size, size, 3);
@@ -1474,12 +1473,11 @@
         const src = pat.getContext('2d').getImageData(bx, by, cw, chh).data;
         const d = dst.data;
 
-        // 融合权重：涂抹 alpha → 二值 → 外扩 3px（盖掉物体残留的一圈边）→ 3×3 均值软化边缘
+        // 融合权重：本次处理的蒙版 → 外扩 3px（盖掉物体残留的一圈边）→ 3×3 均值软化边缘
         const kk = new Float32Array(cw * chh);
         for (let y = 0; y < chh; y++) {
             for (let x = 0; x < cw; x++) {
-                const a = rm[((by + y) * w + (bx + x)) * 4 + 3] / 255;
-                kk[y * cw + x] = a > 0.06 ? 1 : 0;
+                kk[y * cw + x] = m[(by + y) * w + (bx + x)] ? 1 : 0;
             }
         }
         const dil = (srcA, radius) => {
@@ -1579,8 +1577,10 @@
                 await sleep(30);
                 try {
                     const r = await runMigan(work, m0, S.w, S.h);
-                    if (r) { engine = 'ai'; note = ' · AI ' + r.ms + 'ms · ' + (r.scale > 1 ? '放大 ' + r.scale.toFixed(1) + '×' : '原尺寸'); }
-                    else { note = ' · 涂抹区太小，已用本地修复'; }
+                    if (r) {
+                        engine = 'ai';
+                        note = ' · AI ' + r.ms + 'ms' + (r.scale > 1 ? ' · 放大 ' + r.scale.toFixed(1) + '×' : '');
+                    } else { note = ' · 涂抹区太小，已用本地修复'; }
                 } catch (err) {
                     console.warn('[migan]', err);
                     note = ' · AI 模型不可用（' + (err && err.message ? err.message.slice(0, 40) : '未知错误') + '），已用本地修复';
@@ -1606,6 +1606,9 @@
             if (S.hasMask) scheduleFg(); else render();
             syncRmButtons();
             const sec = ((performance.now() - t0) / 1000).toFixed(1);
+            // 洞太大时 512 分辨率不够喂，模型只能补出模糊的平均色 —— 提前把预期讲清楚
+            const bigHole = n / (S.w * S.h) > 0.05;
+            if (engine === 'ai' && bigHole) note += ' · 涂抹区偏大，建议分 2–3 次小面积擦，边缘更实';
             setStatus('已移除 ' + n.toLocaleString() + ' px（' + sec + 's' + note + '）。可点「对比原图」看前后差异。');
             toast(engine === 'ai' ? 'AI 已补齐背景' : '已移除涂抹区');
         } catch (e) {
