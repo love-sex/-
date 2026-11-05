@@ -2390,8 +2390,6 @@ const App = (() => {
     bindNavToggle();
     // 眼睛按钮和助手按钮可拖动
     makeDraggable(document.getElementById('navToggleFab'));
-    makeDraggable(document.getElementById('gameToggleBtn'));
-    makeDraggable(document.getElementById('gameRestoreBtn'));
     renderCalendar();
     bindTodo();
     bindSport();

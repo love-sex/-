@@ -723,26 +723,84 @@
 .brush-groupbar .btn { flex: 1 1 auto; }
 
 /* ---------- 图层面板 ---------- */
+/* 8 个操作改成带文字的 4×2 宫格：光一个 ⤓ / ⧉ 图标没人看得懂 */
 .lyr-tools {
     display: grid;
-    grid-template-columns: repeat(8, minmax(0, 1fr));
-    gap: 3px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
     margin-bottom: 8px;
 }
 
 .lyr-tools button {
-    padding: 5px 0;
+    padding: 6px 1px;
     border: 1px solid rgba(var(--primary-rgb), 0.16);
-    border-radius: 6px;
+    border-radius: 7px;
     background: #fff;
-    font-size: 12px;
-    line-height: 1.2;
+    font-size: 11.5px;
+    line-height: 1.25;
+    white-space: nowrap;
     cursor: pointer;
+    transition: border-color 0.12s, background 0.12s;
 }
 
 .lyr-tools button:hover {
-    border-color: rgba(var(--primary-rgb), 0.42);
-    background: #fffaf0;
+    border-color: rgba(var(--primary-rgb), 0.45);
+    background: #fff8ec;
+}
+
+.lyr-tools button:active { transform: translateY(1px); }
+
+/* 拖动排序 */
+.lyr-row { cursor: grab; }
+.lyr-list.dragging .lyr-row { cursor: grabbing; }
+.lyr-list { position: relative; }
+
+.lyr-drop-line {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--accent);
+    box-shadow: 0 0 0 2px rgba(201, 163, 90, 0.22);
+    pointer-events: none;
+}
+
+/* 右键菜单 */
+.lyr-menu {
+    position: fixed;
+    z-index: 80;
+    min-width: 152px;
+    padding: 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    border: 1px solid rgba(var(--primary-rgb), 0.18);
+    border-radius: 10px;
+    background: #fffdf8;
+    box-shadow: 0 14px 34px rgba(60, 45, 20, 0.2);
+}
+
+.lyr-menu[hidden] { display: none; }
+
+.lyr-menu-item {
+    padding: 7px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--ink);
+    font-size: 12.5px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.lyr-menu-item:hover { background: rgba(201, 163, 90, 0.16); }
+.lyr-menu-item.danger { color: #b3402c; }
+
+.lyr-menu-sep {
+    height: 1px;
+    margin: 4px 6px;
+    background: rgba(var(--primary-rgb), 0.14);
 }
 
 .lyr-list {

@@ -11,16 +11,16 @@
     <title>想想工作台 · 个人AI工作台</title>
     <!-- Auth 页样式 -->
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="style-game.css">
+    <link rel="stylesheet" href="style-game.css?v=20261125a">
     <link rel="stylesheet" href="style-portfolio.css">
     <!-- 想想工作台样式（后加载，覆盖 body/:root） -->
-    <link rel="stylesheet" href="workbench.css?v=20261121">
+    <link rel="stylesheet" href="workbench.css?v=20261125a">
     <!-- 作品集样式 -->
     <link rel="stylesheet" href="portfolio.css?v=20261029">
     <!-- 登录界面动效 -->
     <link rel="stylesheet" href="login.css?v=20261030">
     <!-- 抠图工具样式 -->
-    <link rel="stylesheet" href="matting.css?v=20261124b">
+    <link rel="stylesheet" href="matting.css?v=20261125a">
     <link rel="stylesheet" href="personality.css?v=20261118p">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
@@ -801,19 +801,20 @@
                         </div>
                         <div class="matting-work">
                             <div class="matting-rail matting-need-img" id="mattingMode" role="toolbar" aria-label="工具">
+                                <button type="button" data-val="move" title="移动工具：拖动 = 移动当前图层的像素，方向键微调 1px（Shift 10px）（V）"><i>✥</i><span>移动</span></button>
                                 <button type="button" data-val="erase" class="on" title="擦除背景 (E)"><i>🧽</i><span>擦除</span></button>
                                 <button type="button" data-val="restore" title="恢复主体 (R)"><i>🖌️</i><span>恢复</span></button>
                                 <button type="button" data-val="wand" title="颜色点选：点一下圈出同色区域（Shift 加选 / Alt 减选）（W）"><i>🎯</i><span>点选</span></button>
                                 <button type="button" data-val="lasso" title="套索：按住拖一圈，松手自动闭合（Shift 加选 / Alt 减选）（L）"><i>➰</i><span>套索</span></button>
                                 <button type="button" data-val="remove" title="涂抹去物 (J)"><i>🪄</i><span>去物</span></button>
-                                <button type="button" data-val="pan" title="移动画布 (H)"><i>✋</i><span>移动</span></button>
+                                <button type="button" data-val="pan" title="抓手：拖动平移画布，不动物体（H；空格 / 中键随时可用）"><i>✋</i><span>抓手</span></button>
                             </div>
                             <div class="matting-center">
                                 <div class="matting-stage is-empty" id="mattingStage">
                                     <div class="matting-empty" id="mattingEmpty">还没有图片，先上传一张吧</div>
                                     <canvas id="mattingCanvas"></canvas>
                                 </div>
-                                <p class="muted zoom-tip">滚轮缩放 · 空格/中键拖动 · 双指捏合（手机）· 快捷键：E 擦除 / R 恢复 / W 点选 / L 套索 / J 去物 / H 移动 / [ ] 画笔大小 / K 黑白蒙版 / Esc 取消选区 / Enter 删除选区</p>
+                                <p class="muted zoom-tip">滚轮缩放 · 空格/中键拖动 · 双指捏合（手机）· 快捷键：V 移动 / E 擦除 / R 恢复 / W 点选 / L 套索 / J 去物 / H 抓手 / [ ] 画笔大小 / 方向键微调图层 / K 黑白蒙版 / Esc 取消选区 / Enter 删除选区</p>
                             </div>
                             <aside class="matting-props" id="mattingProps">
                                 <div class="mgroup matting-need-img">
@@ -853,17 +854,18 @@
                                 <div class="mgroup matting-need-img">
                                     <div class="mgroup-t">🗂 图层 <span class="mgroup-hint" id="lyrHint"></span></div>
                                     <div class="lyr-tools">
-                                        <button type="button" id="lyrAdd" title="新建空图层（空层用来放贴图 / 做编组）">＋</button>
-                                        <button type="button" id="lyrImg" title="贴图：把图片作为新图层放进来">🖼</button>
-                                        <button type="button" id="lyrDup" title="复制当前图层">⧉</button>
-                                        <button type="button" id="lyrGroup" title="把当前图层编组">🗀</button>
-                                        <button type="button" id="lyrMerge" title="向下合并">⤓</button>
-                                        <button type="button" id="lyrUp" title="图层上移">↑</button>
-                                        <button type="button" id="lyrDown" title="图层下移">↓</button>
-                                        <button type="button" id="lyrDel" title="删除当前图层">🗑</button>
+                                        <button type="button" id="lyrAdd" title="新建空图层（空层用来放贴图 / 做编组）">＋ 新建</button>
+                                        <button type="button" id="lyrImg" title="贴图：把图片作为新图层放进来">🖼 贴图</button>
+                                        <button type="button" id="lyrDup" title="复制当前图层">⧉ 复制</button>
+                                        <button type="button" id="lyrGroup" title="把当前图层编组（也可以右键图层）">🗀 编组</button>
+                                        <button type="button" id="lyrMerge" title="向下合并：并到下面那一层">⤓ 合并</button>
+                                        <button type="button" id="lyrUp" title="上移一层（也可以直接拖动图层）">↑ 上移</button>
+                                        <button type="button" id="lyrDown" title="下移一层（也可以直接拖动图层）">↓ 下移</button>
+                                        <button type="button" id="lyrDel" title="删除当前图层">🗑 删除</button>
                                     </div>
                                     <input type="file" id="lyrFile" accept="image/*" hidden>
                                     <div class="lyr-list" id="lyrList" role="listbox" aria-label="图层列表"></div>
+                                    <div class="lyr-menu" id="lyrMenu" hidden role="menu"></div>
                                     <div class="matting-range">
                                         <label for="lyrOpacity">不透明</label>
                                         <input type="range" id="lyrOpacity" min="0" max="100" value="100" title="当前图层的不透明度">
@@ -882,7 +884,7 @@
                                         </select>
                                     </div>
                                     <div class="mopt-row">
-                                        <span class="brush-tip-note">双击名字改名 · 右键组解散 · 眼睛整组显隐</span>
+                                        <span class="brush-tip-note">拖动图层可改上下顺序 / 拖进组 · 右键更多操作（拼合、置顶、居中）· 双击改名</span>
                                     </div>
                                 </div>
                                 <div class="mgroup matting-need-img">
@@ -1530,40 +1532,13 @@ PORTFOLIO</p>
         <input type="file" id="pfFileInput" accept="image/*" hidden>
     </div>
 
-    <!-- 游戏化系统（保留） -->
-    <div class="game-container" id="gameContainer">
-        <button class="game-toggle-btn" id="gameToggleBtn" title="隐藏大肥鱼" aria-label="隐藏大肥鱼">✕</button>
-        <div class="exp-bar-container">
-            <div class="exp-header">
-                <span class="level-badge" id="levelBadge">Lv.1 新手</span>
-                <span class="exp-text" id="expText">0 / 100 EXP</span>
-            </div>
-            <div class="exp-bar">
-                <div class="exp-fill" id="expFill" style="width: 0%"></div>
-            </div>
-        </div>
-        <div class="assistant-character" id="assistantChar" role="img" aria-label="大肥鱼助手">
-            <div class="pet-speech" id="petSpeech" role="status" aria-live="polite"></div>
-            <div class="pet-stage">
-                <img class="pet-poster" src="assets/shenshen/idle.png?v=2" alt="" aria-hidden="true">
-                <video class="pet-video" autoplay loop muted playsinline preload="auto">
-                    <source src="assets/shenshen/idle.webm?v=2" type="video/webm">
-                </video>
-            </div>
-            <span class="pet-name">大肥鱼</span>
-        </div>
-    </div>
-
-    <!-- 大肥鱼恢复按钮（隐藏后显示） -->
-    <button class="game-restore-btn" id="gameRestoreBtn" title="显示大肥鱼" aria-label="显示大肥鱼" style="display:none;">🐟</button>
-
     <!-- 通知 -->
     <div class="notification" id="notification"></div>
 
-    <script src="script-game.js"></script>
+    <script src="script-game.js?v=20261125a"></script>
     <script src="script.js?v=20261030"></script>
-    <script src="workbench.js?v=20261121d"></script>
-    <script src="matting.js?v=20261124b"></script>
+    <script src="workbench.js?v=20261125a"></script>
+    <script src="matting.js?v=20261125a"></script>
     <script src="personality.js?v=20261118p"></script>
     <script src="portfolio.js?v=20261029"></script>
     <script src="login-cards.js?v=20261030"></script>

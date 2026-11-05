@@ -1054,3 +1054,41 @@ canvas { width: 100%; height: auto; display: block; margin: 10px 0; }
 
 /* 选中态日期 */
 .cal-day.has-data { font-weight: 700; }
+
+/* ==========================================================
+   手机端整页滚动修正（必须留在文件末尾）
+   上面第 126 行又写了一遍 #wbContainer { overflow: hidden }，
+   同特异性、位置更靠后，把 799px 媒体查询里的 overflow: visible 顶掉了，
+   结果 #wbContainer 被钉在 100% 高度里裁切：手机上整个工作台滑不动
+   （以前只能靠右下角助手浮层那块区域勉强拖动，助手删掉后彻底暴露）。
+   ========================================================== */
+@media (max-width: 799px) {
+    /* 注意：html（root 滚动器）绝不能带 overflow-x: hidden——
+       Chromium 合成器会因此认定根滚动器"不可用户滚动"，滚轮/触摸全部失效
+       （headless 实测：html overflow:visible 后滚动立即恢复）。
+       横向裁剪放在 body 上即可，body 上的 x 裁剪不影响根滚动。 */
+    html {
+        height: auto;
+        min-height: 100%;
+        overflow: visible;
+    }
+    body {
+        height: auto;
+        min-height: 100%;
+        overflow-x: hidden;
+        overflow-y: visible;
+        -webkit-overflow-scrolling: touch;
+    }
+    #wbContainer {
+        flex: none;
+        height: auto;
+        min-height: 100%;
+        overflow: visible;
+    }
+    #wbContainer .app-main {
+        flex: none;
+        height: auto;
+        min-height: 0;
+        overflow: visible;
+    }
+}

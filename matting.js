@@ -666,7 +666,11 @@
 
     const updateCursor = () => {
         const cv = $('#mattingCanvas');
-        if (cv) cv.style.cursor = wantPan() ? 'grab' : (S.mode === 'wand' ? 'pointer' : 'crosshair');
+        if (cv) {
+            cv.style.cursor = wantPan() ? 'grab'
+                : S.mode === 'move' ? 'move'
+                    : S.mode === 'wand' ? 'pointer' : 'crosshair';
+        }
         if (S.syncRing) S.syncRing();   // 切到抓手/点选时把笔尖圈收掉
     };
     const wantPan = () => S.mode === 'pan' || S.spaceDown;
@@ -742,6 +746,7 @@
         if (u) u.disabled = !S.undo.length;
         if (r) r.disabled = !S.redo.length;
     };
+    // 撤销/重做：mask＝单通道蒙版，pix＝某一层的像素（移动/缩放），doc＝整棵树结构
     const undo = () => {
         if (!S.undo.length) return;
         const e = S.undo.pop();
@@ -752,6 +757,12 @@
             if (e.id !== S.activeId) { S.activeId = e.id; S._actSprite = null; cacheRGB(); }
             writeMask(L, e.data);
             postProcess({ refine: false, feather: S.feather, contrast: S.contrast });
+        } else if (e.t === 'pix') {
+            const L = layerById(e.id);
+            if (!L) { syncHistoryButtons(); return; }
+            S.redo.push({ t: 'pix', id: e.id, data: snapLayer(L) });
+            if (e.id !== S.activeId) { S.activeId = e.id; S._actSprite = null; }
+            restorePix(L, e.data);
         } else {
             S.redo.push({ t: 'doc', snap: captureDoc() });
             restoreDoc(e.snap);
@@ -770,6 +781,12 @@
             if (e.id !== S.activeId) { S.activeId = e.id; S._actSprite = null; cacheRGB(); }
             writeMask(L, e.data);
             postProcess({ refine: false, feather: S.feather, contrast: S.contrast });
+        } else if (e.t === 'pix') {
+            const L = layerById(e.id);
+            if (!L) { syncHistoryButtons(); return; }
+            S.undo.push({ t: 'pix', id: e.id, data: snapLayer(L) });
+            if (e.id !== S.activeId) { S.activeId = e.id; S._actSprite = null; }
+            restorePix(L, e.data);
         } else {
             S.undo.push({ t: 'doc', snap: captureDoc() });
             restoreDoc(e.snap);
@@ -974,6 +991,344 @@
         render();
     };
 
+    /* ---------------- 移动图层（PS 的移动工具 V） ----------------
+       直接平移像素：src / raw / mask / rmask 一起挪，蒙版和图像永远对齐，
+       画笔那边完全不用知道偏移量。raw/mask/rmask 的 ctx 跟画布是绑死的，
+       所以只能原地重画，不能换画布对象（只有 src 可以换新的）。 */
+    const snapLayer = (L) => ({
+        src: L.src ? cloneCanvas(L.src) : null,
+        raw: cloneCanvas(L.raw),
+        mask: L.hasMask ? cloneCanvas(L.mask) : null,
+        rmask: cloneCanvas(L.rmask),
+        fg: L.fg ? cloneCanvas(L.fg) : null,
+        hasMask: !!L.hasMask
+    });
+
+    const paintShifted = (ctx, srcC, dx, dy, sc) => {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.clearRect(0, 0, S.w, S.h);
+        if (!srcC) return;
+        if (sc && Math.abs(sc - 1) > 1e-4) {
+            ctx.translate(S.w / 2 + dx, S.h / 2 + dy);
+            ctx.scale(sc, sc);
+            ctx.drawImage(srcC, -S.w / 2, -S.h / 2, S.w, S.h);
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+        } else {
+            ctx.drawImage(srcC, Math.round(dx), Math.round(dy));
+        }
+    };
+
+    const applyLayerShift = (L, snap, dx, dy, sc) => {
+        if (!L || !snap) return;
+        if (snap.src) {
+            const c = mkCv(S.w, S.h);
+            paintShifted(c.getContext('2d'), snap.src, dx, dy, sc);
+            L.src = c;
+        }
+        paintShifted(L.rctx, snap.raw, dx, dy, sc);
+        if (L.hasMask && snap.mask) paintShifted(L.mctx, snap.mask, dx, dy, sc);
+        paintShifted(L.rmctx, snap.rmask, dx, dy, sc);
+        L.fg = null;      // 去过底色的前景缓存要作废
+        L.rgb = null;
+        bumpLayer(L);
+        if (L.id === S.activeId) { S._actSprite = null; cacheRGB(); }
+    };
+
+    // 图层内容的包围盒（在 320px 缩略图上扫一遍，够准也够快）
+    const layerBBox = (L) => {
+        if (!L || !L.src) return null;
+        const k = Math.max(1, Math.max(S.w, S.h) / 320);
+        const w = Math.max(1, Math.round(S.w / k)), h = Math.max(1, Math.round(S.h / k));
+        const c = mkCv(w, h);
+        const x = c.getContext('2d', { willReadFrequently: true });
+        x.drawImage(L.src, 0, 0, w, h);
+        const d = x.getImageData(0, 0, w, h).data;
+        let minX = w, minY = h, maxX = -1, maxY = -1;
+        for (let yy = 0; yy < h; yy++) {
+            for (let xx = 0; xx < w; xx++) {
+                if (d[(yy * w + xx) * 4 + 3] > 8) {
+                    if (xx < minX) minX = xx;
+                    if (xx > maxX) maxX = xx;
+                    if (yy < minY) minY = yy;
+                    if (yy > maxY) maxY = yy;
+                }
+            }
+        }
+        if (maxX < 0) return null;
+        return { x: minX * k, y: minY * k, w: (maxX - minX + 1) * k, h: (maxY - minY + 1) * k };
+    };
+
+    // 像素级历史：只存这一层的四张画布（比整棵树的快照便宜得多）
+    const pushPixEntry = (L, snap) => {
+        if (!L || !snap) return;
+        S.undo.push({ t: 'pix', id: L.id, data: snap });
+        if (S.undo.length > 12) S.undo.shift();
+        S.redo.length = 0;
+        syncHistoryButtons();
+    };
+    const restorePix = (L, snap) => {
+        if (!L || !snap) return;
+        L.src = snap.src ? cloneCanvas(snap.src) : null;
+        paintShifted(L.rctx, snap.raw, 0, 0, 1);
+        if (snap.mask) paintShifted(L.mctx, snap.mask, 0, 0, 1);
+        paintShifted(L.rmctx, snap.rmask, 0, 0, 1);
+        L.hasMask = !!snap.hasMask;
+        L.fg = snap.fg ? cloneCanvas(snap.fg) : null;
+        L.rgb = null;
+        bumpLayer(L);
+        if (L.id === S.activeId) { S._actSprite = null; cacheRGB(); }
+    };
+
+    // 一次性移动（键盘微调 / 菜单里的居中铺满都走这里）
+    const moveLayerBy = (dx, dy) => {
+        const L = actLayer();
+        if (!L || !L.src) return toast('当前图层没有像素，先切到有内容的图层');
+        if (!dx && !dy) return;
+        const snap = snapLayer(L);
+        applyLayerShift(L, snap, dx, dy, 1);
+        pushPixEntry(L, snap);
+        renderLayerPanel();
+        render();
+    };
+
+    const centerLayer = () => {
+        const L = actLayer();
+        if (!L || !L.src) return toast('当前图层没有像素');
+        const b = layerBBox(L);
+        if (!b) return toast('这一层是空的，没东西可移');
+        const dx = Math.round((S.w - b.w) / 2 - b.x);
+        const dy = Math.round((S.h - b.h) / 2 - b.y);
+        if (!dx && !dy) return toast('已经在画面中央了');
+        pushDocHistory();
+        applyLayerShift(L, snapLayer(L), dx, dy, 1);
+        renderLayerPanel();
+        render();
+        setStatus('图层已居中（位移 ' + dx + ', ' + dy + ' px）');
+    };
+
+    const fitLayer = () => {
+        const L = actLayer();
+        if (!L || !L.src) return toast('当前图层没有像素');
+        const b = layerBBox(L);
+        if (!b) return toast('这一层是空的');
+        const sc = Math.max(S.w / b.w, S.h / b.h);
+        pushDocHistory();
+        applyLayerShift(L, snapLayer(L), 0, 0, sc);
+        const b2 = layerBBox(L);
+        if (b2) {
+            applyLayerShift(L, snapLayer(L), Math.round((S.w - b2.w) / 2 - b2.x), Math.round((S.h - b2.h) / 2 - b2.y), 1);
+        }
+        renderLayerPanel();
+        render();
+        setStatus('图层已铺满画布（缩放 ' + Math.round(sc * 100) + '%）');
+    };
+
+    // 拖拽移动：拖动过程中实时重画，松手才记一条撤销
+    const layerDrag = { on: false, id: '', snap: null, from: null, dx: 0, dy: 0, pre: null };
+    const beginLayerDrag = (e) => {
+        const L = actLayer();
+        if (!L) return false;
+        if (!L.src) { toast('当前图层没有像素，先「🖼 贴图」或切到有内容的图层'); return false; }
+        layerDrag.on = true;
+        layerDrag.id = L.id;
+        layerDrag.snap = snapLayer(L);
+        layerDrag.from = toCanvasXY(e);
+        layerDrag.dx = 0;
+        layerDrag.dy = 0;
+        layerDrag.pre = captureDoc();
+        return true;
+    };
+    const moveLayerDrag = (e) => {
+        const L = layerById(layerDrag.id);
+        if (!L) return;
+        const p = toCanvasXY(e);
+        const dx = Math.round(p.x - layerDrag.from.x);
+        const dy = Math.round(p.y - layerDrag.from.y);
+        if (dx === layerDrag.dx && dy === layerDrag.dy) return;
+        layerDrag.dx = dx;
+        layerDrag.dy = dy;
+        applyLayerShift(L, layerDrag.snap, dx, dy, 1);
+        render();
+    };
+    const endLayerDrag = () => {
+        if (!layerDrag.on) return;
+        layerDrag.on = false;
+        const dx = layerDrag.dx, dy = layerDrag.dy;
+        const L = layerById(layerDrag.id);
+        if ((dx || dy) && L && layerDrag.snap) {
+            pushPixEntry(L, layerDrag.snap);
+            setStatus('图层已移动 ' + dx + ', ' + dy + ' px（⌘/Ctrl+Z 可撤销）');
+            renderLayerPanel();
+        }
+        layerDrag.snap = null;
+        layerDrag.dx = 0;
+        layerDrag.dy = 0;
+    };
+
+    /* ---------------- 图层层级 / 拼合 ---------------- */
+    const moveToEdge = (id, edge) => {
+        const n = nodeById(id);
+        if (!n) return;
+        const list = siblingList(id);
+        const i = list.indexOf(n);
+        if (i < 0) return;
+        if (edge === 'top' && i === list.length - 1) return;
+        if (edge === 'bottom' && i === 0) return;
+        pushDocHistory();
+        list.splice(i, 1);
+        if (edge === 'top') list.push(n); else list.unshift(n);
+        renderLayerPanel();
+        render();
+        setStatus(edge === 'top' ? '已置于顶层' : '已置于底层');
+    };
+
+    const flattenVisible = () => {
+        const vis = [];
+        walkLayers((L) => { if (L.visible !== false) vis.push(L); });
+        if (vis.length < 2) return toast('可见图层不到两层，不用拼合');
+        pushDocHistory();
+        const c = mkCv(S.w, S.h);
+        composeDoc(c.getContext('2d'), true);
+        const L = makeLayer('拼合图层', { src: c, hasMask: true });
+        L.rctx.fillStyle = '#fff';
+        L.rctx.fillRect(0, 0, S.w, S.h);
+        L.mctx.fillStyle = '#fff';
+        L.mctx.fillRect(0, 0, S.w, S.h);
+        S.tree = [L];
+        S.activeId = L.id;
+        S._actSprite = null;
+        cacheRGB();
+        renderLayerPanel();
+        render();
+        setStatus('已拼合 ' + vis.length + ' 个可见图层（隐藏的图层被丢弃）');
+    };
+
+    const deleteNode = (id) => {
+        const n = nodeById(id);
+        if (!n) return;
+        if (n.kind === 'layer') {
+            S.activeId = id;
+            return lyrDel();
+        }
+        if (countLayers() - countGroupLayers(n) <= 0) return toast('这一组里没有图层');
+        pushDocHistory();
+        const list = siblingList(id);
+        const i = list.indexOf(n);
+        if (i >= 0) list.splice(i, 1);
+        S.activeId = firstLayerId();
+        S._actSprite = null;
+        cacheRGB();
+        renderLayerPanel();
+        render();
+        setStatus('已删除分组「' + n.name + '」和它里面的图层');
+    };
+
+    const countGroupLayers = (g) => {
+        let c = 0;
+        const walk = (arr) => arr.forEach((n) => { if (n.kind === 'group') walk(n.children); else c++; });
+        walk(g.children || []);
+        return c;
+    };
+
+    /* ---------------- 图层右键菜单 ---------------- */
+    let hideLayerMenu = () => { };
+    const showLayerMenu = (x, y, id) => {
+        const menu = $('#lyrMenu');
+        const n = nodeById(id);
+        if (!menu || !n) return;
+        const items = [];
+        const sep = () => items.push({ sep: true });
+        if (n.kind === 'layer') {
+            items.push({ label: '复制图层', fn: () => lyrDup() });
+            items.push({ label: '编组', fn: () => lyrGroup() });
+            items.push({ label: '向下合并', fn: () => lyrMerge() });
+            sep();
+            items.push({ label: '居中到画面', fn: () => { selectLayer(n.id); centerLayer(); } });
+            items.push({ label: '铺满画布', fn: () => { selectLayer(n.id); fitLayer(); } });
+        } else {
+            items.push({ label: '解散分组', fn: () => lyrUngroup(n.id) });
+        }
+        sep();
+        items.push({ label: '置于顶层', fn: () => moveToEdge(n.id, 'top') });
+        items.push({ label: '置于底层', fn: () => moveToEdge(n.id, 'bottom') });
+        sep();
+        items.push({ label: '拼合可见图层', fn: () => flattenVisible() });
+        items.push({ label: '删除' + (n.kind === 'group' ? '分组' : '图层'), fn: () => deleteNode(n.id), danger: true });
+        menu.innerHTML = '';
+        items.forEach((it) => {
+            if (it.sep) {
+                const d = document.createElement('div');
+                d.className = 'lyr-menu-sep';
+                menu.appendChild(d);
+                return;
+            }
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'lyr-menu-item' + (it.danger ? ' danger' : '');
+            b.textContent = it.label;
+            b.onclick = () => { hideLayerMenu(); it.fn(); };
+            menu.appendChild(b);
+        });
+        menu.hidden = false;
+        // 贴着鼠标，但不许超出视口
+        const mw = menu.offsetWidth, mh = menu.offsetHeight;
+        const px = Math.min(x, window.innerWidth - mw - 8);
+        const py = Math.min(y, window.innerHeight - mh - 8);
+        menu.style.left = Math.max(8, px) + 'px';
+        menu.style.top = Math.max(8, py) + 'px';
+    };
+    hideLayerMenu = () => {
+        const menu = $('#lyrMenu');
+        if (menu) menu.hidden = true;
+    };
+
+    /* ---------------- 图层拖动排序 ---------------- */
+    const isDescendantOf = (id, rootId) => {
+        const root = nodeById(rootId);
+        if (!root || root.kind !== 'group') return false;
+        let hit = false;
+        const walk = (arr) => arr.some((n) => {
+            if (n.id === id) { hit = true; return true; }
+            return n.kind === 'group' && walk(n.children);
+        });
+        walk(root.children);
+        return hit;
+    };
+    // 把 node 放到 target 的上面/下面（above/below 是界面方向），或放进组（into）
+    const moveNodeTo = (id, targetId, where) => {
+        if (!id || !targetId || id === targetId) return false;
+        const node = nodeById(id);
+        const tgt = nodeById(targetId);
+        if (!node || !tgt) return false;
+        if (tgt.kind === 'group' && isDescendantOf(tgt.id, id)) return false;   // 不能把组塞进自己
+        if (isDescendantOf(id, targetId)) return false;
+        if (where === 'into' && tgt.kind !== 'group') return false;
+        const from = siblingList(id);
+        const fi = from.indexOf(node);
+        if (fi < 0) return false;
+        // 拖到原位附近就当作没动
+        const to0 = siblingList(targetId);
+        const ti0 = to0.indexOf(tgt);
+        if (from === to0 && where !== 'into') {
+            const want = where === 'above' ? ti0 + 1 : ti0;
+            if (want === fi || want === fi + 1) return false;
+        }
+        from.splice(fi, 1);
+        if (where === 'into') {
+            tgt.children.push(node);
+        } else {
+            const to = siblingList(targetId);
+            const j = to.indexOf(tgt);
+            // 界面上的「上面」= 数组里更靠后（数组 0 是最底层）
+            const at = where === 'above' ? j + 1 : j;
+            to.splice(j < 0 ? to.length : at, 0, node);
+        }
+        if (node.kind === 'group' && where !== 'into') node.collapsed = false;
+        return true;
+    };
+
     const layerThumbURL = (L) => {
         const N = 40;
         const c = mkCv(N, N);
@@ -1024,7 +1379,6 @@
             cnt.textContent = '(' + n.children.length + ')';
             row.appendChild(cnt);
             row.ondblclick = () => startRename(row, t, n);
-            row.oncontextmenu = (e) => { e.preventDefault(); lyrUngroup(n.id); };
         } else {
             const img = document.createElement('img');
             img.className = 'lyr-thumb';
@@ -1039,7 +1393,63 @@
             row.ondblclick = () => startRename(row, t, n);
         }
         row.onclick = () => { if (!isGroup) selectLayer(n.id); };
+        row.oncontextmenu = (e) => {
+            e.preventDefault();
+            if (!isGroup) selectLayer(n.id);
+            showLayerMenu(e.clientX, e.clientY, n.id);
+        };
+        // 拖动排序：按下先记着，真的移动 5px 才算拖，避免和点击/双击冲突
+        row.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0) return;
+            if (e.target.closest('.lyr-eye') || e.target.closest('.lyr-caret') || e.target.closest('.lyr-rename')) return;
+            rowDrag = { id: n.id, x: e.clientX, y: e.clientY, on: false, pre: null, line: null };
+        });
         return row;
+    };
+
+    /* ---- 拖动排序（PS 里直接拖图层） ---- */
+    let rowDrag = null;
+    const dropLine = (box, y) => {
+        if (!rowDrag.line) {
+            rowDrag.line = document.createElement('div');
+            rowDrag.line.className = 'lyr-drop-line';
+            box.appendChild(rowDrag.line);
+        }
+        const br = box.getBoundingClientRect();
+        rowDrag.line.style.top = Math.max(0, y - br.top + box.scrollTop) + 'px';
+    };
+    const dropTarget = (x, y) => {
+        const el = document.elementFromPoint(x, y);
+        const row = el && el.closest ? el.closest('.lyr-row') : null;
+        if (!row || row.dataset.id === rowDrag.id) return null;
+        const r = row.getBoundingClientRect();
+        const rel = (y - r.top) / Math.max(1, r.height);
+        const isGroup = row.classList.contains('is-group');
+        let where = rel < 0.5 ? 'above' : 'below';
+        if (isGroup && rel > 0.3 && rel < 0.7) where = 'into';
+        return { id: row.dataset.id, where, top: r.top, bottom: r.bottom };
+    };
+    const endRowDrag = (x, y) => {
+        if (!rowDrag) return;
+        const drag = rowDrag;
+        // 先算落点再清状态：dropTarget 里要用 rowDrag.id 排除自己
+        const tgt = (drag.on && x != null) ? dropTarget(x, y) : null;
+        rowDrag = null;
+        if (drag.line) drag.line.remove();
+        if (!drag.on) return;
+        const box = $('#lyrList');
+        if (box) box.classList.remove('dragging');
+        if (!tgt) return;
+        if (!moveNodeTo(drag.id, tgt.id, tgt.where)) return;
+        if (drag.pre) {
+            S.undo.push({ t: 'doc', snap: drag.pre });
+            if (S.undo.length > 8) S.undo.shift();
+            S.redo.length = 0;
+            syncHistoryButtons();
+        }
+        renderLayerPanel();
+        render();
+        setStatus('图层顺序已调整');
     };
     const startRename = (row, span, n) => {
         const inp = document.createElement('input');
@@ -1145,9 +1555,10 @@
         const c = mkCv(S.w, S.h);
         const x = c.getContext('2d');
         x.imageSmoothingQuality = 'high';
-        const k = Math.min(S.w / bmp.width, S.h / bmp.height);
-        const dw = bmp.width * k, dh = bmp.height * k;
-        x.drawImage(bmp, (S.w - dw) / 2, (S.h - dh) / 2, dw, dh);
+        // 跟 PS 一样按 100% 贴进来：只有比画布大时才缩，小图不再被拉大（否则几张图全糊成一块）
+        const k = Math.min(1, S.w / bmp.width, S.h / bmp.height);
+        const dw = Math.max(1, Math.round(bmp.width * k)), dh = Math.max(1, Math.round(bmp.height * k));
+        x.drawImage(bmp, Math.round((S.w - dw) / 2), Math.round((S.h - dh) / 2), dw, dh);
         const L = makeLayer((file.name || '图片').replace(/\.[^.]+$/, '').slice(0, 16), { src: c });
         insertNode(L, S.activeId);
         selectLayer(L.id);
@@ -3514,7 +3925,7 @@
             };
             const syncRing = () => {
                 // 抓手/平移/点选/套索时不留圈；触屏没有悬停概念，也不显示
-                if (!ringPos.has || !S.src || wantPan() || S.mode === 'pan' || S.mode === 'wand' || S.mode === 'lasso') { hideRing(); return; }
+                if (!ringPos.has || !S.src || wantPan() || S.mode === 'pan' || S.mode === 'move' || S.mode === 'wand' || S.mode === 'lasso') { hideRing(); return; }
                 const d = Math.max(6, S.brush * (S.baseScale || 1) * S.zoom);
                 ring.style.width = d + 'px';
                 ring.style.height = d + 'px';
@@ -3556,6 +3967,14 @@
                     panFrom = { x: e.clientX, y: e.clientY };
                     cv.style.cursor = 'grabbing';
                     e.preventDefault();
+                    return;
+                }
+                // 移动工具（PS 的 V）：拖动挪当前图层的像素，不动视口
+                if (S.mode === 'move') {
+                    e.preventDefault();
+                    endPaint();
+                    if (e.button !== 0) return;
+                    if (beginLayerDrag(e)) { cv.style.cursor = 'grabbing'; render(); }
                     return;
                 }
                 if (e.target !== cv && !wantPan()) {          // 点在图片外面：直接当拖动
@@ -3632,6 +4051,7 @@
                     applyView();
                     return;
                 }
+                if (layerDrag.on) { moveLayerDrag(e); return; }
                 if (S.lassoing && S.selDraft) {
                     const p = toCanvasXY(e);
                     const last = S.selDraft[S.selDraft.length - 1];
@@ -3655,6 +4075,7 @@
                 if (e) fingers.delete(e.pointerId);
                 if (fingers.size < 2) pinchPrev = null;
                 if (panFrom) { panFrom = null; updateCursor(); }
+                if (layerDrag.on) { endLayerDrag(); updateCursor(); }
                 // 指针离开画布区就把笔尖圈收起来，否则会一直挂在边缘
                 if (e && e.type === 'pointerleave') hideRing();
                 // 套索松手才真正生成选区；pointerleave 不算松手（指针捕获还在）
@@ -3695,12 +4116,21 @@
                         return;
                     }
                     if (!e.ctrlKey && !e.metaKey && !e.altKey) {
-                        // E 擦除 / R 恢复 / W 点选 / L 套索 / J 涂抹去物 / H 移动；[ ] 画笔大小；K 黑白蒙版
-                        const toolKeys = { e: 'erase', r: 'restore', w: 'wand', l: 'lasso', j: 'remove', h: 'pan' };
+                        // V 移动 / E 擦除 / R 恢复 / W 点选 / L 套索 / J 涂抹去物 / H 抓手；[ ] 画笔大小；K 黑白蒙版
+                        const toolKeys = { v: 'move', e: 'erase', r: 'restore', w: 'wand', l: 'lasso', j: 'remove', h: 'pan' };
                         const k = e.key.toLowerCase();
                         if (toolKeys[k]) {
                             const btn = document.querySelector('#mattingMode button[data-val="' + toolKeys[k] + '"]');
                             if (btn) { e.preventDefault(); btn.click(); return; }
+                        }
+                        // 移动工具下方向键 = 1px 微调（Shift 10px），PS 里的手感
+                        if (S.mode === 'move' && /^Arrow(Up|Down|Left|Right)$/.test(e.key)) {
+                            e.preventDefault();
+                            const step = e.shiftKey ? 10 : 1;
+                            const dir = { ArrowUp: [0, -step], ArrowDown: [0, step], ArrowLeft: [-step, 0], ArrowRight: [step, 0] }[e.key];
+                            pushDocHistory();
+                            moveLayerBy(dir[0], dir[1]);
+                            return;
                         }
                         if (k === 'k') {
                             e.preventDefault();
@@ -4037,6 +4467,39 @@
         }
         const lyrBl = $('#lyrBlend');
         if (lyrBl) lyrBl.onchange = () => { lyrBlend(lyrBl.value); renderLayerPanel(); };
+        // 菜单挂到 body：属性面板有 overflow，fixed 元素留在里面会被裁掉
+        const menuEl = $('#lyrMenu');
+        if (menuEl && menuEl.parentElement !== document.body) document.body.appendChild(menuEl);
+
+        /* ---------------- 图层拖动排序 / 右键菜单的收尾 ---------------- */
+        document.addEventListener('pointermove', (e) => {
+            if (!rowDrag) return;
+            if (!rowDrag.on) {
+                if (Math.abs(e.clientX - rowDrag.x) + Math.abs(e.clientY - rowDrag.y) < 5) return;
+                rowDrag.on = true;
+                rowDrag.pre = captureDoc();      // 拖之前的状态，松手时才记账
+                const box0 = $('#lyrList');
+                if (box0) box0.classList.add('dragging');
+            }
+            const box = $('#lyrList');
+            if (!box) return;
+            const tgt = dropTarget(e.clientX, e.clientY);
+            if (tgt) dropLine(box, tgt.where === 'above' ? tgt.top : tgt.bottom);
+            else {
+                const br = box.getBoundingClientRect();
+                dropLine(box, e.clientY < br.top + br.height / 2 ? br.top + 2 : br.bottom - 2);
+            }
+        }, true);
+        document.addEventListener('pointerup', (e) => endRowDrag(e.clientX, e.clientY), true);
+        document.addEventListener('pointercancel', () => endRowDrag(null, null), true);
+
+        // 点别处 / Esc / 滚动都收起图层菜单
+        document.addEventListener('pointerdown', (e) => {
+            const menu = $('#lyrMenu');
+            if (menu && !menu.hidden && !(e.target.closest && e.target.closest('#lyrMenu'))) hideLayerMenu();
+        }, true);
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideLayerMenu(); });
+        document.addEventListener('scroll', () => hideLayerMenu(), true);
 
         /* ---------------- 新建画布 ---------------- */
         const ncCreate = $('#ncCreate');
@@ -4239,6 +4702,11 @@
         brushTogglePick, brushDelete, brushGroupSelected, brushMoveOut, brushDropGroup,
         newCanvasDoc, addImageLayer, layerThumbURL,
         composite: () => { const c = mkCv(S.w, S.h); composeDoc(c.getContext('2d'), true); return c.toDataURL('image/png'); },
+        moveLayerBy, centerLayer, fitLayer, moveNodeTo, moveToEdge, flattenVisible, deleteNode,
+        showLayerMenu, hideLayerMenu, layerBBox,
+        mode: () => S.mode,
+        drag: () => ({ on: layerDrag.on, id: layerDrag.id, dx: layerDrag.dx, dy: layerDrag.dy }),
+        beginLayerDrag, moveLayerDrag, endLayerDrag,
         lyrNew, lyrDup, lyrDel, lyrMove, lyrGroup, lyrUngroup, lyrMerge,
         lyrToggle, lyrCollapse, lyrRename, lyrOpacity, lyrBlend, selectLayer,
         renderLayerPanel,
