@@ -177,9 +177,14 @@
     };
 
     /* ---------------- 状态显示 ---------------- */
-    const setStatus = (msg) => {
+    const setStatus = (msg, soft) => {
         const el = $('#mattingStatus');
-        if (el) el.textContent = msg || '';
+        if (!el) return;
+        const now = Date.now();
+        // 后台下载/初始化这些进度播报别盖掉用户刚操作得到的结果（4 秒内让位）
+        if (soft && now - (S.statusAt || 0) < 4000) return;
+        el.textContent = msg || '';
+        if (!soft) S.statusAt = now;
     };
     const setProgress = (p) => {
         const box = $('#mattingProgress');
@@ -884,7 +889,7 @@
             got += n;
             const sec = Math.max(0.5, (Date.now() - t0) / 1000);
             setProgress(Math.min(0.99, got / spec.bytes));
-            setStatus('正在下载' + spec.label + '模型 ' + (got / 1048576).toFixed(1) + ' / ' + (spec.bytes / 1048576).toFixed(1) + ' MB（' + (got / 1048576 / sec).toFixed(1) + ' MB/s）');
+            setStatus('正在下载' + spec.label + '模型 ' + (got / 1048576).toFixed(1) + ' / ' + (spec.bytes / 1048576).toFixed(1) + ' MB（' + (got / 1048576 / sec).toFixed(1) + ' MB/s）', true);
         };
         let lastErr = null;
         try {
@@ -1013,7 +1018,7 @@
         const wasmP = loadWasmBinary();
         const [ort, buf, wasmBuf] = await Promise.all([loadORT(), bufP, wasmP]);
         setProgress(0.99);
-        setStatus('正在初始化推理引擎...');
+        setStatus('正在初始化推理引擎...', true);
         if (wasmBuf) ort.env.wasm.wasmBinary = wasmBuf;   // 跳过引擎内部的二次下载
         S.session = await withTimeout(ort.InferenceSession.create(new Uint8Array(buf), {
             executionProviders: ['wasm'],
@@ -1498,7 +1503,7 @@
         const wasmP = needWasm ? loadWasmBinary().catch(() => null) : Promise.resolve(null);
         const [ort, wasmBuf] = await Promise.all([loadORT(), wasmP]);
         if (wasmBuf) ort.env.wasm.wasmBinary = wasmBuf;
-        setStatus('正在初始化 AI 修复模型...');
+        setStatus('正在初始化 AI 修复模型...', true);
         S.migan = await withTimeout(ort.InferenceSession.create(new Uint8Array(buf), {
             executionProviders: ['wasm'],
             graphOptimizationLevel: 'all'
