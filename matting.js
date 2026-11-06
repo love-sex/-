@@ -10,6 +10,9 @@
 (function () {
     'use strict';
 
+    const MATTING_VER = '20261206g';
+    console.log('[matting] engine v' + MATTING_VER);
+
     const $ = (s, r) => (r || document).querySelector(s);
     const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
 
@@ -342,7 +345,7 @@
         const now = Date.now();
         // 后台下载/初始化这些进度播报别盖掉用户刚操作得到的结果（4 秒内让位）
         if (soft && now - (S.statusAt || 0) < 4000) return;
-        el.textContent = msg || '';
+        el.textContent = (msg || '') + '　· 引擎 v' + MATTING_VER;
         if (!soft) S.statusAt = now;
     };
     const setProgress = (p) => {
