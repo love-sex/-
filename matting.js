@@ -10,7 +10,7 @@
 (function () {
     'use strict';
 
-    const MATTING_VER = '20261206g';
+    const MATTING_VER = '20261206h';
     console.log('[matting] engine v' + MATTING_VER);
 
     const $ = (s, r) => (r || document).querySelector(s);
@@ -2207,6 +2207,68 @@
     // ④ 所在白亮连通块到透明区的过渡带宽 > 2px —— 硬边白色主体（月亮、白球）的
     // 边缘反锯齿过渡只有 1~2px，不会被误伤。放在 autoLevels 之前跑：先清光晕，
     // 色阶在剩下的干净分布上重新找分界。
+    // 浅底雾净化（purgeGlow 的浅底对偶）：白底 logo 上模型常给主体外围一圈
+    // 半透明白雾（alpha 0.5~0.9，贴着蓝色主体边缘），色阶除雾的「主体膨胀回滚」
+    // 会拦住它们，显示出来就是字周围洗不掉的白晕。判据：背景够亮 + 像素低饱和
+    // 且亮度接近背景 + 非实心核 + 所在白亮块到透明区的过渡带宽 > 2px。
+    // 真设计白（网格线）即使被清也不要紧：随后 solidifyWhites 的闭运算会把
+    // 主体凹腔里的低 alpha 区重新拉实 —— 先清雾再拉实，顺序就是正确性。
+    const purgeBgFog = (m, w, h) => {
+        const B = estimateBg();
+        if (!B) return 0;
+        const bgLum = 0.299 * B[0] + 0.587 * B[1] + 0.114 * B[2];
+        if (bgLum < 180) return 0;
+        const n = w * h;
+        const px = S.rgb.data;
+        const cand = new Uint8Array(n);
+        let candCnt = 0;
+        for (let j = 0; j < n; j++) {
+            const a = m[j];
+            if (a <= 0.04 || a >= 0.92) continue;      // 透明区与实心核都不动
+            const i = j * 4, r = px[i], g = px[i + 1], b = px[i + 2];
+            const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+            if (mx - mn < 64 && lum > bgLum - 45) { cand[j] = 1; candCnt++; }
+        }
+        if (!candCnt) return 0;
+        const dist = new Int16Array(n).fill(-1);
+        const bq = new Int32Array(n);
+        let qh = 0, qt = 0;
+        for (let j = 0; j < n; j++) if (m[j] <= 0.04) { dist[j] = 0; bq[qt++] = j; }
+        while (qh < qt) {
+            const c = bq[qh++], d = dist[c];
+            if (d >= 40) continue;
+            const x = c % w, y = (c - x) / w;
+            if (x > 0 && dist[c - 1] < 0) { dist[c - 1] = d + 1; bq[qt++] = c - 1; }
+            if (x < w - 1 && dist[c + 1] < 0) { dist[c + 1] = d + 1; bq[qt++] = c + 1; }
+            if (y > 0 && dist[c - w] < 0) { dist[c - w] = d + 1; bq[qt++] = c - w; }
+            if (y < h - 1 && dist[c + w] < 0) { dist[c + w] = d + 1; bq[qt++] = c + w; }
+        }
+        const lab = new Int32Array(n).fill(-1);
+        const stack = new Int32Array(n);
+        const killList = [];
+        for (let j0 = 0; j0 < n; j0++) {
+            if (!cand[j0] || lab[j0] >= 0) continue;
+            let sp = 0, maxD = 0;
+            const members = [];
+            stack[sp++] = j0; lab[j0] = j0;
+            while (sp) {
+                const c = stack[--sp];
+                members.push(c);
+                if (dist[c] > maxD) maxD = dist[c];
+                const x = c % w, y = (c - x) / w;
+                if (x > 0 && cand[c - 1] && lab[c - 1] < 0) { lab[c - 1] = j0; stack[sp++] = c - 1; }
+                if (x < w - 1 && cand[c + 1] && lab[c + 1] < 0) { lab[c + 1] = j0; stack[sp++] = c + 1; }
+                if (y > 0 && cand[c - w] && lab[c - w] < 0) { lab[c - w] = j0; stack[sp++] = c - w; }
+                if (y < h - 1 && cand[c + w] && lab[c + w] < 0) { lab[c + w] = j0; stack[sp++] = c + w; }
+            }
+            if (maxD > 2) for (let k = 0; k < members.length; k++) killList.push(members[k]);
+        }
+        if (!killList.length || killList.length > n * 0.15) return 0;
+        for (let k = 0; k < killList.length; k++) m[killList[k]] = 0;
+        return killList.length;
+    };
+
     const purgeGlow = (m, w, h) => {
         const B = estimateBg();
         if (!B) return 0;
@@ -2480,6 +2542,91 @@
         return filled;
     };
 
+    // 背景白剥离（设计白拉实的收尾）：贴着主体边缘的白色残留（模型实心保留的
+    // 背景白块、白条、白晕）颜色上就是背景白，且通过「宽通道」连着外部背景。
+    // 判别：把全图「低饱和白」像素腐蚀 E px（E 大于设计白连外通道的半宽，如网格
+    // 线宽 14px 半宽 7 < E），腐蚀后仍连通图像边界的白核 → 膨胀回来 → 这些位置
+    // 的 alpha 清零。窄缝连着的凹腔设计白（网格线、方格、白芯）腐蚀断链后不在
+    // 背景核里，全部保留。E 自适应：比窄缝宽、比背景残留块窄。
+    const stripBgWhite = (m, w, h) => {
+        const B = estimateBg();
+        if (!B) return 0;
+        const bgLum = 0.299 * B[0] + 0.587 * B[1] + 0.114 * B[2];
+        if (bgLum < 180) return 0;
+        const n = w * h;
+        const px = S.rgb.data;
+        const W = new Uint8Array(n);
+        let wCnt = 0;
+        for (let j = 0; j < n; j++) {
+            const i = j * 4, r = px[i], g = px[i + 1], b = px[i + 2];
+            const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+            if (mx - mn < 64 && lum > bgLum - 45) { W[j] = 1; wCnt++; }
+        }
+        if (wCnt < n * 0.05 || wCnt > n * 0.9) return 0;   // 得是白底图
+        const invW = new Uint8Array(n);
+        for (let j = 0; j < n; j++) invW[j] = W[j] ? 0 : 1;
+        const E = Math.max(8, Math.min(14, Math.round(Math.min(w, h) * 0.012)));
+        const dCore = chamferDT(invW, w, h);               // 到「非白」的距离
+        const core = new Uint8Array(n);
+        for (let j = 0; j < n; j++) core[j] = W[j] && dCore[j] > E ? 1 : 0;
+        // 背景白核：core 中连通图像边界的部分
+        const seen = new Uint8Array(n);
+        const stack = new Int32Array(n);
+        const bgCore = new Uint8Array(n);
+        let qh = 0, qt = 0;
+        for (let x = 0; x < w; x++) {
+            if (core[x]) { bgCore[x] = 1; stack[qt++] = x; }
+            const t = (h - 1) * w + x;
+            if (core[t] && !bgCore[t]) { bgCore[t] = 1; stack[qt++] = t; }
+        }
+        for (let y = 0; y < h; y++) {
+            const l = y * w, r = y * w + w - 1;
+            if (core[l] && !bgCore[l]) { bgCore[l] = 1; stack[qt++] = l; }
+            if (core[r] && !bgCore[r]) { bgCore[r] = 1; stack[qt++] = r; }
+        }
+        while (qh < qt) {
+            const c = stack[qh++];
+            const x = c % w, y = (c - x) / w;
+            if (x > 0 && core[c - 1] && !bgCore[c - 1]) { bgCore[c - 1] = 1; stack[qt++] = c - 1; }
+            if (x < w - 1 && core[c + 1] && !bgCore[c + 1]) { bgCore[c + 1] = 1; stack[qt++] = c + 1; }
+            if (y > 0 && core[c - w] && !bgCore[c - w]) { bgCore[c - w] = 1; stack[qt++] = c - w; }
+            if (y < h - 1 && core[c + w] && !bgCore[c + w]) { bgCore[c + w] = 1; stack[qt++] = c + w; }
+        }
+        if (!qt) return 0;
+        // 膨胀回 E+2：背景核附近的白像素全部剥离
+        const dStrip = chamferDT(bgCore, w, h);
+        let killed = 0;
+        for (let j = 0; j < n; j++) {
+            if (W[j] && dStrip[j] <= E + 2 && m[j] > 0) { m[j] = 0; killed++; }
+        }
+        // 二次清尾：被蓝色飞白笔触切碎的背景白块太薄（厚 < 2E），腐蚀后没有核，
+        // 上面那步清不到。剩余白实心块里「面积小且离背景核近」的一并清掉；
+        // 大块设计白（整片网格数万像素）不在此列，保留。
+        const restSeen = new Uint8Array(n);
+        for (let j0 = 0; j0 < n; j0++) {
+            if (restSeen[j0] || !W[j0] || m[j0] <= 0) continue;
+            let sp = 0, near = 1 << 28;
+            const members = [];
+            stack[sp++] = j0; restSeen[j0] = 1;
+            while (sp) {
+                const c = stack[--sp];
+                members.push(c);
+                if (dStrip[c] < near) near = dStrip[c];
+                const x = c % w, y = (c - x) / w;
+                if (x > 0 && W[c - 1] && m[c - 1] > 0 && !restSeen[c - 1]) { restSeen[c - 1] = 1; stack[sp++] = c - 1; }
+                if (x < w - 1 && W[c + 1] && m[c + 1] > 0 && !restSeen[c + 1]) { restSeen[c + 1] = 1; stack[sp++] = c + 1; }
+                if (y > 0 && W[c - w] && m[c - w] > 0 && !restSeen[c - w]) { restSeen[c - w] = 1; stack[sp++] = c - w; }
+                if (y < h - 1 && W[c + w] && m[c + w] > 0 && !restSeen[c + w]) { restSeen[c + w] = 1; stack[sp++] = c + w; }
+            }
+            if (members.length < n * 0.003 && near <= E + 8) {
+                for (let k = 0; k < members.length; k++) { m[members[k]] = 0; killed++; }
+            }
+        }
+        if (killed > n * 0.25) return 0;                   // 清太多说明判错，整体放弃
+        return killed;
+    };
+
     const postProcess = (opts) => {
         const w = S.w, h = S.h, n = w * h;
         // 蒙版以 alpha 通道存储（destination-in 只认 alpha，不认灰度）
@@ -2495,10 +2642,15 @@
 
         if (opts.refine && S.rgb) m = guidedFilter(m, S.rgb.data, w, h, 3, 1e-4);
         // 深底光晕净化与除雾都在贴边滤波之前：先清光晕/压雾，引导滤波再让边缘贴回图像轮廓
-        if (S.deepClean && opts.levels !== false && S.rgb) S.glowKilled = purgeGlow(m, w, h) || 0;
+        if (S.deepClean && opts.levels !== false && S.rgb) {
+            S.glowKilled = purgeGlow(m, w, h) || 0;
+            S.fogKilled = purgeBgFog(m, w, h) || 0;
+        }
         if (opts.levels !== false) S.levelsUsed = autoLevels(m, n) || 0;
         // 设计白拉实在色阶之后：主体已拉实，闭运算找凹腔更准
         if (S.deepClean && opts.levels !== false && S.rgb) S.whiteFilled = solidifyWhites(m, w, h) || 0;
+        // 背景白剥离在拉实之后：实心的贴边背景白块由它收尾清掉
+        if (S.deepClean && opts.levels !== false && S.rgb) S.bgStripped = stripBgWhite(m, w, h) || 0;
         // 平滑（PS「平滑」）：先 blur 掉锯齿状的小凹凸，后面净化步骤会把边缘重新收紧
         const smooth = opts.smooth === undefined ? (S.smooth || 0) : opts.smooth;
         if (smooth > 0) m = boxBlurGray(m, w, h, Math.round(smooth) + 1, 2);
@@ -4055,8 +4207,10 @@
                         const dbgAlt = Object.assign({}, S.debug);
                         const q2 = S.debug.rawQ || { comps: 0, mainPct: 0, restPct: 0 };
                         const q2c = maskShape();
-                        // 复核版要「碎块少得多」且「主体没被明显削掉」才算赢，否则退回原来那张
-                        if (q2c.comps <= Math.max(3, q1c.comps * 0.5) && q2c.mainPct >= q1c.mainPct * 0.9) {
+                        // 复核版要「碎块少得多」且「主体没被明显削掉」才算赢，否则退回原来那张。
+                        // 评分用 raw 形状（推理后、清理前）：清理链里有依赖会话状态的步骤，
+                        // 复核会话中同样的蒙版可能被过度清除，raw 对比才稳定可比。
+                        if (q2.comps <= Math.max(3, q1.comps * 0.5) && q2.mainPct >= q1.mainPct * 0.9) {
                             S.pickKey = alt.key;
                             S.debug.retry = { from: primary.key, q1, q1c, q2, q2c, kept: alt.key };
                         } else {
