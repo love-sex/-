@@ -2392,27 +2392,86 @@
             if (m[j] <= 0.5 && dBg[j] > R) { isFill[j] = 1; fillRaw++; }   // 闭运算填起来的 = 设计白候选
         }
         if (fillRaw < n * 0.002 || fillRaw > n * 0.2) { S.whiteWhy = 'fill:' + (fillRaw / n * 100).toFixed(2) + '%'; return 0; }
-        // 只保留与「大前景组件」邻接的填充块：孤立渣点周围的背景口袋不填
-        const bigF = new Uint8Array(n);
-        for (let j = 0; j < n; j++) if (compId[j] >= 0 && compArea[compId[j]] >= bigArea) bigF[j] = 1;
+        {   // 诊断：fill 像素的 dF（到前景距离）分位
+            const arr = [];
+            for (let j = 0; j < n; j++) if (m[j] <= 0.5 && dBg[j] > R) arr.push(dF[j]);
+            arr.sort((a, b) => a - b);
+            const pk = (p) => arr.length ? arr[Math.min(arr.length - 1, Math.round(arr.length * p))] : 0;
+            S.whiteDF = 'dF p50=' + pk(.5) + ' p80=' + pk(.8) + ' p90=' + pk(.9) + ' p95=' + pk(.95) + ' p99=' + pk(.99) + ' max=' + arr[arr.length - 1] + ' R=' + R;
+        }
+        // 只填紧贴前景的窄缝：dF 大的宽旷区（字与球之间的背景）即使被闭运算
+        // 桥接也不填 —— 设计白都贴着蓝色（网格线、字内白、白芯边缘）
+        const dFCap = Math.max(8, Math.round(R * 0.55));
+        for (let j = 0; j < n; j++) {
+            if (isFill[j] && dF[j] > dFCap) isFill[j] = 0;
+        }
+        // 二次补洞：被填充+前景完全包围的小残洞（方格中心）补上，大洞（背景空隙中心）保留
+        {
+            const holeSeen = new Uint8Array(n);
+            for (let j0 = 0; j0 < n; j0++) {
+                if (holeSeen[j0] || m[j0] > 0.5 || isFill[j0]) continue;
+                let sp = 0, area = 0, touchFill = 0, touchEdge = 0;
+                const mem = [];
+                stack[sp++] = j0; holeSeen[j0] = 1;
+                while (sp) {
+                    const c = stack[--sp];
+                    area++; mem.push(c);
+                    const x = c % w, y = (c - x) / w;
+                    if (x === 0 || y === 0 || x === w - 1 || y === h - 1) touchEdge = 1;
+                    const ck = (q) => {
+                        if (m[q] > 0.5) return;
+                        if (isFill[q]) touchFill = 1;
+                        else if (!holeSeen[q]) { holeSeen[q] = 1; stack[sp++] = q; }
+                    };
+                    if (x > 0) ck(c - 1);
+                    if (x < w - 1) ck(c + 1);
+                    if (y > 0) ck(c - w);
+                    if (y < h - 1) ck(c + w);
+                }
+                if (touchFill && !touchEdge && area <= 500) for (let k = 0; k < mem.length; k++) { isFill[mem[k]] = 1; fillRaw++; }
+            }
+        }
+        // 只保留「封闭凹腔」里的填充块：闭运算填起来的白有两种本质 ——
+        // ① 被主体包围的设计白（球内网格线、海浪白芯）→ 保留；
+        // ② 主体之间的背景空隙被闭运算桥接（字与球、字与字之间的方块）→ 丢弃。
+        // 判别：取块内离边界最远的点向 8 个方向步进，全部在到达图像边界前
+        // 碰到前景 → 封闭凹腔；任一方向直通边界 → 开放空隙。
+        // 用 dBg 最大的点做测试：它离背景区最远，最能代表块的「被包围程度」。
         const fill = stack;
         let filled = 0;
         for (let j0 = 0; j0 < n; j0++) {
             if (!isFill[j0]) continue;
-            let sp = 0, touch = 0;
+            let sp = 0, deepP = j0, deepD = -1;
             const members = [];
             fill[sp++] = j0; isFill[j0] = 0;
             while (sp) {
                 const c = fill[--sp];
                 members.push(c);
+                if (dBg[c] > deepD) { deepD = dBg[c]; deepP = c; }
                 const x = c % w, y = (c - x) / w;
-                if ((x > 0 && bigF[c - 1]) || (x < w - 1 && bigF[c + 1]) || (y > 0 && bigF[c - w]) || (y < h - 1 && bigF[c + w])) touch = 1;
                 if (x > 0 && isFill[c - 1]) { isFill[c - 1] = 0; fill[sp++] = c - 1; }
                 if (x < w - 1 && isFill[c + 1]) { isFill[c + 1] = 0; fill[sp++] = c + 1; }
                 if (y > 0 && isFill[c - w]) { isFill[c - w] = 0; fill[sp++] = c - w; }
                 if (y < h - 1 && isFill[c + w]) { isFill[c + w] = 0; fill[sp++] = c + w; }
             }
-            if (touch) for (let k = 0; k < members.length; k++) { m[members[k]] = 1; filled++; }
+            // 8 方向包围测试（步长 2 加速）
+            const px = deepP % w, py = (deepP - px) / w;
+            let hits = 0;
+            for (let d = 0; d < 8; d++) {
+                const dx = [1, 1, 0, -1, -1, -1, 0, 1][d], dy = [0, 1, 1, 1, 0, -1, -1, -1][d];
+                let x = px + dx * 2, y = py + dy * 2, hit = 0;
+                while (x >= 0 && x < w && y >= 0 && y < h) {
+                    if (m[y * w + x] > 0.5) { hit = 1; break; }
+                    x += dx * 2; y += dy * 2;
+                }
+                hits += hit;
+            }
+            if (hits >= 6) for (let k = 0; k < members.length; k++) { m[members[k]] = 1; filled++; }
+            (S._blkD = S._blkD || []).push([members.length, deepD, hits]);
+        }
+        if (S._blkD) {
+            const arr = S._blkD.slice().sort((a, b) => b[0] - a[0]).slice(0, 12);
+            S.whiteBlk = arr.map(b => b[0] + 'px@d' + b[1] + 'h' + b[2]).join(' ');
         }
         if (filled < n * 0.002) { S.whiteWhy = 'filled:' + (filled / n * 100).toFixed(2) + '%'; return 0; }
         return filled;
