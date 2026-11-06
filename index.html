@@ -22,6 +22,8 @@
     <!-- 抠图工具样式 -->
     <link rel="stylesheet" href="matting.css?v=20261125a">
     <link rel="stylesheet" href="personality.css?v=20261118p">
+    <!-- 采集台样式 -->
+    <link rel="stylesheet" href="collect.css?v=20261206a">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
@@ -269,6 +271,11 @@
                                 <div class="module-icon">🔮</div>
                                 <div class="module-name">灵魂角色</div>
                                 <div class="module-stat">40 题 · 134 位角色</div>
+                            </button>
+                            <button class="module-card" data-target="collect">
+                                <div class="module-icon">📡</div>
+                                <div class="module-name">素材采集台</div>
+                                <div class="module-stat">导入 · 热词 · 精选</div>
                             </button>
                         </div>
                     </div>
@@ -1022,6 +1029,103 @@
                 </div>
             </section>
 
+            <!-- ============ 素材采集台 ============ -->
+            <section class="view" data-view="collect" style="display:none;">
+                <div class="view-content">
+                    <div class="page-head">
+                        <button class="back-btn" data-back>← 返回首页</button>
+                        <h2 class="page-title">📡 素材采集台</h2>
+                    </div>
+
+                    <div class="cl-app" id="clApp">
+                        <div class="cl-notice">
+                            <b>本站不抓取任何平台数据。</b>采集请在你自己电脑上运行
+                            <a href="https://github.com/NanmiCoder/MediaCrawler" target="_blank" rel="noopener noreferrer">MediaCrawler</a>，
+                            再把导出的 JSON / JSONL / CSV 拖进来。文件不上传服务器，只存在本机浏览器里。
+                            请仅用于学习研究、遵守各平台条款与相关法律法规，不要大规模抓取或传播他人内容。
+                        </div>
+
+                        <div class="cl-drop" id="clDrop">
+                            <div class="cl-drop-ic">📥</div>
+                            <div class="cl-drop-main">点击选择，或把导出文件拖到这里</div>
+                            <div class="cl-drop-sub">支持 .json / .jsonl / .csv，可多选，自动识别小红书 / 抖音 / 快手 / B站 / 微博 / 贴吧 / 知乎</div>
+                            <input type="file" id="clFile" accept=".json,.jsonl,.ndjson,.csv,.txt" multiple hidden>
+                        </div>
+
+                        <div class="cl-stats" id="clStats"></div>
+
+                        <div class="cl-toolbar">
+                            <div class="cl-toolbar-row">
+                                <input type="search" id="clSearch" placeholder="搜索标题 / 作者 / 关键词">
+                                <select id="clPlatform"><option value="all">全部平台</option></select>
+                            </div>
+                            <div class="cl-toolbar-row">
+                                <select id="clSort">
+                                    <option value="hot">按热度</option>
+                                    <option value="like">按点赞</option>
+                                    <option value="comment">按评论</option>
+                                    <option value="collect">按收藏</option>
+                                    <option value="time">按发布时间</option>
+                                    <option value="added">按导入顺序</option>
+                                </select>
+                                <label class="cl-check"><input type="checkbox" id="clOnlyPicked">只看精选（<span id="clPickedCount">0</span>）</label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="cl-words-head">
+                                <span>🔥 高频词（点击即筛选）</span>
+                                <span>基于当前筛选结果</span>
+                            </div>
+                            <div class="cl-words" id="clWords"></div>
+                        </div>
+
+                        <div class="cl-actions">
+                            <button class="btn btn-primary" id="clExportCsv">导出 CSV</button>
+                            <button class="btn btn-outline" id="clExportMd">导出 Markdown</button>
+                            <button class="btn btn-ghost" id="clUnpick">取消精选</button>
+                            <button class="btn btn-outline" id="clClearAll">清空</button>
+                        </div>
+
+                        <div class="cl-list" id="clList"></div>
+
+                        <details class="cl-fold">
+                            <summary>🧭 还没装 MediaCrawler？三步跑起来</summary>
+                            <div class="cl-fold-body">
+                                <ol>
+                                    <li>装 Python 3.11+ 与 Node.js 16+，然后 <code>uv sync</code>（或 <code>pip install -r requirements.txt</code>）。</li>
+                                    <li>用下面生成的命令运行，首次会弹二维码，用手机对应 App 扫码登录。</li>
+                                    <li>跑完到 <code>data/</code> 目录取导出的 JSON / CSV，拖回上面的框里。</li>
+                                </ol>
+                                <p style="margin-top:8px;">建议先小规模试跑（如 1~2 页），并遵守平台条款，不要用于商业用途或大规模抓取。</p>
+                                <div class="cl-cmd" style="margin-top:10px;">
+                                    <div class="cl-toolbar-row">
+                                        <select id="clCmdPlatform">
+                                            <option value="xhs">小红书</option>
+                                            <option value="dy">抖音</option>
+                                            <option value="ks">快手</option>
+                                            <option value="bili">B站</option>
+                                            <option value="wb">微博</option>
+                                            <option value="tieba">贴吧</option>
+                                            <option value="zhihu">知乎</option>
+                                        </select>
+                                        <select id="clCmdType">
+                                            <option value="search">关键词搜索</option>
+                                            <option value="detail">指定帖子</option>
+                                        </select>
+                                    </div>
+                                    <div class="cl-toolbar-row">
+                                        <input type="text" id="clCmdKeyword" placeholder="关键词（多个用逗号分隔）或帖子链接">
+                                        <button class="btn btn-primary" id="clCopyCmd" style="flex:0 0 auto;">生成并复制</button>
+                                    </div>
+                                    <div class="cl-cmd-out" id="clCmdOut">uv run main.py --platform xhs --lt qrcode --type search --keywords "关键词1,关键词2"</div>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </section>
+
             <!-- ============ 设置 ============ -->
             <section class="view" data-view="settings" style="display:none;">
                 <div class="view-content">
@@ -1537,7 +1641,8 @@ PORTFOLIO</p>
 
     <script src="script-game.js?v=20261125a"></script>
     <script src="script.js?v=20261030"></script>
-    <script src="workbench.js?v=20261125a"></script>
+    <script src="workbench.js?v=20261206a"></script>
+    <script src="collect.js?v=20261206a"></script>
     <script src="matting.js?v=20261125a"></script>
     <script src="personality.js?v=20261118p"></script>
     <script src="portfolio.js?v=20261029"></script>
