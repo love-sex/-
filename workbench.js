@@ -346,7 +346,6 @@ const App = (() => {
     if (name === 'study') renderStudy();
     if (name === 'settings') renderSettings();
     if (name === 'soul' && typeof window.__soulView === 'function') window.__soulView();
-    if (name === 'collect' && window.__collect) window.__collect.render();
   };
 
   // 供独立模块（灵魂角色测试）读写自己的那段数据，保证跟着导出/导入一起走
