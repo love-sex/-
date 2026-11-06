@@ -2293,13 +2293,129 @@
         if (thr < 77 || thr > 191) return 0;     // 分界不在 0.3~0.75 之间说明这不是雾形分布
         const t = thr / 255, half = 0.22;
         const a = Math.max(0.01, t - half), b = Math.min(0.99, t + half);
-        let touched = 0;
+        // 先映射到临时数组：若实心主体因此凭空膨胀（如量化模型在白纸上的雾被拉成
+        // 前景，文档整页变白块），整体放弃，保护「雾压缩但不造主体」的语义
+        const out2 = new Float32Array(n);
+        let touched = 0, hi1 = 0;
         for (let j = 0; j < n; j++) {
             const v = (m[j] - a) / (b - a);
             const nv = v < 0 ? 0 : v > 1 ? 1 : v * v * (3 - 2 * v);
-            if (nv !== m[j]) { m[j] = nv; touched++; }
+            out2[j] = nv;
+            if (nv !== m[j]) touched++;
+            if (nv > 0.5) hi1++;
         }
+        if (hi1 > hi * 1.5 + n * 0.01) return 0;
+        if (touched) m.set(out2);
         return touched;
+    };
+
+    // 切比雪夫距离变换：seed=1 的像素距离 0，两遍扫描
+    const chamferDT = (seed, w, h) => {
+        const INF = 1 << 28, n = w * h;
+        const d = new Int32Array(n);
+        for (let j = 0; j < n; j++) d[j] = seed[j] ? 0 : INF;
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+            const j = y * w + x; let v = d[j];
+            if (v === 0) continue;
+            if (x > 0 && d[j - 1] + 1 < v) v = d[j - 1] + 1;
+            if (y > 0) {
+                if (d[j - w] + 1 < v) v = d[j - w] + 1;
+                if (x > 0 && d[j - w - 1] + 1 < v) v = d[j - w - 1] + 1;
+                if (x < w - 1 && d[j - w + 1] + 1 < v) v = d[j - w + 1] + 1;
+            }
+            d[j] = v;
+        }
+        for (let y = h - 1; y >= 0; y--) for (let x = w - 1; x >= 0; x--) {
+            const j = y * w + x; let v = d[j];
+            if (v === 0) continue;
+            if (x < w - 1 && d[j + 1] + 1 < v) v = d[j + 1] + 1;
+            if (y < h - 1) {
+                if (d[j + w] + 1 < v) v = d[j + w] + 1;
+                if (x < w - 1 && d[j + w + 1] + 1 < v) v = d[j + w + 1] + 1;
+                if (x > 0 && d[j + w - 1] + 1 < v) v = d[j + w - 1] + 1;
+            }
+            d[j] = v;
+        }
+        return d;
+    };
+
+    // 设计白拉实（白底 logo 的灵魂步骤）：白色既是背景也是设计 —— 白网格线、
+    // 波浪白缝、字体笔画间的白，模型一律判成背景（与背景同色），抠出来放到
+    // 深底上就是半透明雾和窟窿。可画的做法等价于：把主体（实心前景）做形态学
+    // 闭运算，闭运算填起来的低 alpha 区 = 被主体包夹/紧邻的设计白 → 拉实。
+    // 安全阀：只管浅底；前景组件数 > 200（文档黑字、密排截图）直接放弃；
+    // 填充面积超全图 20% 或不足 0.2% 也放弃。
+    const solidifyWhites = (m, w, h) => {
+        const B = estimateBg();
+        if (!B) return 0;
+        const bgLum = 0.299 * B[0] + 0.587 * B[1] + 0.114 * B[2];
+        if (bgLum < 180) { S.whiteWhy = 'bg-dark'; return 0; }
+        const n = w * h;
+        const F = new Uint8Array(n);
+        let fCnt = 0;
+        for (let j = 0; j < n; j++) if (m[j] > 0.5) { F[j] = 1; fCnt++; }
+        if (fCnt < n * 0.004 || fCnt > n * 0.75) { S.whiteWhy = 'F-size:' + (fCnt / n * 100).toFixed(1) + '%'; return 0; }
+        // 前景连通组件计数（带面积），组件过多说明是文字/文档纹理，不适用
+        const seen = new Uint8Array(n);
+        const stack = new Int32Array(n);
+        let comps = 0;
+        const bigArea = Math.max(80, Math.round(n * 0.0002));   // 面积达标才算“真组件”，渣点碎片不计
+        const compId = new Int32Array(n).fill(-1);
+        const compArea = [];
+        for (let j0 = 0; j0 < n; j0++) {
+            if (!F[j0] || seen[j0]) continue;
+            const id = compArea.length;
+            let sp = 0, area = 0; stack[sp++] = j0; seen[j0] = 1; compId[j0] = id;
+            while (sp) {
+                const c = stack[--sp];
+                area++;
+                const x = c % w, y = (c - x) / w;
+                if (x > 0 && F[c - 1] && !seen[c - 1]) { seen[c - 1] = 1; compId[c - 1] = id; stack[sp++] = c - 1; }
+                if (x < w - 1 && F[c + 1] && !seen[c + 1]) { seen[c + 1] = 1; compId[c + 1] = id; stack[sp++] = c + 1; }
+                if (y > 0 && F[c - w] && !seen[c - w]) { seen[c - w] = 1; compId[c - w] = id; stack[sp++] = c - w; }
+                if (y < h - 1 && F[c + w] && !seen[c + w]) { seen[c + w] = 1; compId[c + w] = id; stack[sp++] = c + w; }
+            }
+            compArea.push(area);
+            if (area >= bigArea) {
+                comps++;
+                if (comps > 120) { S.whiteWhy = 'comps:' + comps; return 0; }
+            }
+        }
+        const R = Math.max(14, Math.round(Math.min(w, h) * 0.024));
+        const dF = chamferDT(F, w, h);
+        const seed = new Uint8Array(n);
+        for (let j = 0; j < n; j++) seed[j] = dF[j] > R ? 1 : 0;
+        const dBg = chamferDT(seed, w, h);             // 到「膨胀补集」的距离
+        const isFill = new Uint8Array(n);
+        let fillRaw = 0;
+        for (let j = 0; j < n; j++) {
+            if (m[j] <= 0.5 && dBg[j] > R) { isFill[j] = 1; fillRaw++; }   // 闭运算填起来的 = 设计白候选
+        }
+        if (fillRaw < n * 0.002 || fillRaw > n * 0.2) { S.whiteWhy = 'fill:' + (fillRaw / n * 100).toFixed(2) + '%'; return 0; }
+        // 只保留与「大前景组件」邻接的填充块：孤立渣点周围的背景口袋不填
+        const bigF = new Uint8Array(n);
+        for (let j = 0; j < n; j++) if (compId[j] >= 0 && compArea[compId[j]] >= bigArea) bigF[j] = 1;
+        const fill = stack;
+        let filled = 0;
+        for (let j0 = 0; j0 < n; j0++) {
+            if (!isFill[j0]) continue;
+            let sp = 0, touch = 0;
+            const members = [];
+            fill[sp++] = j0; isFill[j0] = 0;
+            while (sp) {
+                const c = fill[--sp];
+                members.push(c);
+                const x = c % w, y = (c - x) / w;
+                if ((x > 0 && bigF[c - 1]) || (x < w - 1 && bigF[c + 1]) || (y > 0 && bigF[c - w]) || (y < h - 1 && bigF[c + w])) touch = 1;
+                if (x > 0 && isFill[c - 1]) { isFill[c - 1] = 0; fill[sp++] = c - 1; }
+                if (x < w - 1 && isFill[c + 1]) { isFill[c + 1] = 0; fill[sp++] = c + 1; }
+                if (y > 0 && isFill[c - w]) { isFill[c - w] = 0; fill[sp++] = c - w; }
+                if (y < h - 1 && isFill[c + w]) { isFill[c + w] = 0; fill[sp++] = c + w; }
+            }
+            if (touch) for (let k = 0; k < members.length; k++) { m[members[k]] = 1; filled++; }
+        }
+        if (filled < n * 0.002) { S.whiteWhy = 'filled:' + (filled / n * 100).toFixed(2) + '%'; return 0; }
+        return filled;
     };
 
     const postProcess = (opts) => {
@@ -2319,6 +2435,8 @@
         // 深底光晕净化与除雾都在贴边滤波之前：先清光晕/压雾，引导滤波再让边缘贴回图像轮廓
         if (S.deepClean && opts.levels !== false && S.rgb) S.glowKilled = purgeGlow(m, w, h) || 0;
         if (opts.levels !== false) S.levelsUsed = autoLevels(m, n) || 0;
+        // 设计白拉实在色阶之后：主体已拉实，闭运算找凹腔更准
+        if (S.deepClean && opts.levels !== false && S.rgb) S.whiteFilled = solidifyWhites(m, w, h) || 0;
         // 平滑（PS「平滑」）：先 blur 掉锯齿状的小凹凸，后面净化步骤会把边缘重新收紧
         const smooth = opts.smooth === undefined ? (S.smooth || 0) : opts.smooth;
         if (smooth > 0) m = boxBlurGray(m, w, h, Math.round(smooth) + 1, 2);
