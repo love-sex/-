@@ -395,18 +395,22 @@
     };
 
     // 涂抹去物：红色半透明覆盖层，让「要移除什么」一眼可见（渲染层，不动权威蒙版）
-    const drawRm = () => {
-        if (!S.rmHas || !S.rmctx) return;
-        const ctx = S.vctx;
-        const tint = document.createElement('canvas');
-        tint.width = S.w; tint.height = S.h;
-        const t = tint.getContext('2d');
-        t.drawImage(S.rmask, 0, 0);
-        t.globalCompositeOperation = 'source-in';
-        t.fillStyle = 'rgba(255,46,46,0.5)';
-        t.fillRect(0, 0, S.w, S.h);
-        ctx.drawImage(tint, 0, 0);
-    };
+    // tint 画布复用，避免 pointermove 每帧新建一张全尺寸 canvas 造成 GC 卡顿
+    const drawRm = (() => {
+        let tint = null;
+        return () => {
+            if (!S.rmHas || !S.rmctx) return;
+            if (!tint || tint.width !== S.w || tint.height !== S.h) tint = mkCv(S.w, S.h);
+            const t = tint.getContext('2d');
+            t.globalCompositeOperation = 'source-over';
+            t.clearRect(0, 0, S.w, S.h);
+            t.drawImage(S.rmask, 0, 0);
+            t.globalCompositeOperation = 'source-in';
+            t.fillStyle = 'rgba(255,46,46,0.5)';
+            t.fillRect(0, 0, S.w, S.h);
+            S.vctx.drawImage(tint, 0, 0);
+        };
+    })();
 
     // 前后对比：左半边画「擦除前」，右半边画「擦除后」，中间一条分割线。
     // 用像素级分割而不是两层 DOM，缩放/平移天然同步，也不再依赖按住手势（手机上好按）
@@ -1001,7 +1005,8 @@
         mask: L.hasMask ? cloneCanvas(L.mask) : null,
         rmask: cloneCanvas(L.rmask),
         fg: L.fg ? cloneCanvas(L.fg) : null,
-        hasMask: !!L.hasMask
+        hasMask: !!L.hasMask,
+        rmHas: !!L.rmHas
     });
 
     const paintShifted = (ctx, srcC, dx, dy, sc) => {
@@ -1075,6 +1080,7 @@
         if (snap.mask) paintShifted(L.mctx, snap.mask, 0, 0, 1);
         paintShifted(L.rmctx, snap.rmask, 0, 0, 1);
         L.hasMask = !!snap.hasMask;
+        L.rmHas = !!snap.rmHas;
         L.fg = snap.fg ? cloneCanvas(snap.fg) : null;
         L.rgb = null;
         bumpLayer(L);
@@ -2320,10 +2326,8 @@
             if (st.some(s => s.done)) break;
             await sleep(250); waited += 250;
         }
-        let best = -1;
-        st.forEach((s, i) => { if (!s.err && (best < 0 || s.got > st[best].got)) best = i; });
-        if (best >= 0) urls.forEach((_, i) => { if (i !== best) { try { ctrls[i].abort(); } catch (e) { } } });
-        // 领先者继续跑；它若中途挂了，其余还在跑的源会自动顶上
+        // 全程不提前 abort：任何一个源挂了，其余在跑的源都能顶上（提前 abort 会让
+        // 领先者中途失败时无源可用，直接抛「下载失败」）。赢家产出后再统一收尾。
         let reported = 0;
         while (!st.some(s => s.done && s.buf) && st.some(s => !s.err)) {
             let lead = -1;
@@ -2332,6 +2336,7 @@
             await sleep(250);
         }
         const win = st.find(s => s.done && s.buf);
+        urls.forEach((_, i) => { try { ctrls[i].abort(); } catch (e) { } });
         if (win) { if (onBytes && win.buf.length > reported) onBytes(win.buf.length - reported); return win.buf; }
         throw new Error(st.map(s => s.err).filter(Boolean)[0] || '下载失败');
     };
@@ -3805,19 +3810,33 @@
         }
     };
 
-    // 恢复到刚上传的样子：不重新选文件，清掉蒙版与历史即可
+    // 恢复到刚上传的样子：不重新选文件，清掉所有图层的蒙版与历史
     const restoreOriginal = () => {
-        if (!S.src) return toast('请先上传图片');
+        // 多图层文档下活动图层可能是空的（如新建的空图层），只要文档里
+        // 任何一层有内容就允许恢复；否则停在空图层上点「恢复原图」会没反应
+        let anySrc = false;
+        walkLayers((L) => { if (L.src) anySrc = true; });
+        if (!anySrc) return toast('请先上传图片');
+        walkLayers((L) => {
+            L.hasMask = false;
+            L.fg = null;
+            L.inpaintHist = [];
+            if (L.rctx) { L.rctx.globalCompositeOperation = 'source-over'; L.rctx.clearRect(0, 0, S.w, S.h); }
+            if (L.mctx) L.mctx.clearRect(0, 0, S.w, S.h);
+            bumpLayer(L);
+        });
+        S._actSprite = null;
         S.hasMask = false;
         S.fg = null;
+        S.cmpOn = false;
+        S.selDraft = null;
         S.undo = []; S.redo = [];
-        if (S.rctx) { S.rctx.globalCompositeOperation = 'source-over'; S.rctx.clearRect(0, 0, S.w, S.h); }
-        if (S.mctx) S.mctx.clearRect(0, 0, S.w, S.h);
         if (S.sctx) S.sctx.clearRect(0, 0, S.w, S.h);
         S.selOn = false; S.selArea = 0;
         rebuildSelVisual();
         syncHistoryButtons();
         render();
+        renderLayerPanel();
         setStatus('已恢复到刚上传的原图，可以重新点「一键去背景」，或直接用画笔涂');
         toast('已恢复原图');
     };
@@ -3993,14 +4012,29 @@
                     return;
                 }
                 if (S.mode === 'lasso') {
-                    // 套索：按住拖一圈，松手自动闭合变成选区
+                    // 套索二合一：按住拖一圈 = 自由套索；单击加点 = 多边形套索，
+                    // 点回起点、双击或 Enter 闭合（Shift 加选 / Alt 减选）
                     endPaint();
                     e.preventDefault();
                     if (e.button !== 0 && e.button !== 2) return;
                     if (!S.hasMask) return toast('请先点「一键去背景」，再用套索圈范围');
                     S.lassoMode = selModeNow(e);
+                    const p = toCanvasXY(e);
+                    if (S.selDraft && !S.lassoing) {
+                        // 多边形进行中：点起点附近就闭合，否则继续加点
+                        const f = S.selDraft[0];
+                        const th = 12 / (S.zoom || 1);
+                        if (S.selDraft.length >= 3 && Math.abs(p.x - f.x) + Math.abs(p.y - f.y) <= th) {
+                            S.selDraft.push(p);
+                            lassoCommit(S.lassoMode);
+                        } else {
+                            S.selDraft.push(p);
+                            render();
+                        }
+                        return;
+                    }
                     S.lassoing = true;
-                    S.selDraft = [toCanvasXY(e)];
+                    S.selDraft = [p];
                     render();
                     return;
                 }
@@ -4081,13 +4115,22 @@
                 // 套索松手才真正生成选区；pointerleave 不算松手（指针捕获还在）
                 if (S.lassoing && (!e || e.type !== 'pointerleave')) {
                     S.lassoing = false;
-                    lassoCommit(S.lassoMode || 'new');
+                    // 拖动了（不止一个点）→ 自由套索，松手闭合；
+                    // 只点了一下 → 进入多边形套索模式，等下一个点
+                    if (S.selDraft && S.selDraft.length > 1) lassoCommit(S.lassoMode || 'new');
+                    else render();
                 }
                 endPaint();
             };
             stage.addEventListener('pointerup', release);
             stage.addEventListener('pointercancel', release);
             stage.addEventListener('pointerleave', release);
+
+            // 多边形套索：双击闭合
+            stage.addEventListener('dblclick', (e) => {
+                if (S.mode !== 'lasso' || S.lassoing) return;
+                if (S.selDraft && S.selDraft.length >= 3) lassoCommit(S.lassoMode || 'new');
+            });
 
             // 滚轮缩放（触控板捏合表现为 ctrl+wheel，同一套处理）
             stage.addEventListener('wheel', (e) => {
@@ -4110,9 +4153,17 @@
             window.addEventListener('keydown', (e) => {
                 // 涂抹去物模式下 Ctrl/⌘+Z = 撤销擦除；Esc 退出对比；PS 式单键工具切换
                 if (S.src && viewVisible() && !isTyping(e.target)) {
-                    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z') && S.mode === 'remove') {
+                    // PS 式全局撤销：普通抠图走 undo/redo，去物模式只支持逐步撤销
+                    if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'z' || e.key === 'Z')) {
                         e.preventDefault();
-                        undoInpaint();
+                        if (S.mode === 'remove') { if (!e.shiftKey) undoInpaint(); }
+                        else if (e.shiftKey) redo();
+                        else undo();
+                        return;
+                    }
+                    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
+                        e.preventDefault();
+                        if (S.mode !== 'remove') redo();
                         return;
                     }
                     if (!e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -4165,9 +4216,23 @@
                         selAll();
                         return;
                     }
+                    if (e.key === 'Enter' && S.selDraft && !S.lassoing) {
+                        // 多边形套索：Enter 闭合（不足 3 个点视为放弃）
+                        e.preventDefault();
+                        if (S.selDraft.length >= 3) lassoCommit(S.lassoMode || 'new');
+                        else { S.selDraft = null; render(); }
+                        return;
+                    }
                     if (e.key === 'Enter' && S.selOn && !e.ctrlKey && !e.metaKey) {
                         e.preventDefault();
                         applySelection(false);
+                        return;
+                    }
+                    if (e.key === 'Escape' && S.selDraft && !S.lassoing) {
+                        // 多边形套索进行中：Esc 放弃本次圈选
+                        e.preventDefault();
+                        S.selDraft = null;
+                        render();
                         return;
                     }
                     if (e.key === 'Escape' && S.cmpOn) {
@@ -4219,8 +4284,10 @@
         seg('#mattingMode', (v) => {
             S.mode = v;
             updateCursor();
+            // 切工具时丢弃未完成的多边形草稿，避免下次进套索把旧点接上
+            if (v !== 'lasso' && S.selDraft && !S.lassoing) { S.selDraft = null; render(); }
             if (v === 'wand') setStatus('点选：点一下圈出同色区域（Shift 加选 / Alt 减选），再点「删除选区」或「恢复选区」');
-            if (v === 'lasso') setStatus('套索：按住拖一圈，松手自动闭合（Shift 加选 / Alt 减选）；Esc 取消选区');
+            if (v === 'lasso') setStatus('套索：按住拖一圈松手闭合；或单击加点、回起点 / 双击 / Enter 闭合 = 多边形套索（Shift 加选 / Alt 减选；Esc 取消）');
             if (v === 'pan') setStatus('可拖动画面：把要修的地方移到眼前；滚轮或 ➕➖ 可缩放');
             if (v === 'remove') setStatus('涂抹去物：把要移除的人/物/文字涂红（略超出边缘 4–6px），再点下方「移除涂抹区」');
         });
@@ -4690,7 +4757,7 @@
     else bind();
 
     window.__matting = {
-        state: S, autoRemove, exportPNG, exportSVG,
+        state: S, autoRemove, exportPNG, exportSVG, restoreOriginal,
         fitView, zoomCenter, zoomAt, centerOn, applyView,
         purgeBgBlobs, shrinkBgEdge, despeckle, cleanBgFlood, postProcess, render,
         selClear, applySelection, selInvert, selMorph, selAll, rebuildSelVisual,
