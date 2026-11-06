@@ -2197,6 +2197,71 @@
         fgTimer = setTimeout(() => { buildFg(); render(); }, 140);
     };
 
+    // 深底光晕净化：深色背景上的 logo/图形常带白色反光光晕（发光描边、柔光），
+    // 模型把它们当高亮主体整片高置信保留，贴到深底/棋盘格上就是一圈洗不掉的白雾。
+    // 判据（同时满足才清）：① 估出的背景够暗（浅底图白雾走 shrinkBgEdge，这里不介入）；
+    // ② 像素低饱和且明显比背景亮；③ 非实心核（实心白色主体不受影响）；
+    // ④ 所在白亮连通块到透明区的过渡带宽 > 2px —— 硬边白色主体（月亮、白球）的
+    // 边缘反锯齿过渡只有 1~2px，不会被误伤。放在 autoLevels 之前跑：先清光晕，
+    // 色阶在剩下的干净分布上重新找分界。
+    const purgeGlow = (m, w, h) => {
+        const B = estimateBg();
+        if (!B) return 0;
+        const bgLum = 0.299 * B[0] + 0.587 * B[1] + 0.114 * B[2];
+        if (bgLum > 110) return 0;
+        const n = w * h;
+        const px = S.rgb.data;
+        const cand = new Uint8Array(n);
+        let candCnt = 0;
+        for (let j = 0; j < n; j++) {
+            const a = m[j];
+            if (a <= 0.04 || a >= 0.92) continue;      // 透明区与实心核都不动
+            const i = j * 4, r = px[i], g = px[i + 1], b = px[i + 2];
+            const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+            if (mx - mn < 64 && lum > bgLum + 60) { cand[j] = 1; candCnt++; }
+        }
+        if (!candCnt) return 0;
+        // 到透明区的 BFS 距离（限幅 40），用来量「过渡带宽度」
+        const dist = new Int16Array(n).fill(-1);
+        const bq = new Int32Array(n);
+        let qh = 0, qt = 0;
+        for (let j = 0; j < n; j++) if (m[j] <= 0.04) { dist[j] = 0; bq[qt++] = j; }
+        while (qh < qt) {
+            const c = bq[qh++], d = dist[c];
+            if (d >= 40) continue;
+            const x = c % w, y = (c - x) / w;
+            if (x > 0 && dist[c - 1] < 0) { dist[c - 1] = d + 1; bq[qt++] = c - 1; }
+            if (x < w - 1 && dist[c + 1] < 0) { dist[c + 1] = d + 1; bq[qt++] = c + 1; }
+            if (y > 0 && dist[c - w] < 0) { dist[c - w] = d + 1; bq[qt++] = c - w; }
+            if (y < h - 1 && dist[c + w] < 0) { dist[c + w] = d + 1; bq[qt++] = c + w; }
+        }
+        // 白亮候选按连通块分组：块内最大 dist > 2 才是渐变光晕
+        const lab = new Int32Array(n).fill(-1);
+        const stack = new Int32Array(n);
+        const killList = [];
+        for (let j0 = 0; j0 < n; j0++) {
+            if (!cand[j0] || lab[j0] >= 0) continue;
+            let sp = 0, maxD = 0;
+            const members = [];
+            stack[sp++] = j0; lab[j0] = j0;
+            while (sp) {
+                const c = stack[--sp];
+                members.push(c);
+                if (dist[c] > maxD) maxD = dist[c];
+                const x = c % w, y = (c - x) / w;
+                if (x > 0 && cand[c - 1] && lab[c - 1] < 0) { lab[c - 1] = j0; stack[sp++] = c - 1; }
+                if (x < w - 1 && cand[c + 1] && lab[c + 1] < 0) { lab[c + 1] = j0; stack[sp++] = c + 1; }
+                if (y > 0 && cand[c - w] && lab[c - w] < 0) { lab[c - w] = j0; stack[sp++] = c - w; }
+                if (y < h - 1 && cand[c + w] && lab[c + w] < 0) { lab[c + w] = j0; stack[sp++] = c + w; }
+            }
+            if (maxD > 2) for (let k = 0; k < members.length; k++) killList.push(members[k]);
+        }
+        if (!killList.length || killList.length > n * 0.15) return 0;   // 清太多说明判错，整体放弃
+        for (let k = 0; k < killList.length; k++) m[killList[k]] = 0;
+        return killList.length;
+    };
+
     // 自动 alpha 色阶（除雾）：模型在白雾、反光、同色系图上常给出大片 0.05~0.5 的
     // 低置信输出，显示出来就是一层洗不掉的雾（贴到深色底上尤其明显）。
     // 这里先统计非零 alpha 的分布：低带（雾）占比显著且存在主体带时，用 Otsu 找
@@ -2251,7 +2316,8 @@
         }
 
         if (opts.refine && S.rgb) m = guidedFilter(m, S.rgb.data, w, h, 3, 1e-4);
-        // 除雾在贴边滤波之前：先把低置信雾压掉，引导滤波再让边缘贴回图像轮廓
+        // 深底光晕净化与除雾都在贴边滤波之前：先清光晕/压雾，引导滤波再让边缘贴回图像轮廓
+        if (S.deepClean && opts.levels !== false && S.rgb) S.glowKilled = purgeGlow(m, w, h) || 0;
         if (opts.levels !== false) S.levelsUsed = autoLevels(m, n) || 0;
         // 平滑（PS「平滑」）：先 blur 掉锯齿状的小凹凸，后面净化步骤会把边缘重新收紧
         const smooth = opts.smooth === undefined ? (S.smooth || 0) : opts.smooth;
