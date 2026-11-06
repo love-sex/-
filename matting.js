@@ -2197,6 +2197,46 @@
         fgTimer = setTimeout(() => { buildFg(); render(); }, 140);
     };
 
+    // 自动 alpha 色阶（除雾）：模型在白雾、反光、同色系图上常给出大片 0.05~0.5 的
+    // 低置信输出，显示出来就是一层洗不掉的雾（贴到深色底上尤其明显）。
+    // 这里先统计非零 alpha 的分布：低带（雾）占比显著且存在主体带时，用 Otsu 找
+    // 雾/主体分界做 smoothstep 重映射 —— 雾归零、主体拉实、边缘保留过渡。
+    // 分布健康（如白底商品图 p10≈190）时一行都不改，保护真半透明边缘。
+    const autoLevels = (m, n) => {
+        let lo = 0, hi = 0, total = 0;
+        for (let j = 0; j < n; j++) {
+            const v = m[j];
+            if (v <= 0.004) continue;
+            total++;
+            if (v < 0.25) lo++;
+            else if (v > 0.5) hi++;
+        }
+        // 雾占非零像素 1/4 以上、且实心主体确实存在，才值得动手
+        if (total < n * 0.002 || lo < total * 0.25 || hi < total * 0.1) return 0;
+        const hist = new Float64Array(256);
+        for (let j = 0; j < n; j++) { const v = m[j]; if (v > 0.004 && v < 0.996) hist[Math.round(v * 255)]++; }
+        let sum = 0; for (let i = 0; i < 256; i++) sum += i * hist[i];
+        let sumB = 0, wB = 0, best = 0, thr = -1;
+        for (let i = 0; i < 256; i++) {
+            wB += hist[i]; if (!wB) continue;
+            const wF = total - wB; if (wF <= 0) break;
+            sumB += i * hist[i];
+            const mB = sumB / wB, mF = (sum - sumB) / wF;
+            const between = wB * wF * (mB - mF) * (mB - mF);
+            if (between > best) { best = between; thr = i; }
+        }
+        if (thr < 77 || thr > 191) return 0;     // 分界不在 0.3~0.75 之间说明这不是雾形分布
+        const t = thr / 255, half = 0.22;
+        const a = Math.max(0.01, t - half), b = Math.min(0.99, t + half);
+        let touched = 0;
+        for (let j = 0; j < n; j++) {
+            const v = (m[j] - a) / (b - a);
+            const nv = v < 0 ? 0 : v > 1 ? 1 : v * v * (3 - 2 * v);
+            if (nv !== m[j]) { m[j] = nv; touched++; }
+        }
+        return touched;
+    };
+
     const postProcess = (opts) => {
         const w = S.w, h = S.h, n = w * h;
         // 蒙版以 alpha 通道存储（destination-in 只认 alpha，不认灰度）
@@ -2211,6 +2251,8 @@
         }
 
         if (opts.refine && S.rgb) m = guidedFilter(m, S.rgb.data, w, h, 3, 1e-4);
+        // 除雾在贴边滤波之前：先把低置信雾压掉，引导滤波再让边缘贴回图像轮廓
+        if (opts.levels !== false) S.levelsUsed = autoLevels(m, n) || 0;
         // 平滑（PS「平滑」）：先 blur 掉锯齿状的小凹凸，后面净化步骤会把边缘重新收紧
         const smooth = opts.smooth === undefined ? (S.smooth || 0) : opts.smooth;
         if (smooth > 0) m = boxBlurGray(m, w, h, Math.round(smooth) + 1, 2);
