@@ -79,7 +79,7 @@
       <span style="font-size:12px;">掌纹清晰 · 光线充足 · 五指自然张开</span>
     </div>
     <img id="preview" alt="手掌照片预览">
-    <input type="file" id="file" accept="image/*" style="display:none">
+    <input type="file" id="file" accept="image/*" style="position:fixed;left:-9999px;top:0;opacity:0;width:1px;height:1px;">
     <div class="field">
       <label>想问什么（可不填）</label>
       <input type="text" id="question" maxlength="60" placeholder="例如：今年财运怎么样">
@@ -111,26 +111,59 @@
   var imageData = '';
 
   drop.onclick = function () { file.click(); };
-  file.onchange = function () {
-    if (!file.files || !file.files[0]) return;
-    var f = file.files[0];
-    if (!/^image\//.test(f.type)) { alert('请选择照片文件'); return; }
+
+  function showPicked(dataUrl) {
+    imageData = dataUrl;
+    preview.src = dataUrl;
+    preview.style.display = 'block';
+    drop.style.display = 'none';
+  }
+
+  // 压缩失败（HEIC 等特殊格式）或超大图 → 直接读原图；再不行给明确提示
+  function fallbackRaw(f) {
+    if (f.size > 8 * 1024 * 1024) {
+      alert('这张照片无法处理（可能是手机的特殊格式）。请在相册里截图后重新选择，或改用 JPG 照片。');
+      return;
+    }
+    var r = new FileReader();
+    r.onload = function () { showPicked(r.result); };
+    r.onerror = function () { alert('照片读取失败，请换一张试试。'); };
+    r.readAsDataURL(f);
+  }
+
+  function handleFile(f) {
+    if (!f) return;
+    if (f.type && !/^image\//.test(f.type)) { alert('请选择照片文件'); return; }
     var img = new Image();
     img.onload = function () {
-      // 压到最长边 1280，控制体积
-      var max = 1280, w = img.width, h = img.height;
-      var scale = Math.min(1, max / Math.max(w, h));
-      var canvas = document.createElement('canvas');
-      canvas.width = Math.round(w * scale);
-      canvas.height = Math.round(h * scale);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      imageData = canvas.toDataURL('image/jpeg', 0.85);
-      preview.src = imageData;
-      preview.style.display = 'block';
-      drop.style.display = 'none';
+      try {
+        // 压到最长边 1280，控制体积
+        var max = 1280, w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+        if (!w || !h) { fallbackRaw(f); return; }
+        var scale = Math.min(1, max / Math.max(w, h));
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.round(w * scale);
+        canvas.height = Math.round(h * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        var data = canvas.toDataURL('image/jpeg', 0.85);
+        if (!data || data.length < 100) { fallbackRaw(f); return; }
+        showPicked(data);
+      } catch (e) { fallbackRaw(f); }
+    };
+    img.onerror = function () {
+      // iPhone HEIC 等浏览器解不出的格式
+      fallbackRaw(f);
     };
     img.src = URL.createObjectURL(f);
+  }
+
+  file.onchange = function () {
+    if (!file.files || !file.files[0]) return;
+    handleFile(file.files[0]);
   };
+
+  // 兜底：部分手机浏览器 change 事件异常，轮询一次 input 的值
+  file.addEventListener('click', function () { this.value = ''; });
 
   // 轻量 Markdown 渲染
   function md(text) {
