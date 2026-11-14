@@ -311,6 +311,11 @@ body {
   box-shadow: var(--shadow);
 }
 .module-card:active { transform: scale(0.97); }
+/* <a> 形式的模块卡（外链子应用）与 <button> 卡片视觉统一 */
+a.module-card { text-decoration: none; color: inherit; display: block; }
+a.module-card:hover { text-decoration: none; }
+a.module-card .module-name, a.module-card .module-stat { color: inherit; }
+a.module-card .module-stat { color: var(--text-secondary); }
 .module-icon { font-size: 28px; margin-bottom: 6px; }
 .module-name { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
 .module-stat { font-size: 11px; color: var(--text-secondary); }
