@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>掌中有话 · 手相指南</title>
+<meta name="description" content="上传手掌照片，AI 依据开源手相断语库生成娱乐向手相指南：签运、六项指数、流年流月、人生阶段、逐条掌纹解读。">
+<style>
+  :root {
+    --bg: #faf6ef; --surface: #fffdf8; --line: #e8ddc8;
+    --text: #3d3222; --muted: #8a7d63; --gold: #b8922a; --gold-2: #d4a948;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    min-height: 100vh; line-height: 1.7;
+  }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 24px 16px 60px; }
+  header { text-align: center; padding: 18px 0 6px; }
+  header .back { font-size: 13px; color: var(--muted); text-decoration: none; display: inline-block; margin-bottom: 14px; }
+  header h1 { font-size: 22px; letter-spacing: 0.15em; color: var(--gold); font-weight: 700; }
+  header p { font-size: 12px; color: var(--muted); letter-spacing: 0.3em; margin-top: 6px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+    padding: 20px; margin-top: 16px; box-shadow: 0 2px 10px rgba(120,90,30,0.06);
+  }
+  .drop {
+    border: 2px dashed var(--gold-2); border-radius: 14px; padding: 28px 16px;
+    text-align: center; cursor: pointer; color: var(--muted); font-size: 14px;
+    transition: background .2s;
+  }
+  .drop:hover { background: #fff9ec; }
+  .drop b { color: var(--gold); }
+  #preview { display: none; max-width: 100%; max-height: 300px; margin: 12px auto 0; display: block; border-radius: 12px; }
+  .field { margin-top: 14px; }
+  .field label { font-size: 12px; color: var(--muted); letter-spacing: 0.1em; display: block; margin-bottom: 6px; }
+  .field input {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+    font-size: 14px; background: #fff; color: var(--text); outline: none;
+  }
+  .field input:focus { border-color: var(--gold-2); }
+  #goBtn {
+    width: 100%; margin-top: 18px; padding: 13px; border: none; border-radius: 12px;
+    background: linear-gradient(135deg, #d4a948, #b8922a); color: #fff; font-size: 15px;
+    font-weight: 600; letter-spacing: 0.2em; cursor: pointer;
+  }
+  #goBtn:disabled { opacity: 0.5; cursor: wait; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 10px; text-align: center; }
+  #status { text-align: center; color: var(--gold); font-size: 13px; margin-top: 14px; display: none; }
+  #report { display: none; }
+  #report h1, #report h2 {
+    font-size: 17px; color: var(--gold); letter-spacing: 0.08em;
+    border-bottom: 1px solid var(--line); padding-bottom: 8px; margin: 26px 0 12px;
+  }
+  #report h3 { font-size: 15px; margin: 18px 0 8px; }
+  #report p { margin: 8px 0; font-size: 14px; }
+  #report ul { margin: 8px 0 8px 20px; font-size: 14px; }
+  #report li { margin: 4px 0; }
+  #report hr { border: none; border-top: 1px dashed var(--line); margin: 22px 0; }
+  #report em { color: var(--muted); font-style: normal; font-size: 12px; }
+  #report strong { color: #8a6414; }
+  footer { text-align: center; font-size: 11px; color: var(--muted); margin-top: 36px; line-height: 1.8; }
+  footer a { color: var(--gold); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="/">← 返回工作台</a>
+    <h1>掌中有话</h1>
+    <p>手 相 指 南 · 娱 乐 向</p>
+  </header>
+
+  <div class="card" id="inputCard">
+    <div class="drop" id="drop">
+      <div style="font-size:30px; margin-bottom:6px;">✋</div>
+      点击拍摄或选择手掌照片<br>
+      <span style="font-size:12px;">掌纹清晰 · 光线充足 · 五指自然张开</span>
+    </div>
+    <img id="preview" alt="手掌照片预览">
+    <input type="file" id="file" accept="image/*" style="display:none">
+    <div class="field">
+      <label>想问什么（可不填）</label>
+      <input type="text" id="question" maxlength="60" placeholder="例如：今年财运怎么样">
+    </div>
+    <button id="goBtn">开始解读</button>
+    <div class="hint">照片仅用于本次生成，不做存储</div>
+    <div id="status">正在看掌纹…（约需 1-2 分钟）</div>
+  </div>
+
+  <div class="card" id="report"></div>
+
+  <footer>
+    方法与断语来自开源项目 <a href="https://github.com/dososo/blcaptain-shouxiang" target="_blank" rel="noopener">dososo/blcaptain-shouxiang</a>（Apache-2.0）<br>
+    娱乐项目 · 不构成医疗或投资建议 · 身体不适请就医
+  </footer>
+</div>
+
+<script>
+(function () {
+  var WORKER = 'https://ziwei-ai.oywt13819783283.workers.dev';
+  var drop = document.getElementById('drop');
+  var file = document.getElementById('file');
+  var preview = document.getElementById('preview');
+  var question = document.getElementById('question');
+  var goBtn = document.getElementById('goBtn');
+  var statusEl = document.getElementById('status');
+  var report = document.getElementById('report');
+  var imageData = '';
+
+  drop.onclick = function () { file.click(); };
+  file.onchange = function () {
+    if (!file.files || !file.files[0]) return;
+    var f = file.files[0];
+    if (!/^image\//.test(f.type)) { alert('请选择照片文件'); return; }
+    var img = new Image();
+    img.onload = function () {
+      // 压到最长边 1280，控制体积
+      var max = 1280, w = img.width, h = img.height;
+      var scale = Math.min(1, max / Math.max(w, h));
+      var canvas = document.createElement('canvas');
+      canvas.width = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      imageData = canvas.toDataURL('image/jpeg', 0.85);
+      preview.src = imageData;
+      preview.style.display = 'block';
+      drop.style.display = 'none';
+    };
+    img.src = URL.createObjectURL(f);
+  };
+
+  // 轻量 Markdown 渲染
+  function md(text) {
+    var html = text
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    html = html.replace(/^### (.*)$/gm, '<h3>$1</h3>')
+               .replace(/^## (.*)$/gm, '<h2>$1</h2>')
+               .replace(/^# (.*)$/gm, '<h2>$1</h2>')
+               .replace(/^---+$/gm, '<hr>')
+               .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+               .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
+               .replace(/^- (.*)$/gm, '<li>$1</li>')
+               .replace(/(<li>[\s\S]*?<\/li>)(?!\s*<li>)/g, '<ul>$1</ul>')
+               .replace(/\n{2,}/g, '<br><br>')
+               .replace(/\n/g, '<br>');
+    return html.replace(/<br><br><(h2|h3|ul|hr)/g, '<$1');
+  }
+
+  goBtn.onclick = function () {
+    if (!imageData) { alert('请先拍摄或选择手掌照片'); return; }
+    goBtn.disabled = true;
+    statusEl.style.display = 'block';
+    report.style.display = 'none';
+    report.innerHTML = '';
+
+    fetch(WORKER + '/api/palm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: imageData, question: question.value.trim() }),
+    }).then(function (res) {
+      if (!res.ok || !res.body) throw new Error('http ' + res.status);
+      var reader = res.body.getReader();
+      var decoder = new TextDecoder();
+      var text = '', pending = '';
+      report.style.display = 'block';
+
+      function flush() { report.innerHTML = md(text) + '<span style="opacity:.4">▌</span>'; }
+
+      function pump() {
+        return reader.read().then(function (r) {
+          if (r.done) {
+            report.innerHTML = md(text);
+            goBtn.disabled = false;
+            statusEl.style.display = 'none';
+            return;
+          }
+          pending += decoder.decode(r.value, { stream: true });
+          var lines = pending.split('\n');
+          pending = lines.pop() || '';
+          for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].replace(/\r$/, '');
+            if (line.indexOf('data: ') !== 0) continue;
+            var data = line.slice(6);
+            if (data === '[DONE]') continue;
+            try {
+              text += JSON.parse(data).delta.text || '';
+              flush();
+            } catch (e) { /* 忽略 */ }
+          }
+          return pump();
+        });
+      }
+      return pump();
+    }).catch(function (e) {
+      statusEl.style.display = 'none';
+      goBtn.disabled = false;
+      report.style.display = 'block';
+      report.innerHTML = '<p>解读失败（' + (e.message || '网络错误') + '），请稍后重试。</p>';
+    });
+  };
+})();
+</script>
+</body>
+</html>
