@@ -1,0 +1,562 @@
+{
+ "date": "2026-11-15",
+ "generatedAt": "2026-11-15 17:14",
+ "count": 30,
+ "items": [
+  {
+   "rank": 1,
+   "name": "microsoft/vscode",
+   "url": "https://github.com/microsoft/vscode",
+   "descEn": "Visual Studio Code",
+   "stars": 195407,
+   "forks": 43849,
+   "language": "TypeScript",
+   "langCN": "TypeScript",
+   "topics": [
+    "editor",
+    "electron",
+    "microsoft",
+    "typescript"
+   ],
+   "industry": "开发工具",
+   "avatar": "https://github.com/microsoft.png?size=64",
+   "desc": "Visual Studio Code"
+  },
+  {
+   "rank": 2,
+   "name": "anthropics/skills",
+   "url": "https://github.com/anthropics/skills",
+   "descEn": "Public repository for Agent Skills",
+   "stars": 194847,
+   "forks": 22920,
+   "language": "Python",
+   "langCN": "Python",
+   "topics": [
+    "agent-skills"
+   ],
+   "industry": "AI · 大模型",
+   "avatar": "https://github.com/anthropics.png?size=64",
+   "desc": "Public repository for Agent Skills"
+  },
+  {
+   "rank": 3,
+   "name": "avelino/awesome-go",
+   "url": "https://github.com/avelino/awesome-go",
+   "descEn": "A curated list of awesome Go frameworks, libraries and software",
+   "stars": 193999,
+   "forks": 13747,
+   "language": "Go",
+   "langCN": "Go",
+   "topics": [
+    "awesome",
+    "awesome-list",
+    "go",
+    "golang"
+   ],
+   "industry": "开发工具",
+   "avatar": "https://github.com/avelino.png?size=64",
+   "desc": "A curated list of awesome Go frameworks, libraries and software"
+  },
+  {
+   "rank": 4,
+   "name": "Significant-Gravitas/AutoGPT",
+   "url": "https://github.com/Significant-Gravitas/AutoGPT",
+   "descEn": "AutoGPT is the vision of accessible AI for everyone, to use and to build on. Our mission is to provide the tools, so that you can focus on what matters.",
+   "stars": 188031,
+   "forks": 45862,
+   "language": "Python",
+   "langCN": "Python",
+   "topics": [
+    "agentic-ai",
+    "agents",
+    "ai",
+    "artificial-intelligence"
+   ],
+   "industry": "AI · 大模型",
+   "avatar": "https://github.com/Significant-Gravitas.png?size=64",
+   "desc": "AutoGPT is the vision of accessible AI for everyone, to use and to build on. Our mission is to provide the tools, so that you can focus on what matters."
+  },
+  {
+   "rank": 5,
+   "name": "ollama/ollama",
+   "url": "https://github.com/ollama/ollama",
+   "descEn": "Get up and running with Kimi, GLM, MiniMax, DeepSeek, gpt-oss, Qwen, Gemma and other models.",
+   "stars": 187009,
+   "forks": 19091,
+   "language": "Go",
+   "langCN": "Go",
+   "topics": [
+    "deepseek",
+    "gemma",
+    "glm",
+    "go"
+   ],
+   "industry": "AI · 大模型",
+   "avatar": "https://github.com/ollama.png?size=64",
+   "desc": "Get up and running with Kimi, GLM, MiniMax, DeepSeek, gpt-oss, Qwen, Gemma and other models."
+  },
+  {
+   "rank": 6,
+   "name": "CyC2018/CS-Notes",
+   "url": "https://github.com/CyC2018/CS-Notes",
+   "descEn": ":books: 技术面试必备基础知识、Leetcode、计算机操作系统、计算机网络、系统设计",
+   "stars": 186513,
+   "forks": 50631,
+   "language": "JavaScript",
+   "langCN": "JavaScript",
+   "topics": [
+    "algorithm",
+    "computer-science",
+    "cpp",
+    "interview"
+   ],
+   "industry": "学习 · 资源",
+   "avatar": "https://github.com/CyC2018.png?size=64",
+   "desc": ":books: 技术面试必备基础知识、Leetcode、计算机操作系统、计算机网络、系统设计"
+  },
+  {
+   "rank": 7,
+   "name": "flutter/flutter",
+   "url": "https://github.com/flutter/flutter",
+   "descEn": "Flutter makes it easy and fast to build beautiful apps for mobile and beyond",
+   "stars": 181278,
+   "forks": 32167,
+   "language": "Dart",
+   "langCN": "Dart",
+   "topics": [
+    "android",
+    "app-framework",
+    "cross-platform",
+    "dart"
+   ],
+   "industry": "开发工具",
+   "avatar": "https://github.com/flutter.png?size=64",
+   "desc": "Flutter makes it easy and fast to build beautiful apps for mobile and beyond"
+  },
+  {
+   "rank": 8,
+   "name": "f/prompts.chat",
+   "url": "https://github.com/f/prompts.chat",
+   "descEn": "f.k.a. Awesome ChatGPT Prompts. Share, discover, and collect prompts from the community. Free and open source — self-host for your organization with complete privacy.",
+   "stars": 177450,
+   "forks": 22619,
+   "language": "MDX",
+   "langCN": "MDX",
+   "topics": [
+    "ai",
+    "artificial-intelligence",
+    "awesome-list",
+    "chatgpt"
+   ],
+   "industry": "AI · 大模型",
+   "avatar": "https://github.com/f.png?size=64",
+   "desc": "f.k.a. Awesome ChatGPT Prompts. Share, discover, and collect prompts from the community. Free and open source — self-host for your organization with complete privacy."
+  },
+  {
+   "rank": 9,
+   "name": "github/gitignore",
+   "url": "https://github.com/github/gitignore",
+   "descEn": "A collection of useful .gitignore templates",
+   "stars": 176339,
+   "forks": 82015,
+   "language": "",
+   "langCN": "",
+   "topics": [
+    "git",
+    "gitignore"
+   ],
+   "industry": "开发工具",
+   "avatar": "https://github.com/github.png?size=64",
+   "desc": "A collection of useful .gitignore templates"
+  },
+  {
+   "rank": 10,
+   "name": "twbs/bootstrap",
+   "url": "https://github.com/twbs/bootstrap",
+   "descEn": "The most popular HTML, CSS, and JavaScript framework for developing responsive, mobile first projects on the web.",
+   "stars": 175062,
+   "forks": 79372,
+   "language": "MDX",
+   "langCN": "MDX",
+   "topics": [
+    "bootstrap",
+    "css",
+    "css-framework",
+    "html"
+   ],
+   "industry": "开发工具",
+   "avatar": "https://github.com/twbs.png?size=64",
+   "desc": "The most popular HTML, CSS, and JavaScript framework for developing responsive, mobile first projects on the web."
+  },
+  {
+   "rank": 11,
+   "name": "huggingface/transformers",
+   "url": "https://github.com/huggingface/transformers",
+   "descEn": "🤗 Transformers: the model-definition framework for state-of-the-art machine learning models in text, vision, audio, and multimodal models, for both inference and training.",
+   "stars": 168997,
+   "forks": 35217,
+   "language": "Python",
+   "langCN": "Python",
+   "topics": [
+    "audio",
+    "deep-learning",
+    "deepseek",
+    "gemma"
+   ],
+   "industry": "AI · 大模型",
+   "avatar": "https://github.com/huggingface.png?size=64",
+   "desc": "🤗 Transformers: the model-definition framework for state-of-the-art machine learning models in text, vision, audio, and multimodal models, for both inference and training."
+  },
+  {
+   "rank": 12,
+   "name": "langgenius/dify",
+   "url": "https://github.com/langgenius/dify",
+   "descEn": "Build Agentic workflows, RAG pipelines, with rich AI model and tool support on one collaborative workspace. Deploy on cloud, VPC, or self-hosted, so teams move from prototype to production without reb",
+   "stars": 161182,
+   "forks": 25505,
+   "language": "Python",
+   "langCN": "Python",
+   "topics": [
+    "agent",
+    "agentic-ai",
+    "agentic-framework",
+    "agentic-workflow"
+   ],
+   "industry": "AI · 大模型",
+   "avatar": "https://github.com/langgenius.png?size=64",
+   "desc": "Build Agentic workflows, RAG pipelines, with rich AI model and tool support on one collaborative workspace. Deploy on cloud, VPC, or self-hosted, so teams move from prototype to production without reb"
+  },
+  {
+   "rank": 13,
+   "name": "open-webui/open-webui",
+   "url": "https://github.com/open-webui/open-webui",
+   "descEn": "User-friendly AI Interface (Supports Ollama, OpenAI API, ...)",
+   "stars": 158685,
+   "forks": 23076,
+   "language": "Svelte",
+   "langCN": "Svelte",
+   "topics": [
+    "ai",
+    "llm",
+    "llm-ui",
+    "llm-webui"
+   ],
+   "industry": "AI · 大模型",
+   "avatar": "https://github.com/open-webui.png?size=64",
+   "desc": "User-friendly AI Interface (Supports Ollama, OpenAI API, ...)"
+  },
+  {
+   "rank": 14,
+   "name": "clash-verge-rev/clash-verge-rev",
+   "url": "https://github.com/clash-verge-rev/clash-verge-rev",
+   "descEn": "A modern GUI client based on Tauri, designed to run in Windows, macOS and Linux for tailored proxy experience",
+   "stars": 158512,
+   "forks": 11410,
+   "language": "Rust",
+   "langCN": "Rust",
+   "topics": [
+    "clash",
+    "clash-meta",
+    "clash-verge",
+    "linux"
+   ],
+   "industry": "AI · 大模型",
+   "avatar": "https://github.com/clash-verge-rev.png?size=64",
+   "desc": "A modern GUI client based on Tauri, designed to run in Windows, macOS and Linux for tailored proxy experience"
+  },
+  {
+   "rank": 15,
+   "name": "langflow-ai/langflow",
+   "url": "https://github.com/langflow-ai/langflow",
+   "descEn": "Langflow is a powerful tool for building and deploying AI-powered agents and workflows.",
+   "stars": 156657,
+   "forks": 10412,
+   "language": "Python",
+   "langCN": "Python",
+   "topics": [
+    "agents",
+    "chatgpt",
+    "generative-ai",
+    "large-language-models"
+   ],
+   "industry": "AI · 大模型",
+   "avatar": "https://github.com/langflow-ai.png?size=64",
+   "desc": "Langflow is a powerful tool for building and deploying AI-powered agents and workflows."
+  },
+  {
+   "rank": 16,
+   "name": "anthropics/claude-code",
+   "url": "https://github.com/anthropics/claude-code",
+   "descEn": "Claude Code is an agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster by executing routine tasks, explaining complex code, and handling git workflows ",
+   "stars": 155723,
+   "forks": 25002,
+   "language": "TypeScript",
+   "langCN": "TypeScript",
+   "topics": [],
+   "industry": "AI · 大模型",
+   "avatar": "https://github.com/anthropics.png?size=64",
+   "desc": "Claude Code is an agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster by executing routine tasks, explaining complex code, and handling git workflows "
+  },
+  {
+   "rank": 17,
+   "name": "Genymobile/scrcpy",
+   "url": "https://github.com/Genymobile/scrcpy",
+   "descEn": "Display and control your Android device",
+   "stars": 154865,
+   "forks": 14221,
+   "language": "C",
+   "langCN": "C",
+   "topics": [
+    "android",
+    "c",
+    "ffmpeg",
+    "genyteam-system"
+   ],
+   "industry": "前端 · 移动",
+   "avatar": "https://github.com/Genymobile.png?size=64",
+   "desc": "Display and control your Android device"
+  },
+  {
+   "rank": 18,
+   "name": "farion1231/cc-switch",
+   "url": "https://github.com/farion1231/cc-switch",
+   "descEn": "A cross-platform desktop All-in-One assistant for Claude Code, Codex, OpenCode,DeepSeek Harness and more. Only official website: ccswitch.io",
+   "stars": 154521,
+   "forks": 10128,
+   "language": "Rust",
+   "langCN": "Rust",
+   "topics": [
+    "ai-tools",
+    "claude-code",
+    "codex",
+    "deepseek-harness"
+   ],
+   "industry": "AI · 大模型",
+   "avatar": "https://github.com/farion1231.png?size=64",
+   "desc": "A cross-platform desktop All-in-One assistant for Claude Code, Codex, OpenCode,DeepSeek Harness and more. Only official website: ccswitch.io"
+  },
+  {
+   "rank": 19,
+   "name": "nextlevelbuilder/ui-ux-pro-max-skill",
+   "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
+   "descEn": "An AI skill that provides design intelligence for building professional UI/UX across multiple platforms.",
+   "stars": 149660,
+   "forks": 15828,
+   "language": "Python",
+   "langCN": "Python",
+   "topics": [
+    "ai-skills",
+    "antigravity",
+    "claude",
+    "claude-code"
+   ],
+   "industry": "AI · 大模型",
+   "avatar": "https://github.com/nextlevelbuilder.png?size=64",
+   "desc": "An AI skill that provides design intelligence for building professional UI/UX across multiple platforms."
+  },
+  {
+   "rank": 20,
+   "name": "langchain-ai/langchain",
+   "url": "https://github.com/langchain-ai/langchain",
+   "descEn": "The agent engineering platform.",
+   "stars": 149537,
+   "forks": 25134,
+   "language": "Python",
+   "langCN": "Python",
+   "topics": [
+    "agents",
+    "ai",
+    "ai-agents",
+    "anthropic"
+   ],
+   "industry": "AI · 大模型",
+   "avatar": "https://github.com/langchain-ai.png?size=64",
+   "desc": "The agent engineering platform."
+  },
+  {
+   "rank": 21,
+   "name": "Graphify-Labs/graphify",
+   "url": "https://github.com/Graphify-Labs/graphify",
+   "descEn": "Turn any codebase, with its docs, SQL schemas, configs, and PDFs, into a queryable knowledge graph. A /graphify skill for Claude Code, Cursor, Codex, and Gemini CLI: local deterministic AST parsing, e",
+   "stars": 147983,
+   "forks": 14194,
+   "language": "Python",
+   "langCN": "Python",
+   "topics": [
+    "ai-agents",
+    "antigravity",
+    "ast",
+    "claude-code"
+   ],
+   "industry": "AI · 大模型",
+   "avatar": "https://github.com/Graphify-Labs.png?size=64",
+   "desc": "Turn any codebase, with its docs, SQL schemas, configs, and PDFs, into a queryable knowledge graph. A /graphify skill for Claude Code, Cursor, Codex, and Gemini CLI: local deterministic AST parsing, e"
+  },
+  {
+   "rank": 22,
+   "name": "Comfy-Org/ComfyUI",
+   "url": "https://github.com/Comfy-Org/ComfyUI",
+   "descEn": "The most powerful and modular diffusion model GUI, api and backend with a graph/nodes interface. The fastest local inference engine in the world.",
+   "stars": 146911,
+   "forks": 17519,
+   "language": "Python",
+   "langCN": "Python",
+   "topics": [
+    "ai",
+    "comfy",
+    "comfyui",
+    "python"
+   ],
+   "industry": "AI · 大模型",
+   "avatar": "https://github.com/Comfy-Org.png?size=64",
+   "desc": "The most powerful and modular diffusion model GUI, api and backend with a graph/nodes interface. The fastest local inference engine in the world."
+  },
+  {
+   "rank": 23,
+   "name": "Shubhamsaboo/awesome-llm-apps",
+   "url": "https://github.com/Shubhamsaboo/awesome-llm-apps",
+   "descEn": "100+ AI Agents, Agent Skills and RAG Apps - Free and Open Source.",
+   "stars": 144669,
+   "forks": 21293,
+   "language": "Python",
+   "langCN": "Python",
+   "topics": [
+    "agents",
+    "llms",
+    "python",
+    "rag"
+   ],
+   "industry": "AI · 大模型",
+   "avatar": "https://github.com/Shubhamsaboo.png?size=64",
+   "desc": "100+ AI Agents, Agent Skills and RAG Apps - Free and Open Source."
+  },
+  {
+   "rank": 24,
+   "name": "iptv-org/iptv",
+   "url": "https://github.com/iptv-org/iptv",
+   "descEn": "Collection of publicly available IPTV channels from all over the world",
+   "stars": 144062,
+   "forks": 8600,
+   "language": "TypeScript",
+   "langCN": "TypeScript",
+   "topics": [
+    "iptv",
+    "m3u",
+    "playlist",
+    "streams"
+   ],
+   "industry": "AI · 大模型",
+   "avatar": "https://github.com/iptv-org.png?size=64",
+   "desc": "Collection of publicly available IPTV channels from all over the world"
+  },
+  {
+   "rank": 25,
+   "name": "vercel/next.js",
+   "url": "https://github.com/vercel/next.js",
+   "descEn": "The React Framework",
+   "stars": 143526,
+   "forks": 32804,
+   "language": "JavaScript",
+   "langCN": "JavaScript",
+   "topics": [
+    "blog",
+    "browser",
+    "compiler",
+    "components"
+   ],
+   "industry": "开发工具",
+   "avatar": "https://github.com/vercel.png?size=64",
+   "desc": "The React Framework"
+  },
+  {
+   "rank": 26,
+   "name": "garrytan/gstack",
+   "url": "https://github.com/garrytan/gstack",
+   "descEn": "Use Garry Tan's exact Claude Code setup: 23 opinionated tools that serve as CEO, Designer, Eng Manager, Release Manager, Doc Engineer, and QA",
+   "stars": 141607,
+   "forks": 20917,
+   "language": "TypeScript",
+   "langCN": "TypeScript",
+   "topics": [],
+   "industry": "AI · 大模型",
+   "avatar": "https://github.com/garrytan.png?size=64",
+   "desc": "Use Garry Tan's exact Claude Code setup: 23 opinionated tools that serve as CEO, Designer, Eng Manager, Release Manager, Doc Engineer, and QA"
+  },
+  {
+   "rank": 27,
+   "name": "excalidraw/excalidraw",
+   "url": "https://github.com/excalidraw/excalidraw",
+   "descEn": "Virtual whiteboard for sketching hand-drawn like diagrams",
+   "stars": 135701,
+   "forks": 16174,
+   "language": "TypeScript",
+   "langCN": "TypeScript",
+   "topics": [
+    "canvas",
+    "collaboration",
+    "diagrams",
+    "drawing"
+   ],
+   "industry": "其他 · 综合",
+   "avatar": "https://github.com/excalidraw.png?size=64",
+   "desc": "Virtual whiteboard for sketching hand-drawn like diagrams"
+  },
+  {
+   "rank": 28,
+   "name": "Chalarangelo/30-seconds-of-code",
+   "url": "https://github.com/Chalarangelo/30-seconds-of-code",
+   "descEn": "Coding articles to level up your development skills",
+   "stars": 129519,
+   "forks": 12521,
+   "language": "JavaScript",
+   "langCN": "JavaScript",
+   "topics": [
+    "astro",
+    "awesome-list",
+    "css",
+    "education"
+   ],
+   "industry": "前端 · 移动",
+   "avatar": "https://github.com/Chalarangelo.png?size=64",
+   "desc": "Coding articles to level up your development skills"
+  },
+  {
+   "rank": 29,
+   "name": "stablyai/orca",
+   "url": "https://github.com/stablyai/orca",
+   "descEn": "Orca lets you run a fleet of coding agents (e.g. Claude Code, Codex) with your own subscription. Available on desktop, mobile and remote runtime.",
+   "stars": 125283,
+   "forks": 7946,
+   "language": "TypeScript",
+   "langCN": "TypeScript",
+   "topics": [
+    "agent-ide",
+    "ai-agents",
+    "automation",
+    "bot"
+   ],
+   "industry": "AI · 大模型",
+   "avatar": "https://github.com/stablyai.png?size=64",
+   "desc": "Orca lets you run a fleet of coding agents (e.g. Claude Code, Codex) with your own subscription. Available on desktop, mobile and remote runtime."
+  },
+  {
+   "rank": 30,
+   "name": "nodejs/node",
+   "url": "https://github.com/nodejs/node",
+   "descEn": "Node.js JavaScript runtime ✨🐢🚀✨",
+   "stars": 123739,
+   "forks": 38076,
+   "language": "JavaScript",
+   "langCN": "JavaScript",
+   "topics": [
+    "javascript",
+    "js",
+    "linux",
+    "macos"
+   ],
+   "industry": "开发工具",
+   "avatar": "https://github.com/nodejs.png?size=64",
+   "desc": "Node.js JavaScript runtime ✨🐢🚀✨"
+  }
+ ]
+}

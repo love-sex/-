@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitHub 每日热点 · 全中文排行</title>
+<style>
+:root {
+  --bg: #f6f2e9; --card: #fffdf7; --ink: #3c3325; --muted: #8a7f6a;
+  --gold: #b8922a; --gold-2: #d4a948; --line: #e8dfc9;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); min-height: 100vh;
+  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  padding: 28px 16px 60px;
+}
+.wrap { max-width: 860px; margin: 0 auto; }
+.back { display: inline-block; color: var(--muted); text-decoration: none; font-size: 14px; margin-bottom: 18px; }
+h1 { text-align: center; font-size: 26px; letter-spacing: .25em; color: #8a6d1f; margin-bottom: 6px; }
+.sub { text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 6px; }
+.meta { text-align: center; color: var(--muted); font-size: 12px; margin-bottom: 22px; }
+.meta b { color: var(--gold); }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 22px; }
+.tab {
+  padding: 6px 14px; border-radius: 999px; border: 1.5px solid var(--line);
+  background: var(--card); color: var(--muted); font-size: 13px; cursor: pointer; user-select: none;
+}
+.tab.on { background: linear-gradient(135deg, var(--gold-2), var(--gold)); color: #fff; border-color: transparent; }
+.repo {
+  display: flex; gap: 14px; background: var(--card); border: 1px solid var(--line);
+  border-radius: 14px; padding: 16px 18px; margin-bottom: 12px; text-decoration: none;
+  color: inherit; transition: transform .12s, box-shadow .12s;
+}
+.repo:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(140,110,40,.12); }
+.rank {
+  flex: 0 0 34px; text-align: center; font-size: 17px; font-weight: 800; color: var(--gold);
+  font-style: italic; padding-top: 2px;
+}
+.repo:nth-child(-n+3) .rank { color: #d4a017; font-size: 19px; }
+.avatar { width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--line); flex: 0 0 44px; }
+.body { flex: 1; min-width: 0; }
+.title { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.name { font-weight: 700; font-size: 16px; color: #2c2618; }
+.ind {
+  font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #f3ead2; color: #8a6d1f; white-space: nowrap;
+}
+.desc { font-size: 14px; line-height: 1.7; color: #5a5140; margin-top: 5px; }
+.meta2 { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); margin-top: 8px; align-items: center; }
+.lang-dot { width: 9px; height: 9px; border-radius: 50%; background: #c9b98a; display: inline-block; margin-right: 4px; vertical-align: -1px; }
+.topic { background: #f3ead2; border-radius: 6px; padding: 1px 6px; font-size: 11px; }
+.stars { color: #b8922a; font-weight: 700; }
+.foot { text-align: center; color: var(--muted); font-size: 12px; margin-top: 26px; line-height: 1.8; }
+.foot a { color: var(--gold); }
+#empty { text-align: center; color: var(--muted); padding: 60px 0; }
+@media (max-width: 560px) {
+  body { padding: 20px 12px 40px; }
+  h1 { font-size: 21px; }
+  .avatar { display: none; }
+  .repo { padding: 13px 14px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">← 返回工作台</a>
+  <h1>GitHub 每日热点</h1>
+  <div class="sub">全网高分开源项目 · 行业分类 · 全中文简介</div>
+  <div class="meta">数据日期 <b id="date">…</b> · 生成于 <span id="gen">…</span> · 每天早 7:30 自动更新</div>
+  <div class="tabs" id="tabs"></div>
+  <div id="list"></div>
+  <div id="empty">数据加载中，请稍候…</div>
+  <div class="foot">
+    数据来自 <a href="https://github.com/trending" target="_blank" rel="noopener">GitHub Search API</a>，按近 24 小时高分项目排序，简介由 AI 汉化<br>
+    点击卡片直达项目仓库 · 本页面由 GitHub Actions 每日自动更新
+  </div>
+</div>
+
+<script>
+(function () {
+  var data = null, cur = '全部';
+
+  function fmt(n) { return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n); }
+
+  function renderTabs() {
+    var counts = { '全部': data.items.length };
+    data.items.forEach(function (it) { counts[it.industry] = (counts[it.industry] || 0) + 1; });
+    var tabs = document.getElementById('tabs');
+    tabs.innerHTML = '';
+    Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; }).forEach(function (k) {
+      var el = document.createElement('span');
+      el.className = 'tab' + (k === cur ? ' on' : '');
+      el.textContent = k + ' ' + counts[k];
+      el.onclick = function () { cur = k; renderTabs(); renderList(); };
+      tabs.appendChild(el);
+    });
+  }
+
+  function renderList() {
+    var list = document.getElementById('list');
+    var items = cur === '全部' ? data.items : data.items.filter(function (it) { return it.industry === cur; });
+    list.innerHTML = items.map(function (it) {
+      var topics = (it.topics || []).map(function (t) { return '<span class="topic">' + t + '</span>'; }).join('');
+      var lang = it.langCN ? '<span><span class="lang-dot"></span>' + it.langCN + '</span>' : '';
+      var desc = it.desc || it.descEn || '（暂无简介）';
+      return '<a class="repo" href="' + it.url + '" target="_blank" rel="noopener">'
+        + '<div class="rank">' + it.rank + '</div>'
+        + '<img class="avatar" loading="lazy" src="' + it.avatar + '" alt="">'
+        + '<div class="body">'
+        +   '<div class="title"><span class="name">' + it.name + '</span><span class="ind">' + it.industry + '</span></div>'
+        +   '<div class="desc">' + desc.replace(/</g, '&lt;') + '</div>'
+        +   '<div class="meta2"><span class="stars">★ ' + fmt(it.stars) + '</span>'
+        +   '<span>⑂ ' + fmt(it.forks) + '</span>' + lang + topics + '</div>'
+        + '</div></a>';
+    }).join('');
+    document.getElementById('empty').style.display = items.length ? 'none' : 'block';
+  }
+
+  fetch('data.json?t=' + Date.now())
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (d) {
+      data = d;
+      document.getElementById('date').textContent = d.date;
+      document.getElementById('gen').textContent = d.generatedAt + '（北京时间）';
+      renderTabs(); renderList();
+    })
+    .catch(function () {
+      document.getElementById('empty').textContent = '数据加载失败，请刷新重试';
+    });
+})();
+</script>
+</body>
+</html>
