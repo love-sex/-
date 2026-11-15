@@ -25,7 +25,6 @@ jobs:
       - name: 抓取并汉化今日热门
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: python tools/trending_build.py trend/data.json
 
       - name: 提交数据（有变化才提交）

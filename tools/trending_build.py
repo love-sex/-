@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 GitHub 每日热门 → 全中文数据构建脚本
-抓取 GitHub 近 24h 高分项目 → 行业分类 → DeepSeek 汉化简介 → 写 trend/data.json
-仅用标准库；DEEPSEEK_API_KEY 缺失或失败时自动降级为英文简介（页面照常可用）。
+抓取 GitHub 近 24h 高分项目 → 行业分类 → 免费翻译（Google→MyMemory）→ 写 trend/data.json
+仅用标准库，无需任何 API 密钥；翻译源全部不可用时降级为英文简介。
 """
 import json
 import os
@@ -113,35 +113,59 @@ def gh_fetch(token):
     return pool[:LIMIT]
 
 
-def translate(items, key):
-    """批量汉化简介：一次调用翻译全部；返回 {full_name: 中文简介}"""
-    payload = [{"i": it["rank"], "t": f"{it['name']}: {it['descEn']}"} for it in items]
-    body = json.dumps({
-        "model": "deepseek-chat",
-        "temperature": 0.3,
-        "max_tokens": 4000,
-        "messages": [
-            {"role": "system", "content":
-                "你是科技资讯编辑。把每个 GitHub 项目的英文简介翻译成简洁生动的简体中文（15-40字），"
-                "专有名词保留英文（如 React、LLM）。只输出 JSON 数组：[{\"i\":序号,\"t\":\"中文简介\"}]，不要输出其他内容。"},
-            {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
-        ],
-    }, ensure_ascii=False).encode("utf-8")
-    req = urllib.request.Request(
-        "https://api.deepseek.com/chat/completions", data=body,
-        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=90) as resp:
-        text = json.loads(resp.read())["choices"][0]["message"]["content"]
-    text = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-    out = {}
-    for row in json.loads(text):
-        out[row["i"]] = str(row["t"]).strip()
-    return out
+def translate_google(text):
+    """Google 翻译非官方接口（免费无密钥；Actions 服务器在美国可达）"""
+    params = urllib.parse.urlencode({
+        "client": "gtx", "sl": "en", "tl": "zh-CN", "dt": "t", "q": text[:1500],
+    })
+    url = f"https://translate.googleapis.com/translate_a/single?{params}"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        data = json.loads(resp.read())
+    return "".join(seg[0] for seg in data[0] if seg and seg[0])
+
+
+def translate_mymemory(text):
+    """MyMemory 免费翻译 API（备用，无需密钥）"""
+    params = urllib.parse.urlencode({
+        "q": text[:480], "langpair": "en|zh-CN",
+    })
+    url = f"https://api.mymemory.translated.net/get?{params}"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        data = json.loads(resp.read())
+    t = (data.get("responseData") or {}).get("translatedText", "")
+    if "MYMEMORY WARNING" in t or "QUERY LENGTH LIMIT" in t.upper():
+        return ""
+    return t
+
+
+def translate_one(text):
+    """免费翻译链：Google → MyMemory → 原文"""
+    for fn in (translate_google, translate_mymemory):
+        try:
+            t = fn(text).strip()
+            if t:
+                return t
+        except Exception:
+            continue
+    return ""
+
+
+def translate_all(items):
+    """逐条汉化简介，返回成功条数"""
+    ok = 0
+    for it in items:
+        zh = translate_one(it["descEn"])
+        if zh:
+            it["desc"] = zh
+            ok += 1
+        time.sleep(0.3)
+    return ok
 
 
 def main():
     token = os.environ.get("GITHUB_TOKEN", "")
-    ds_key = os.environ.get("DEEPSEEK_API_KEY", "")
     out_path = sys.argv[1] if len(sys.argv) > 1 else "trend/data.json"
 
     print("[INFO] 抓取 GitHub 每日热门…", file=sys.stderr)
@@ -170,21 +194,12 @@ def main():
             "avatar": f"https://github.com/{r['full_name'].split('/')[0]}.png?size=64",
         })
 
-    if ds_key:
-        print("[INFO] DeepSeek 汉化简介…", file=sys.stderr)
-        try:
-            zh = translate(items, ds_key)
-            for it in items:
-                it["desc"] = zh.get(it["rank"]) or it["descEn"]
-            print(f"[INFO] 汉化完成 {len(zh)}/{len(items)}", file=sys.stderr)
-        except Exception as e:
-            print(f"[WARN] 汉化失败，降级英文简介: {e}", file=sys.stderr)
-            for it in items:
-                it["desc"] = it["descEn"]
+    print("[INFO] 免费汉化简介（Google → MyMemory 兜底）…", file=sys.stderr)
+    ok = translate_all(items)
+    if ok:
+        print(f"[INFO] 汉化完成 {ok}/{len(items)}", file=sys.stderr)
     else:
-        print("[WARN] 未设置 DEEPSEEK_API_KEY，简介保持英文", file=sys.stderr)
-        for it in items:
-            it["desc"] = it["descEn"]
+        print("[WARN] 全部翻译源不可用，简介保持英文", file=sys.stderr)
 
     data = {
         "date": now.strftime("%Y-%m-%d"),
