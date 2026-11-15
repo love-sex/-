@@ -21,6 +21,15 @@ h1 { text-align: center; font-size: 26px; letter-spacing: .25em; color: #8a6d1f;
 .sub { text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 6px; }
 .meta { text-align: center; color: var(--muted); font-size: 12px; margin-bottom: 22px; }
 .meta b { color: var(--gold); }
+.ptabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 16px; }
+.ptab {
+  padding: 9px 22px; border-radius: 12px; border: 1.5px solid var(--line);
+  background: var(--card); color: var(--muted); font-size: 15px; font-weight: 600; cursor: pointer; user-select: none;
+}
+.ptab.on {
+  background: linear-gradient(135deg, var(--gold-2), var(--gold)); color: #fff; border-color: transparent;
+  box-shadow: 0 4px 12px rgba(184,146,42,.3);
+}
 .tabs { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 22px; }
 .tab {
   padding: 6px 14px; border-radius: 999px; border: 1.5px solid var(--line);
@@ -64,30 +73,51 @@ h1 { text-align: center; font-size: 26px; letter-spacing: .25em; color: #8a6d1f;
 <body>
 <div class="wrap">
   <a class="back" href="/">← 返回工作台</a>
-  <h1>GitHub 每日热点</h1>
-  <div class="sub">全网高分开源项目 · 行业分类 · 全中文简介</div>
+  <h1>GitHub 热点排行</h1>
+  <div class="sub">全网高分开源项目 · 16 大行业分类 · 全中文简介</div>
   <div class="meta">数据日期 <b id="date">…</b> · 生成于 <span id="gen">…</span> · 每天早 7:30 自动更新</div>
+  <div class="ptabs" id="ptabs"></div>
   <div class="tabs" id="tabs"></div>
   <div id="list"></div>
   <div id="empty">数据加载中，请稍候…</div>
   <div class="foot">
-    数据来自 <a href="https://github.com/trending" target="_blank" rel="noopener">GitHub Search API</a>，按近 24 小时高分项目排序，简介由 AI 汉化<br>
+    数据来自 <a href="https://github.com/trending" target="_blank" rel="noopener">GitHub Search API</a>，按高分项目排序，简介由免费翻译源汉化<br>
     点击卡片直达项目仓库 · 本页面由 GitHub Actions 每日自动更新
   </div>
 </div>
 
 <script>
 (function () {
-  var data = null, cur = '全部';
+  var data = null, cur = '全部', period = 'daily';
+  var P_ORDER = [['daily', '🔥 今日'], ['weekly', '📊 本周'], ['monthly', '📈 本月']];
 
   function fmt(n) { return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n); }
+  function curData() { return (data.periods && data.periods[period]) || { items: [] }; }
+
+  function renderPeriods() {
+    var box = document.getElementById('ptabs');
+    box.innerHTML = '';
+    P_ORDER.forEach(function (p) {
+      if (!data.periods || !data.periods[p[0]]) return;
+      var el = document.createElement('span');
+      el.className = 'ptab' + (period === p[0] ? ' on' : '');
+      el.textContent = p[1];
+      el.onclick = function () { period = p[0]; cur = '全部'; renderPeriods(); renderTabs(); renderList(); };
+      box.appendChild(el);
+    });
+  }
 
   function renderTabs() {
-    var counts = { '全部': data.items.length };
-    data.items.forEach(function (it) { counts[it.industry] = (counts[it.industry] || 0) + 1; });
+    var items = curData().items;
+    var counts = { '全部': items.length };
+    items.forEach(function (it) { counts[it.industry] = (counts[it.industry] || 0) + 1; });
     var tabs = document.getElementById('tabs');
     tabs.innerHTML = '';
-    Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; }).forEach(function (k) {
+    Object.keys(counts).sort(function (a, b) {
+      if (a === '全部') return -1;
+      if (b === '全部') return 1;
+      return counts[b] - counts[a];
+    }).forEach(function (k) {
       var el = document.createElement('span');
       el.className = 'tab' + (k === cur ? ' on' : '');
       el.textContent = k + ' ' + counts[k];
@@ -98,7 +128,8 @@ h1 { text-align: center; font-size: 26px; letter-spacing: .25em; color: #8a6d1f;
 
   function renderList() {
     var list = document.getElementById('list');
-    var items = cur === '全部' ? data.items : data.items.filter(function (it) { return it.industry === cur; });
+    var all = curData().items;
+    var items = cur === '全部' ? all : all.filter(function (it) { return it.industry === cur; });
     list.innerHTML = items.map(function (it) {
       var topics = (it.topics || []).map(function (t) { return '<span class="topic">' + t + '</span>'; }).join('');
       var lang = it.langCN ? '<span><span class="lang-dot"></span>' + it.langCN + '</span>' : '';
@@ -122,7 +153,7 @@ h1 { text-align: center; font-size: 26px; letter-spacing: .25em; color: #8a6d1f;
       data = d;
       document.getElementById('date').textContent = d.date;
       document.getElementById('gen').textContent = d.generatedAt + '（北京时间）';
-      renderTabs(); renderList();
+      renderPeriods(); renderTabs(); renderList();
     })
     .catch(function () {
       document.getElementById('empty').textContent = '数据加载失败，请刷新重试';
