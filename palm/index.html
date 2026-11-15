@@ -46,6 +46,11 @@
     font-weight: 600; letter-spacing: 0.2em; cursor: pointer;
   }
   #goBtn:disabled { opacity: 0.5; cursor: wait; }
+  #saveBtn {
+    width: 100%; margin-top: 10px; padding: 12px; border: 1.5px solid var(--gold-2); border-radius: 12px;
+    background: transparent; color: var(--gold); font-size: 14px; font-weight: 600; letter-spacing: 0.2em; cursor: pointer;
+  }
+  #saveBtn:disabled { opacity: 0.5; }
   .hint { font-size: 12px; color: var(--muted); margin-top: 10px; text-align: center; }
   #status { text-align: center; color: var(--gold); font-size: 13px; margin-top: 14px; display: none; }
   #report { display: none; }
@@ -87,6 +92,7 @@
     <button id="goBtn">开始解读</button>
     <div class="hint">照片仅用于本次生成，不做存储</div>
     <div id="status">正在看掌纹…（约需 1-2 分钟）</div>
+    <button id="saveBtn" style="display:none">📷 保存报告为图片</button>
   </div>
 
   <div class="card" id="report"></div>
@@ -97,6 +103,7 @@
   </footer>
 </div>
 
+<script src="html2canvas.min.js"></script>
 <script>
 (function () {
   var WORKER = '/ziwei/api';
@@ -108,7 +115,49 @@
   var goBtn = document.getElementById('goBtn');
   var statusEl = document.getElementById('status');
   var report = document.getElementById('report');
+  var saveBtn = document.getElementById('saveBtn');
   var imageData = '';
+
+  // ─── 导出报告为 PNG ───
+  saveBtn.onclick = function () {
+    if (typeof html2canvas === 'undefined') { alert('导出组件还没加载好，请稍等或刷新页面重试'); return; }
+    var btn = saveBtn, t = btn.textContent;
+    btn.disabled = true; btn.textContent = '正在生成图片…';
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'position:fixed;left:-9999px;top:0;width:720px;background:#faf6ee;padding:30px 34px;';
+    var head = '<div style="text-align:center;font-size:22px;font-weight:700;color:#8a6d1f;letter-spacing:.3em;margin-bottom:4px;">掌中有话 · 手相指南</div>'
+      + '<div style="text-align:center;font-size:12px;color:#a89878;margin-bottom:20px;">生成于 ' + new Date().toLocaleDateString('zh-CN') + '</div>';
+    if (imageData) head = '<div style="text-align:center;margin-bottom:12px;"><img src="' + imageData + '" style="width:170px;border-radius:12px;border:2px solid #d4a948;"></div>' + head;
+    wrap.innerHTML = head;
+    var clone = report.cloneNode(true);
+    clone.style.display = 'block';
+    clone.style.padding = '0';
+    clone.style.border = 'none';
+    clone.style.background = 'transparent';
+    wrap.appendChild(clone);
+    var foot = document.createElement('div');
+    foot.style.cssText = 'margin-top:18px;text-align:center;font-size:11px;color:#a89878;';
+    foot.textContent = '图一乐，身体不适请就医 · 仅供娱乐参考';
+    wrap.appendChild(foot);
+    document.body.appendChild(wrap);
+    html2canvas(wrap, { scale: 2, backgroundColor: '#faf6ee' }).then(function (canvas) {
+      document.body.removeChild(wrap);
+      canvas.toBlob(function (blob) {
+        btn.disabled = false; btn.textContent = t;
+        if (!blob) { alert('图片生成失败，请重试'); return; }
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = '手相报告-' + new Date().toISOString().slice(0, 10) + '.png';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 8000);
+      }, 'image/png');
+    }).catch(function () {
+      if (wrap.parentNode) document.body.removeChild(wrap);
+      btn.disabled = false; btn.textContent = t;
+      alert('图片生成失败，请重试');
+    });
+  };
 
   drop.onclick = function () { file.click(); };
 
@@ -191,6 +240,7 @@
     if (!imageData) { alert('请先拍摄或选择手掌照片'); return; }
     goBtn.disabled = true;
     statusEl.style.display = 'block';
+    saveBtn.style.display = 'none';
     report.style.display = 'none';
     report.innerHTML = '';
 
@@ -220,6 +270,7 @@
             report.innerHTML = md(text);
             goBtn.disabled = false;
             statusEl.style.display = 'none';
+            saveBtn.style.display = 'block';
             return;
           }
           pending += decoder.decode(r.value, { stream: true });
