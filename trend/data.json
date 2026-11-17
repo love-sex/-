@@ -1,6 +1,6 @@
 {
- "date": "2026-11-16",
- "generatedAt": "2026-11-16 10:55",
+ "date": "2026-11-17",
+ "generatedAt": "2026-11-17 13:09",
  "periods": {
   "daily": {
    "label": "今日",
@@ -8,11 +8,27 @@
    "items": [
     {
      "rank": 1,
+     "name": "anthropics/skills",
+     "url": "https://github.com/anthropics/skills",
+     "descEn": "Public repository for Agent Skills",
+     "stars": 196180,
+     "forks": 23026,
+     "language": "Python",
+     "langCN": "Python",
+     "topics": [
+      "agent-skills"
+     ],
+     "industry": "其他 · 综合",
+     "avatar": "https://github.com/anthropics.png?size=64",
+     "desc": "客服代表技能的公共存储库"
+    },
+    {
+     "rank": 2,
      "name": "microsoft/vscode",
      "url": "https://github.com/microsoft/vscode",
      "descEn": "Visual Studio Code",
-     "stars": 195438,
-     "forks": 43858,
+     "stars": 195514,
+     "forks": 43860,
      "language": "TypeScript",
      "langCN": "TypeScript",
      "topics": [
@@ -26,12 +42,31 @@
      "desc": "Visual Studio Code"
     },
     {
-     "rank": 2,
+     "rank": 3,
+     "name": "avelino/awesome-go",
+     "url": "https://github.com/avelino/awesome-go",
+     "descEn": "A curated list of awesome Go frameworks, libraries and software",
+     "stars": 194317,
+     "forks": 13757,
+     "language": "Go",
+     "langCN": "Go",
+     "topics": [
+      "awesome",
+      "awesome-list",
+      "go",
+      "golang"
+     ],
+     "industry": "学习 · 资源",
+     "avatar": "https://github.com/avelino.png?size=64",
+     "desc": "精选的优秀 Go 框架、库和软件列表"
+    },
+    {
+     "rank": 4,
      "name": "ohmyzsh/ohmyzsh",
      "url": "https://github.com/ohmyzsh/ohmyzsh",
      "descEn": "🙃   A delightful community-driven (with 2,500+ contributors) framework for managing your zsh configuration. Includes 300+ optional plugins (rails, git, macOS, hub, docker, homebrew, node, php, python,",
-     "stars": 190655,
-     "forks": 27288,
+     "stars": 190637,
+     "forks": 27277,
      "language": "Shell",
      "langCN": "Shell",
      "topics": [
@@ -42,14 +77,14 @@
      ],
      "industry": "游戏",
      "avatar": "https://github.com/ohmyzsh.png?size=64",
-     "desc": "🙃   一个由社区驱动（拥有 2,500 多名贡献者）的优秀框架，用于管理您的 zsh 配置。包含 300 多个可选插件（rails、git、macOS、hub、docker、homebrew、node、php、python、"
+     "desc": "🙃   一个由社区驱动（拥有 2,500 多名贡献者）的绝佳框架，用于管理您的 zsh 配置。包含 300 多个可选插件（rails、git、macOS、hub、docker、homebrew、node、php、python、"
     },
     {
-     "rank": 3,
+     "rank": 5,
      "name": "Significant-Gravitas/AutoGPT",
      "url": "https://github.com/Significant-Gravitas/AutoGPT",
      "descEn": "AutoGPT is the vision of accessible AI for everyone, to use and to build on. Our mission is to provide the tools, so that you can focus on what matters.",
-     "stars": 188046,
+     "stars": 188068,
      "forks": 45857,
      "language": "Python",
      "langCN": "Python",
@@ -64,12 +99,12 @@
      "desc": "AutoGPT的愿景是让每个人都能使用和基于其进行构建的无障碍人工智能。我们的使命是提供工具，让您能够专注于重要的事情。"
     },
     {
-     "rank": 4,
+     "rank": 6,
      "name": "ollama/ollama",
      "url": "https://github.com/ollama/ollama",
      "descEn": "Get up and running with Kimi, GLM, MiniMax, DeepSeek, gpt-oss, Qwen, Gemma and other models.",
-     "stars": 187120,
-     "forks": 19110,
+     "stars": 187292,
+     "forks": 19116,
      "language": "Go",
      "langCN": "Go",
      "topics": [
@@ -83,12 +118,31 @@
      "desc": "使用 Kimi、GLM、MiniMax、DeepSeek、gpt-oss、Qwen、Gemma 和其他模型快速上手。"
     },
     {
-     "rank": 5,
+     "rank": 7,
+     "name": "flutter/flutter",
+     "url": "https://github.com/flutter/flutter",
+     "descEn": "Flutter makes it easy and fast to build beautiful apps for mobile and beyond",
+     "stars": 181273,
+     "forks": 32153,
+     "language": "Dart",
+     "langCN": "Dart",
+     "topics": [
+      "android",
+      "app-framework",
+      "cross-platform",
+      "dart"
+     ],
+     "industry": "移动端",
+     "avatar": "https://github.com/flutter.png?size=64",
+     "desc": "Flutter让您轻松快速地为移动设备及其他平台构建精美的应用程序"
+    },
+    {
+     "rank": 8,
      "name": "f/prompts.chat",
      "url": "https://github.com/f/prompts.chat",
      "descEn": "f.k.a. Awesome ChatGPT Prompts. Share, discover, and collect prompts from the community. Free and open source — self-host for your organization with complete privacy.",
-     "stars": 177570,
-     "forks": 22644,
+     "stars": 177691,
+     "forks": 22664,
      "language": "MDX",
      "langCN": "MDX",
      "topics": [
@@ -99,14 +153,33 @@
      ],
      "industry": "AI · 大模型",
      "avatar": "https://github.com/f.png?size=64",
-     "desc": "原名“Awesome ChatGPT Prompts”。分享、发现和收集来自社区的提示。免费且开源——为您的组织自托管，享有完全的隐私。"
+     "desc": "原名：Awesome ChatGPT Prompts。分享、发现和收集来自社区的提示。免费且开源——为您的组织自托管，并享有完全的隐私。"
     },
     {
-     "rank": 6,
+     "rank": 9,
+     "name": "twbs/bootstrap",
+     "url": "https://github.com/twbs/bootstrap",
+     "descEn": "The most popular HTML, CSS, and JavaScript framework for developing responsive, mobile first projects on the web.",
+     "stars": 175073,
+     "forks": 79556,
+     "language": "MDX",
+     "langCN": "MDX",
+     "topics": [
+      "bootstrap",
+      "css",
+      "css-framework",
+      "html"
+     ],
+     "industry": "前端 · 网页",
+     "avatar": "https://github.com/twbs.png?size=64",
+     "desc": "最受欢迎的 HTML、CSS 和 JavaScript 框架，用于在网络上开发响应式、移动优先的项目。"
+    },
+    {
+     "rank": 10,
      "name": "huggingface/transformers",
      "url": "https://github.com/huggingface/transformers",
      "descEn": "🤗 Transformers: the model-definition framework for state-of-the-art machine learning models in text, vision, audio, and multimodal models, for both inference and training.",
-     "stars": 169031,
+     "stars": 169098,
      "forks": 35215,
      "language": "Python",
      "langCN": "Python",
@@ -121,12 +194,12 @@
      "desc": "🤗 Transformers：用于文本、视觉、音频和多模态模型的最先进机器学习模型的模型定义框架，可用于推理和训练。"
     },
     {
-     "rank": 7,
+     "rank": 11,
      "name": "langgenius/dify",
      "url": "https://github.com/langgenius/dify",
      "descEn": "Build Agentic workflows, RAG pipelines, with rich AI model and tool support on one collaborative workspace. Deploy on cloud, VPC, or self-hosted, so teams move from prototype to production without reb",
-     "stars": 161225,
-     "forks": 25513,
+     "stars": 161314,
+     "forks": 25516,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -137,15 +210,15 @@
      ],
      "industry": "AI · 大模型",
      "avatar": "https://github.com/langgenius.png?size=64",
-     "desc": "在一个协作工作空间中，借助丰富的 AI 模型和工具支持，构建 Agentic 工作流和 RAG 管道。在云端、VPC 或自托管环境中部署，让团队无需重新构建即可从原型阶段过渡到生产阶段。"
+     "desc": "在一个协作工作空间中，借助丰富的AI模型和工具支持，构建Agentic工作流和RAG管道。在云端、VPC 或自托管环境中部署，让团队无需重新构建即可从原型阶段过渡到生产阶段。"
     },
     {
-     "rank": 8,
+     "rank": 12,
      "name": "open-webui/open-webui",
      "url": "https://github.com/open-webui/open-webui",
      "descEn": "User-friendly AI Interface (Supports Ollama, OpenAI API, ...)",
-     "stars": 158771,
-     "forks": 23087,
+     "stars": 158872,
+     "forks": 23090,
      "language": "Svelte",
      "langCN": "Svelte",
      "topics": [
@@ -159,12 +232,12 @@
      "desc": "用户友好的 AI 界面（支持 Ollama、OpenAI API 等）"
     },
     {
-     "rank": 9,
+     "rank": 13,
      "name": "clash-verge-rev/clash-verge-rev",
      "url": "https://github.com/clash-verge-rev/clash-verge-rev",
      "descEn": "A modern GUI client based on Tauri, designed to run in Windows, macOS and Linux for tailored proxy experience",
-     "stars": 158605,
-     "forks": 11419,
+     "stars": 158844,
+     "forks": 11435,
      "language": "Rust",
      "langCN": "Rust",
      "topics": [
@@ -178,12 +251,12 @@
      "desc": "一款基于 Tauri 的现代化 GUI 客户端，专为在 Windows、macOS 和 Linux 上运行而设计，旨在提供量身定制的代理体验"
     },
     {
-     "rank": 10,
+     "rank": 14,
      "name": "langflow-ai/langflow",
      "url": "https://github.com/langflow-ai/langflow",
      "descEn": "Langflow is a powerful tool for building and deploying AI-powered agents and workflows.",
-     "stars": 156686,
-     "forks": 10417,
+     "stars": 156720,
+     "forks": 10420,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -197,26 +270,26 @@
      "desc": "Langflow是一款功能强大的工具，用于构建和部署由人工智能驱动的代理和工作流。"
     },
     {
-     "rank": 11,
+     "rank": 15,
      "name": "anthropics/claude-code",
      "url": "https://github.com/anthropics/claude-code",
      "descEn": "Claude Code is an agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster by executing routine tasks, explaining complex code, and handling git workflows ",
-     "stars": 155801,
-     "forks": 25012,
+     "stars": 155942,
+     "forks": 25013,
      "language": "TypeScript",
      "langCN": "TypeScript",
      "topics": [],
      "industry": "AI · 大模型",
      "avatar": "https://github.com/anthropics.png?size=64",
-     "desc": "Claude Code 是一款智能编码工具，它运行在您的终端中，能够理解您的代码库，并通过执行日常任务、解释复杂代码和处理 Git 工作流来帮助您更快地编写代码。"
+     "desc": "Claude Code 是一款智能编码工具，运行在您的终端中，能够理解您的代码库，并通过执行日常任务、解释复杂代码和处理 Git 工作流来帮助您更快地编写代码。"
     },
     {
-     "rank": 12,
+     "rank": 16,
      "name": "farion1231/cc-switch",
      "url": "https://github.com/farion1231/cc-switch",
      "descEn": "A cross-platform desktop All-in-One assistant for Claude Code, Codex, OpenCode,DeepSeek Harness and more. Only official website: ccswitch.io",
-     "stars": 154681,
-     "forks": 10135,
+     "stars": 154993,
+     "forks": 10150,
      "language": "Rust",
      "langCN": "Rust",
      "topics": [
@@ -230,12 +303,12 @@
      "desc": "一款跨平台桌面多合一助手，适用于 Claude Code、Codex、OpenCode、DeepSeek Harness 等。唯一官方网站：ccswitch.io"
     },
     {
-     "rank": 13,
+     "rank": 17,
      "name": "nextlevelbuilder/ui-ux-pro-max-skill",
      "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
      "descEn": "An AI skill that provides design intelligence for building professional UI/UX across multiple platforms.",
-     "stars": 149994,
-     "forks": 15863,
+     "stars": 150519,
+     "forks": 15912,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -249,12 +322,31 @@
      "desc": "一种 AI 技能，为跨多个平台构建专业的 UI/UX 提供设计智能。"
     },
     {
-     "rank": 14,
+     "rank": 18,
+     "name": "github/spec-kit",
+     "url": "https://github.com/github/spec-kit",
+     "descEn": "💫 Toolkit to help you get started with SDD or any other process!",
+     "stars": 150143,
+     "forks": 13488,
+     "language": "Python",
+     "langCN": "Python",
+     "topics": [
+      "ai",
+      "copilot",
+      "development",
+      "engineering"
+     ],
+     "industry": "AI · 大模型",
+     "avatar": "https://github.com/github.png?size=64",
+     "desc": "💫 帮助您开始使用SDD或任何其他流程的工具包！"
+    },
+    {
+     "rank": 19,
      "name": "langchain-ai/langchain",
      "url": "https://github.com/langchain-ai/langchain",
      "descEn": "The agent engineering platform.",
-     "stars": 149590,
-     "forks": 25141,
+     "stars": 149735,
+     "forks": 25147,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -268,12 +360,12 @@
      "desc": "代理工程平台。"
     },
     {
-     "rank": 15,
+     "rank": 20,
      "name": "Graphify-Labs/graphify",
      "url": "https://github.com/Graphify-Labs/graphify",
      "descEn": "Turn any codebase, with its docs, SQL schemas, configs, and PDFs, into a queryable knowledge graph. A /graphify skill for Claude Code, Cursor, Codex, and Gemini CLI: local deterministic AST parsing, e",
-     "stars": 148479,
-     "forks": 14248,
+     "stars": 149143,
+     "forks": 14334,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -287,12 +379,12 @@
      "desc": "将任何代码库及其文档、SQL 架构、配置文件和 PDF 文件转换为可查询的知识图谱。适用于 Claude Code、Cursor、Codex 和 Gemini CLI 的 /graphify 技能：本地确定性 AST 解析，e"
     },
     {
-     "rank": 16,
+     "rank": 21,
      "name": "Comfy-Org/ComfyUI",
      "url": "https://github.com/Comfy-Org/ComfyUI",
      "descEn": "The most powerful and modular diffusion model GUI, api and backend with a graph/nodes interface. The fastest local inference engine in the world.",
-     "stars": 147047,
-     "forks": 17543,
+     "stars": 147219,
+     "forks": 17586,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -306,31 +398,12 @@
      "desc": "功能最强大、模块化程度最高的扩散模型 GUI、API 和后端，配备图/节点界面。世界上最快的本地推理引擎。"
     },
     {
-     "rank": 17,
-     "name": "Shubhamsaboo/awesome-llm-apps",
-     "url": "https://github.com/Shubhamsaboo/awesome-llm-apps",
-     "descEn": "100+ AI Agents, Agent Skills and RAG Apps - Free and Open Source.",
-     "stars": 144764,
-     "forks": 21309,
-     "language": "Python",
-     "langCN": "Python",
-     "topics": [
-      "agents",
-      "llms",
-      "python",
-      "rag"
-     ],
-     "industry": "AI · 大模型",
-     "avatar": "https://github.com/Shubhamsaboo.png?size=64",
-     "desc": "100 多个 AI 代理、代理技能和 RAG 应用 - 免费且开源。"
-    },
-    {
-     "rank": 18,
+     "rank": 22,
      "name": "iptv-org/iptv",
      "url": "https://github.com/iptv-org/iptv",
      "descEn": "Collection of publicly available IPTV channels from all over the world",
-     "stars": 144131,
-     "forks": 8608,
+     "stars": 144196,
+     "forks": 8613,
      "language": "TypeScript",
      "langCN": "TypeScript",
      "topics": [
@@ -344,12 +417,31 @@
      "desc": "来自世界各地的公开 IPTV 频道合集"
     },
     {
-     "rank": 19,
+     "rank": 23,
+     "name": "harry0703/MoneyPrinterTurbo",
+     "url": "https://github.com/harry0703/MoneyPrinterTurbo",
+     "descEn": "利用 AI 大模型和自动化工作流，根据主题或关键词一键生成高清短视频。Generate HD short videos from a topic or keyword with an automated AI workflow.",
+     "stars": 144070,
+     "forks": 23095,
+     "language": "Python",
+     "langCN": "Python",
+     "topics": [
+      "ai-video-generator",
+      "content-creation",
+      "ffmpeg",
+      "instagram-reels"
+     ],
+     "industry": "多媒体 · 影音",
+     "avatar": "https://github.com/harry0703.png?size=64",
+     "desc": "利用 AI 大模型和自动化工作流，根据主题或关键词一键生成高清短视频。利用自动化 AI 工作流，根据主题或关键词生成高清短视频。"
+    },
+    {
+     "rank": 24,
      "name": "vercel/next.js",
      "url": "https://github.com/vercel/next.js",
      "descEn": "The React Framework",
-     "stars": 143547,
-     "forks": 32806,
+     "stars": 143656,
+     "forks": 32809,
      "language": "JavaScript",
      "langCN": "JavaScript",
      "topics": [
@@ -363,12 +455,12 @@
      "desc": "React 框架"
     },
     {
-     "rank": 20,
+     "rank": 25,
      "name": "ripienaar/free-for-dev",
      "url": "https://github.com/ripienaar/free-for-dev",
      "descEn": "A list of SaaS, PaaS and IaaS offerings that have free tiers of interest to devops and infradev",
-     "stars": 142935,
-     "forks": 15367,
+     "stars": 143006,
+     "forks": 15378,
      "language": "HTML",
      "langCN": "HTML",
      "topics": [
@@ -377,15 +469,15 @@
      ],
      "industry": "运维 · 云原生",
      "avatar": "https://github.com/ripienaar.png?size=64",
-     "desc": "SaaS、PaaS和IaaS产品的清单，其中包含DevOps和Infradev感兴趣的免费套餐"
+     "desc": "SaaS、PaaS和IaaS产品的列表，其中包含DevOps和Infradev感兴趣的免费套餐"
     },
     {
-     "rank": 21,
+     "rank": 26,
      "name": "garrytan/gstack",
      "url": "https://github.com/garrytan/gstack",
      "descEn": "Use Garry Tan's exact Claude Code setup: 23 opinionated tools that serve as CEO, Designer, Eng Manager, Release Manager, Doc Engineer, and QA",
-     "stars": 141712,
-     "forks": 20930,
+     "stars": 141834,
+     "forks": 20948,
      "language": "TypeScript",
      "langCN": "TypeScript",
      "topics": [],
@@ -394,50 +486,12 @@
      "desc": "使用Garry Tan的完整Claude Code配置：23款专业工具，分别担任首席执行官、设计师、工程经理、发布经理、文档工程师和QA的角色"
     },
     {
-     "rank": 22,
-     "name": "microsoft/PowerToys",
-     "url": "https://github.com/microsoft/PowerToys",
-     "descEn": "Microsoft PowerToys is a collection of utilities that supercharge productivity and customization on Windows",
-     "stars": 141025,
-     "forks": 8749,
-     "language": "C",
-     "langCN": "C",
-     "topics": [
-      "advanced-paste",
-      "color-picker",
-      "command-palette",
-      "desktop"
-     ],
-     "industry": "效率 · 办公",
-     "avatar": "https://github.com/microsoft.png?size=64",
-     "desc": "Microsoft PowerToys 是一套实用工具集，可大幅提升 Windows 的工作效率和自定义功能"
-    },
-    {
-     "rank": 23,
-     "name": "golang/go",
-     "url": "https://github.com/golang/go",
-     "descEn": "The Go programming language",
-     "stars": 139936,
-     "forks": 20282,
-     "language": "Go",
-     "langCN": "Go",
-     "topics": [
-      "go",
-      "golang",
-      "language",
-      "programming-language"
-     ],
-     "industry": "其他 · 综合",
-     "avatar": "https://github.com/golang.png?size=64",
-     "desc": "Go 编程语言"
-    },
-    {
-     "rank": 24,
+     "rank": 27,
      "name": "excalidraw/excalidraw",
      "url": "https://github.com/excalidraw/excalidraw",
      "descEn": "Virtual whiteboard for sketching hand-drawn like diagrams",
-     "stars": 135746,
-     "forks": 16185,
+     "stars": 135827,
+     "forks": 16195,
      "language": "TypeScript",
      "langCN": "TypeScript",
      "topics": [
@@ -451,26 +505,12 @@
      "desc": "用于绘制手绘式图表的虚拟白板"
     },
     {
-     "rank": 25,
-     "name": "openai/codex",
-     "url": "https://github.com/openai/codex",
-     "descEn": "Lightweight coding agent that runs in your terminal",
-     "stars": 135425,
-     "forks": 21480,
-     "language": "Rust",
-     "langCN": "Rust",
-     "topics": [],
-     "industry": "AI · 大模型",
-     "avatar": "https://github.com/openai.png?size=64",
-     "desc": "在您的终端中运行的轻量级编码代理"
-    },
-    {
-     "rank": 26,
+     "rank": 28,
      "name": "krahets/hello-algo",
      "url": "https://github.com/krahets/hello-algo",
      "descEn": "《Hello 算法》：动画图解、一键运行的数据结构与算法教程。支持简中、繁中、English、日本語，提供 Python, Java, C++, C, C#, JS, Go, Swift, Rust, Ruby, Kotlin, TS, Dart 等代码实现",
-     "stars": 132347,
-     "forks": 15621,
+     "stars": 132368,
+     "forks": 15623,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -481,78 +521,45 @@
      ],
      "industry": "学习 · 资源",
      "avatar": "https://github.com/krahets.png?size=64",
-     "desc": "《Hello 算法》：动画图解、一键运行的数据结构与算法教程。支持简体中文、繁体中文、英语、日语，提供 Python、Java、C++、C、C#、JS、Go、Swift、Rust、Ruby、Kotlin、TS、Dart 等代码实现"
-    },
-    {
-     "rank": 27,
-     "name": "stablyai/orca",
-     "url": "https://github.com/stablyai/orca",
-     "descEn": "Orca lets you run a fleet of coding agents (e.g. Claude Code, Codex) with your own subscription. Available on desktop, mobile and remote runtime.",
-     "stars": 125884,
-     "forks": 7980,
-     "language": "TypeScript",
-     "langCN": "TypeScript",
-     "topics": [
-      "agent-ide",
-      "ai-agents",
-      "automation",
-      "bot"
-     ],
-     "industry": "AI · 大模型",
-     "avatar": "https://github.com/stablyai.png?size=64",
-     "desc": "Orca 让您可以使用自己的订阅来运行一组编码代理（例如 Claude Code、Codex）。适用于桌面端、移动端和远程运行时。"
-    },
-    {
-     "rank": 28,
-     "name": "nodejs/node",
-     "url": "https://github.com/nodejs/node",
-     "descEn": "Node.js JavaScript runtime ✨🐢🚀✨",
-     "stars": 123760,
-     "forks": 38077,
-     "language": "JavaScript",
-     "langCN": "JavaScript",
-     "topics": [
-      "javascript",
-      "js",
-      "linux",
-      "macos"
-     ],
-     "industry": "其他 · 综合",
-     "avatar": "https://github.com/nodejs.png?size=64",
-     "desc": "Node.js JavaScript 运行时 ✨🐢🚀✨"
+     "desc": "《Hello 算法》：动画图解、一键运行的数据结构与算法教程。支持简体中文、繁体中文、英语、日语，提供 Python、Java、C++、C、C#、JS、Go、Swift、Rust、Ruby、Kotlin、TS、Dart 等代码实现。"
     },
     {
      "rank": 29,
-     "name": "earendil-works/pi",
-     "url": "https://github.com/earendil-works/pi",
-     "descEn": "AI agent toolkit: unified LLM API, agent loop, TUI, coding agent CLI",
-     "stars": 122189,
-     "forks": 15754,
-     "language": "TypeScript",
-     "langCN": "TypeScript",
-     "topics": [],
-     "industry": "AI · 大模型",
-     "avatar": "https://github.com/earendil-works.png?size=64",
-     "desc": "AI 代理工具包：统一的 LLM API、代理循环、TUI、编码代理 CLI"
+     "name": "Chalarangelo/30-seconds-of-code",
+     "url": "https://github.com/Chalarangelo/30-seconds-of-code",
+     "descEn": "Coding articles to level up your development skills",
+     "stars": 129533,
+     "forks": 12522,
+     "language": "JavaScript",
+     "langCN": "JavaScript",
+     "topics": [
+      "astro",
+      "awesome-list",
+      "css",
+      "education"
+     ],
+     "industry": "前端 · 网页",
+     "avatar": "https://github.com/Chalarangelo.png?size=64",
+     "desc": "帮助您提升开发技能的编程文章"
     },
     {
      "rank": 30,
-     "name": "browser-use/browser-use",
-     "url": "https://github.com/browser-use/browser-use",
-     "descEn": "Open-source Python library for AI browser agents, plus Browser Use Cloud: stealth browsers and a hosted agent API.",
-     "stars": 121126,
-     "forks": 13542,
-     "language": "Python",
-     "langCN": "Python",
+     "name": "shadcn-ui/ui",
+     "url": "https://github.com/shadcn-ui/ui",
+     "descEn": "Composable, accessible components with thoughtful defaults. Build your own component library with code you can customize, extend, and make your own.",
+     "stars": 128356,
+     "forks": 11400,
+     "language": "TypeScript",
+     "langCN": "TypeScript",
      "topics": [
-      "ai-agents",
-      "ai-tools",
-      "browser-agent",
-      "browser-automation"
+      "ai",
+      "base-ui",
+      "components",
+      "gen-ui"
      ],
-     "industry": "后端 · 服务",
-     "avatar": "https://github.com/browser-use.png?size=64",
-     "desc": "适用于 AI 浏览器代理的开源 Python 库，以及 Browser Use Cloud：隐身浏览器和托管代理 API。"
+     "industry": "前端 · 网页",
+     "avatar": "https://github.com/shadcn-ui.png?size=64",
+     "desc": "可组合、无障碍的组件，并提供贴心的默认设置。使用您可以自定义、扩展并据为己有的代码，构建您自己的组件库。"
     }
    ]
   },
@@ -565,8 +572,8 @@
      "name": "massgravel/Microsoft-Activation-Scripts",
      "url": "https://github.com/massgravel/Microsoft-Activation-Scripts",
      "descEn": "Open-source Windows and Office activator featuring HWID, Ohook, TSforge, and Online KMS activation methods, along with advanced troubleshooting.",
-     "stars": 199555,
-     "forks": 18873,
+     "stars": 199769,
+     "forks": 18891,
      "language": "Batchfile",
      "langCN": "Batchfile",
      "topics": [
@@ -581,11 +588,27 @@
     },
     {
      "rank": 2,
+     "name": "anthropics/skills",
+     "url": "https://github.com/anthropics/skills",
+     "descEn": "Public repository for Agent Skills",
+     "stars": 196180,
+     "forks": 23026,
+     "language": "Python",
+     "langCN": "Python",
+     "topics": [
+      "agent-skills"
+     ],
+     "industry": "其他 · 综合",
+     "avatar": "https://github.com/anthropics.png?size=64",
+     "desc": "客服代表技能的公共存储库"
+    },
+    {
+     "rank": 3,
      "name": "microsoft/vscode",
      "url": "https://github.com/microsoft/vscode",
      "descEn": "Visual Studio Code",
-     "stars": 195438,
-     "forks": 43858,
+     "stars": 195514,
+     "forks": 43860,
      "language": "TypeScript",
      "langCN": "TypeScript",
      "topics": [
@@ -599,28 +622,12 @@
      "desc": "Visual Studio Code"
     },
     {
-     "rank": 3,
-     "name": "anthropics/skills",
-     "url": "https://github.com/anthropics/skills",
-     "descEn": "Public repository for Agent Skills",
-     "stars": 195423,
-     "forks": 22968,
-     "language": "Python",
-     "langCN": "Python",
-     "topics": [
-      "agent-skills"
-     ],
-     "industry": "其他 · 综合",
-     "avatar": "https://github.com/anthropics.png?size=64",
-     "desc": "客服代表技能的公共存储库"
-    },
-    {
      "rank": 4,
      "name": "ultraworkers/claw-code",
      "url": "https://github.com/ultraworkers/claw-code",
      "descEn": "An agent-managed museum exhibit, built in Rust with Gajae-Code / LazyCodex — developed and maintained with no human intervention.",
-     "stars": 194766,
-     "forks": 107290,
+     "stars": 194761,
+     "forks": 107260,
      "language": "Rust",
      "langCN": "Rust",
      "topics": [],
@@ -633,8 +640,8 @@
      "name": "avelino/awesome-go",
      "url": "https://github.com/avelino/awesome-go",
      "descEn": "A curated list of awesome Go frameworks, libraries and software",
-     "stars": 194129,
-     "forks": 13751,
+     "stars": 194317,
+     "forks": 13757,
      "language": "Go",
      "langCN": "Go",
      "topics": [
@@ -652,8 +659,8 @@
      "name": "ohmyzsh/ohmyzsh",
      "url": "https://github.com/ohmyzsh/ohmyzsh",
      "descEn": "🙃   A delightful community-driven (with 2,500+ contributors) framework for managing your zsh configuration. Includes 300+ optional plugins (rails, git, macOS, hub, docker, homebrew, node, php, python,",
-     "stars": 190655,
-     "forks": 27288,
+     "stars": 190637,
+     "forks": 27277,
      "language": "Shell",
      "langCN": "Shell",
      "topics": [
@@ -671,7 +678,7 @@
      "name": "Significant-Gravitas/AutoGPT",
      "url": "https://github.com/Significant-Gravitas/AutoGPT",
      "descEn": "AutoGPT is the vision of accessible AI for everyone, to use and to build on. Our mission is to provide the tools, so that you can focus on what matters.",
-     "stars": 188046,
+     "stars": 188068,
      "forks": 45857,
      "language": "Python",
      "langCN": "Python",
@@ -690,8 +697,8 @@
      "name": "ollama/ollama",
      "url": "https://github.com/ollama/ollama",
      "descEn": "Get up and running with Kimi, GLM, MiniMax, DeepSeek, gpt-oss, Qwen, Gemma and other models.",
-     "stars": 187120,
-     "forks": 19110,
+     "stars": 187292,
+     "forks": 19116,
      "language": "Go",
      "langCN": "Go",
      "topics": [
@@ -709,8 +716,8 @@
      "name": "CyC2018/CS-Notes",
      "url": "https://github.com/CyC2018/CS-Notes",
      "descEn": ":books: 技术面试必备基础知识、Leetcode、计算机操作系统、计算机网络、系统设计",
-     "stars": 186518,
-     "forks": 50632,
+     "stars": 186526,
+     "forks": 50627,
      "language": "JavaScript",
      "langCN": "JavaScript",
      "topics": [
@@ -728,8 +735,8 @@
      "name": "flutter/flutter",
      "url": "https://github.com/flutter/flutter",
      "descEn": "Flutter makes it easy and fast to build beautiful apps for mobile and beyond",
-     "stars": 181286,
-     "forks": 32170,
+     "stars": 181273,
+     "forks": 32153,
      "language": "Dart",
      "langCN": "Dart",
      "topics": [
@@ -747,8 +754,8 @@
      "name": "f/prompts.chat",
      "url": "https://github.com/f/prompts.chat",
      "descEn": "f.k.a. Awesome ChatGPT Prompts. Share, discover, and collect prompts from the community. Free and open source — self-host for your organization with complete privacy.",
-     "stars": 177570,
-     "forks": 22644,
+     "stars": 177691,
+     "forks": 22664,
      "language": "MDX",
      "langCN": "MDX",
      "topics": [
@@ -766,8 +773,8 @@
      "name": "github/gitignore",
      "url": "https://github.com/github/gitignore",
      "descEn": "A collection of useful .gitignore templates",
-     "stars": 176293,
-     "forks": 82019,
+     "stars": 176305,
+     "forks": 82018,
      "language": "",
      "langCN": "",
      "topics": [
@@ -776,15 +783,15 @@
      ],
      "industry": "后端 · 服务",
      "avatar": "https://github.com/github.png?size=64",
-     "desc": "实用 .gitignore 模板合集"
+     "desc": "实用的 .gitignore 模板合集"
     },
     {
      "rank": 13,
      "name": "twbs/bootstrap",
      "url": "https://github.com/twbs/bootstrap",
      "descEn": "The most popular HTML, CSS, and JavaScript framework for developing responsive, mobile first projects on the web.",
-     "stars": 175066,
-     "forks": 79414,
+     "stars": 175073,
+     "forks": 79557,
      "language": "MDX",
      "langCN": "MDX",
      "topics": [
@@ -802,7 +809,7 @@
      "name": "huggingface/transformers",
      "url": "https://github.com/huggingface/transformers",
      "descEn": "🤗 Transformers: the model-definition framework for state-of-the-art machine learning models in text, vision, audio, and multimodal models, for both inference and training.",
-     "stars": 169031,
+     "stars": 169098,
      "forks": 35215,
      "language": "Python",
      "langCN": "Python",
@@ -818,25 +825,11 @@
     },
     {
      "rank": 15,
-     "name": "msitarzewski/agency-agents",
-     "url": "https://github.com/msitarzewski/agency-agents",
-     "descEn": "A complete AI agency at your fingertips - From frontend wizards to Reddit community ninjas, from whimsy injectors to reality checkers. Each agent is a specialized expert with personality, processes, a",
-     "stars": 168607,
-     "forks": 27364,
-     "language": "Shell",
-     "langCN": "Shell",
-     "topics": [],
-     "industry": "游戏",
-     "avatar": "https://github.com/msitarzewski.png?size=64",
-     "desc": "一个触手可及的完整人工智能代理——从前端巫师到 Reddit 社区忍者，从奇思妙想注入者到现实核查员。每个代理都是一位专业专家，具有个性、流程、"
-    },
-    {
-     "rank": 16,
      "name": "langgenius/dify",
      "url": "https://github.com/langgenius/dify",
      "descEn": "Build Agentic workflows, RAG pipelines, with rich AI model and tool support on one collaborative workspace. Deploy on cloud, VPC, or self-hosted, so teams move from prototype to production without reb",
-     "stars": 161225,
-     "forks": 25513,
+     "stars": 161314,
+     "forks": 25516,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -847,15 +840,15 @@
      ],
      "industry": "AI · 大模型",
      "avatar": "https://github.com/langgenius.png?size=64",
-     "desc": "在一个协作工作空间中，借助丰富的 AI 模型和工具支持，构建 Agentic 工作流和 RAG 管道。在云、VPC 或自托管环境中部署，让团队无需重新构建即可从原型阶段过渡到生产阶段。"
+     "desc": "在一个协作工作空间中，借助丰富的AI模型和工具支持，构建Agentic工作流和RAG管道。在云端、VPC 或自托管环境中部署，让团队无需重新构建即可从原型阶段过渡到生产阶段。"
     },
     {
-     "rank": 17,
+     "rank": 16,
      "name": "open-webui/open-webui",
      "url": "https://github.com/open-webui/open-webui",
      "descEn": "User-friendly AI Interface (Supports Ollama, OpenAI API, ...)",
-     "stars": 158771,
-     "forks": 23087,
+     "stars": 158872,
+     "forks": 23090,
      "language": "Svelte",
      "langCN": "Svelte",
      "topics": [
@@ -869,12 +862,12 @@
      "desc": "用户友好的 AI 界面（支持 Ollama、OpenAI API 等）"
     },
     {
-     "rank": 18,
+     "rank": 17,
      "name": "clash-verge-rev/clash-verge-rev",
      "url": "https://github.com/clash-verge-rev/clash-verge-rev",
      "descEn": "A modern GUI client based on Tauri, designed to run in Windows, macOS and Linux for tailored proxy experience",
-     "stars": 158606,
-     "forks": 11419,
+     "stars": 158844,
+     "forks": 11435,
      "language": "Rust",
      "langCN": "Rust",
      "topics": [
@@ -888,12 +881,12 @@
      "desc": "一款基于 Tauri 的现代化 GUI 客户端，专为在 Windows、macOS 和 Linux 上运行而设计，旨在提供量身定制的代理体验"
     },
     {
-     "rank": 19,
+     "rank": 18,
      "name": "langflow-ai/langflow",
      "url": "https://github.com/langflow-ai/langflow",
      "descEn": "Langflow is a powerful tool for building and deploying AI-powered agents and workflows.",
-     "stars": 156686,
-     "forks": 10417,
+     "stars": 156720,
+     "forks": 10420,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -907,26 +900,26 @@
      "desc": "Langflow是一款功能强大的工具，用于构建和部署由人工智能驱动的代理和工作流。"
     },
     {
-     "rank": 20,
+     "rank": 19,
      "name": "anthropics/claude-code",
      "url": "https://github.com/anthropics/claude-code",
      "descEn": "Claude Code is an agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster by executing routine tasks, explaining complex code, and handling git workflows ",
-     "stars": 155801,
-     "forks": 25012,
+     "stars": 155942,
+     "forks": 25013,
      "language": "TypeScript",
      "langCN": "TypeScript",
      "topics": [],
      "industry": "AI · 大模型",
      "avatar": "https://github.com/anthropics.png?size=64",
-     "desc": "Claude Code 是一款智能编码工具，运行在您的终端中，能够理解您的代码库，并通过执行日常任务、解释复杂代码和处理 Git 工作流来帮助您更快地编写代码。"
+     "desc": "Claude Code 是一款智能编码工具，驻留在您的终端中，能够理解您的代码库，并通过执行日常任务、解释复杂代码和处理 Git 工作流来帮助您更快地编写代码。"
     },
     {
-     "rank": 21,
+     "rank": 20,
      "name": "Genymobile/scrcpy",
      "url": "https://github.com/Genymobile/scrcpy",
      "descEn": "Display and control your Android device",
-     "stars": 154914,
-     "forks": 14223,
+     "stars": 155004,
+     "forks": 14232,
      "language": "C",
      "langCN": "C",
      "topics": [
@@ -940,12 +933,12 @@
      "desc": "显示和控制您的 Android 设备"
     },
     {
-     "rank": 22,
+     "rank": 21,
      "name": "farion1231/cc-switch",
      "url": "https://github.com/farion1231/cc-switch",
      "descEn": "A cross-platform desktop All-in-One assistant for Claude Code, Codex, OpenCode,DeepSeek Harness and more. Only official website: ccswitch.io",
-     "stars": 154681,
-     "forks": 10135,
+     "stars": 154992,
+     "forks": 10150,
      "language": "Rust",
      "langCN": "Rust",
      "topics": [
@@ -959,12 +952,12 @@
      "desc": "一款跨平台桌面多合一助手，适用于 Claude Code、Codex、OpenCode、DeepSeek Harness 等。唯一官方网站：ccswitch.io"
     },
     {
-     "rank": 23,
+     "rank": 22,
      "name": "nextlevelbuilder/ui-ux-pro-max-skill",
      "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
      "descEn": "An AI skill that provides design intelligence for building professional UI/UX across multiple platforms.",
-     "stars": 149994,
-     "forks": 15863,
+     "stars": 150519,
+     "forks": 15912,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -978,12 +971,12 @@
      "desc": "一种 AI 技能，为跨多个平台构建专业的 UI/UX 提供设计智能。"
     },
     {
-     "rank": 24,
+     "rank": 23,
      "name": "github/spec-kit",
      "url": "https://github.com/github/spec-kit",
      "descEn": "💫 Toolkit to help you get started with SDD or any other process!",
-     "stars": 149952,
-     "forks": 13473,
+     "stars": 150143,
+     "forks": 13488,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -997,12 +990,12 @@
      "desc": "💫 帮助您开始使用SDD或任何其他流程的工具包！"
     },
     {
-     "rank": 25,
+     "rank": 24,
      "name": "langchain-ai/langchain",
      "url": "https://github.com/langchain-ai/langchain",
      "descEn": "The agent engineering platform.",
-     "stars": 149590,
-     "forks": 25141,
+     "stars": 149735,
+     "forks": 25147,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -1016,12 +1009,12 @@
      "desc": "代理工程平台。"
     },
     {
-     "rank": 26,
+     "rank": 25,
      "name": "Graphify-Labs/graphify",
      "url": "https://github.com/Graphify-Labs/graphify",
      "descEn": "Turn any codebase, with its docs, SQL schemas, configs, and PDFs, into a queryable knowledge graph. A /graphify skill for Claude Code, Cursor, Codex, and Gemini CLI: local deterministic AST parsing, e",
-     "stars": 148481,
-     "forks": 14248,
+     "stars": 149143,
+     "forks": 14334,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -1035,12 +1028,12 @@
      "desc": "将任何代码库及其文档、SQL 架构、配置文件和 PDF 文件转换为可查询的知识图谱。适用于 Claude Code、Cursor、Codex 和 Gemini CLI 的 /graphify 技能：本地确定性 AST 解析，e"
     },
     {
-     "rank": 27,
+     "rank": 26,
      "name": "Comfy-Org/ComfyUI",
      "url": "https://github.com/Comfy-Org/ComfyUI",
      "descEn": "The most powerful and modular diffusion model GUI, api and backend with a graph/nodes interface. The fastest local inference engine in the world.",
-     "stars": 147047,
-     "forks": 17543,
+     "stars": 147219,
+     "forks": 17586,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -1054,12 +1047,12 @@
      "desc": "功能最强大、模块化程度最高的扩散模型 GUI、API 和后端，配备图/节点界面。世界上最快的本地推理引擎。"
     },
     {
-     "rank": 28,
+     "rank": 27,
      "name": "Shubhamsaboo/awesome-llm-apps",
      "url": "https://github.com/Shubhamsaboo/awesome-llm-apps",
      "descEn": "100+ AI Agents, Agent Skills and RAG Apps - Free and Open Source.",
-     "stars": 144764,
-     "forks": 21309,
+     "stars": 144897,
+     "forks": 21337,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -1073,12 +1066,12 @@
      "desc": "100 多个 AI 代理、代理技能和 RAG 应用——免费且开源。"
     },
     {
-     "rank": 29,
+     "rank": 28,
      "name": "iptv-org/iptv",
      "url": "https://github.com/iptv-org/iptv",
      "descEn": "Collection of publicly available IPTV channels from all over the world",
-     "stars": 144131,
-     "forks": 8608,
+     "stars": 144196,
+     "forks": 8613,
      "language": "TypeScript",
      "langCN": "TypeScript",
      "topics": [
@@ -1092,12 +1085,12 @@
      "desc": "来自世界各地的公开 IPTV 频道合集"
     },
     {
-     "rank": 30,
+     "rank": 29,
      "name": "harry0703/MoneyPrinterTurbo",
      "url": "https://github.com/harry0703/MoneyPrinterTurbo",
      "descEn": "利用 AI 大模型和自动化工作流，根据主题或关键词一键生成高清短视频。Generate HD short videos from a topic or keyword with an automated AI workflow.",
-     "stars": 143837,
-     "forks": 23042,
+     "stars": 144070,
+     "forks": 23095,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -1111,12 +1104,12 @@
      "desc": "利用 AI 大模型和自动化工作流，根据主题或关键词一键生成高清短视频。通过自动化的 AI 工作流，根据主题或关键词生成高清短视频。"
     },
     {
-     "rank": 31,
+     "rank": 30,
      "name": "vercel/next.js",
      "url": "https://github.com/vercel/next.js",
      "descEn": "The React Framework",
-     "stars": 143547,
-     "forks": 32806,
+     "stars": 143656,
+     "forks": 32809,
      "language": "JavaScript",
      "langCN": "JavaScript",
      "topics": [
@@ -1130,26 +1123,26 @@
      "desc": "React 框架"
     },
     {
-     "rank": 32,
+     "rank": 31,
      "name": "garrytan/gstack",
      "url": "https://github.com/garrytan/gstack",
      "descEn": "Use Garry Tan's exact Claude Code setup: 23 opinionated tools that serve as CEO, Designer, Eng Manager, Release Manager, Doc Engineer, and QA",
-     "stars": 141712,
-     "forks": 20930,
+     "stars": 141834,
+     "forks": 20948,
      "language": "TypeScript",
      "langCN": "TypeScript",
      "topics": [],
      "industry": "AI · 大模型",
      "avatar": "https://github.com/garrytan.png?size=64",
-     "desc": "使用Garry Tan的完整Claude Code配置：23款专业工具，分别担任首席执行官、设计师、工程经理、发布经理、文档工程师和QA的角色"
+     "desc": "使用Garry Tan的完整Claude Code配置：23款专业工具，分别担任首席执行官、设计师、工程经理、发布经理、文档工程师和QA"
     },
     {
-     "rank": 33,
+     "rank": 32,
      "name": "golang/go",
      "url": "https://github.com/golang/go",
      "descEn": "The Go programming language",
-     "stars": 139937,
-     "forks": 20282,
+     "stars": 139978,
+     "forks": 20263,
      "language": "Go",
      "langCN": "Go",
      "topics": [
@@ -1163,12 +1156,12 @@
      "desc": "Go 编程语言"
     },
     {
-     "rank": 34,
+     "rank": 33,
      "name": "excalidraw/excalidraw",
      "url": "https://github.com/excalidraw/excalidraw",
      "descEn": "Virtual whiteboard for sketching hand-drawn like diagrams",
-     "stars": 135746,
-     "forks": 16185,
+     "stars": 135828,
+     "forks": 16195,
      "language": "TypeScript",
      "langCN": "TypeScript",
      "topics": [
@@ -1182,12 +1175,12 @@
      "desc": "用于绘制手绘式图表的虚拟白板"
     },
     {
-     "rank": 35,
+     "rank": 34,
      "name": "krahets/hello-algo",
      "url": "https://github.com/krahets/hello-algo",
      "descEn": "《Hello 算法》：动画图解、一键运行的数据结构与算法教程。支持简中、繁中、English、日本語，提供 Python, Java, C++, C, C#, JS, Go, Swift, Rust, Ruby, Kotlin, TS, Dart 等代码实现",
-     "stars": 132347,
-     "forks": 15621,
+     "stars": 132368,
+     "forks": 15623,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -1198,15 +1191,15 @@
      ],
      "industry": "学习 · 资源",
      "avatar": "https://github.com/krahets.png?size=64",
-     "desc": "《Hello 算法》：动画图解、一键运行的数据结构与算法教程。支持简体中文、繁体中文、英语、日语，提供 Python、Java、C++、C、C#、JS、Go、Swift、Rust、Ruby、Kotlin、TS、Dart 等代码实现。"
+     "desc": "《Hello 算法》：动画图解、一键运行的数据结构与算法教程。支持简体中文、繁体中文、英语、日语，提供 Python、Java、C++、C、C#、JS、Go、Swift、Rust、Ruby、Kotlin、TS、Dart 等代码实现"
     },
     {
-     "rank": 36,
+     "rank": 35,
      "name": "Chalarangelo/30-seconds-of-code",
      "url": "https://github.com/Chalarangelo/30-seconds-of-code",
      "descEn": "Coding articles to level up your development skills",
-     "stars": 129523,
-     "forks": 12520,
+     "stars": 129533,
+     "forks": 12522,
      "language": "JavaScript",
      "langCN": "JavaScript",
      "topics": [
@@ -1220,12 +1213,12 @@
      "desc": "帮助您提升开发技能的编程文章"
     },
     {
-     "rank": 37,
+     "rank": 36,
      "name": "kubernetes/kubernetes",
      "url": "https://github.com/kubernetes/kubernetes",
      "descEn": "Production-Grade Container Scheduling and Management",
-     "stars": 129110,
-     "forks": 45111,
+     "stars": 129149,
+     "forks": 45094,
      "language": "Go",
      "langCN": "Go",
      "topics": [
@@ -1239,12 +1232,12 @@
      "desc": "生产级容器调度和管理"
     },
     {
-     "rank": 38,
+     "rank": 37,
      "name": "shadcn-ui/ui",
      "url": "https://github.com/shadcn-ui/ui",
      "descEn": "Composable, accessible components with thoughtful defaults. Build your own component library with code you can customize, extend, and make your own.",
-     "stars": 128263,
-     "forks": 11391,
+     "stars": 128356,
+     "forks": 11400,
      "language": "TypeScript",
      "langCN": "TypeScript",
      "topics": [
@@ -1258,12 +1251,12 @@
      "desc": "可组合、无障碍的组件，并提供贴心的默认设置。使用您可以自定义、扩展并据为己有的代码，构建您自己的组件库。"
     },
     {
-     "rank": 39,
+     "rank": 38,
      "name": "stablyai/orca",
      "url": "https://github.com/stablyai/orca",
      "descEn": "Orca lets you run a fleet of coding agents (e.g. Claude Code, Codex) with your own subscription. Available on desktop, mobile and remote runtime.",
-     "stars": 125887,
-     "forks": 7980,
+     "stars": 126942,
+     "forks": 8060,
      "language": "TypeScript",
      "langCN": "TypeScript",
      "topics": [
@@ -1274,15 +1267,15 @@
      ],
      "industry": "AI · 大模型",
      "avatar": "https://github.com/stablyai.png?size=64",
-     "desc": "Orca 让您可以使用自己的订阅来运行一组编码代理（例如 Claude Code、Codex）。适用于桌面、移动端和远程运行时。"
+     "desc": "Orca 让您可以使用自己的订阅来运行一组编码代理（例如 Claude Code、Codex）。适用于桌面端、移动端和远程运行时。"
     },
     {
-     "rank": 40,
+     "rank": 39,
      "name": "nodejs/node",
      "url": "https://github.com/nodejs/node",
      "descEn": "Node.js JavaScript runtime ✨🐢🚀✨",
-     "stars": 123760,
-     "forks": 38077,
+     "stars": 123755,
+     "forks": 38071,
      "language": "JavaScript",
      "langCN": "JavaScript",
      "topics": [
@@ -1294,6 +1287,25 @@
      "industry": "其他 · 综合",
      "avatar": "https://github.com/nodejs.png?size=64",
      "desc": "Node.js JavaScript 运行时 ✨🐢🚀✨"
+    },
+    {
+     "rank": 40,
+     "name": "TauricResearch/TradingAgents",
+     "url": "https://github.com/TauricResearch/TradingAgents",
+     "descEn": "TradingAgents: Multi-Agents LLM Financial Trading Framework",
+     "stars": 122879,
+     "forks": 23558,
+     "language": "Python",
+     "langCN": "Python",
+     "topics": [
+      "agent",
+      "finance",
+      "llm",
+      "multiagent"
+     ],
+     "industry": "AI · 大模型",
+     "avatar": "https://github.com/TauricResearch.png?size=64",
+     "desc": "TradingAgents：多智能体LLM金融交易框架"
     }
    ]
   },
@@ -1306,8 +1318,8 @@
      "name": "massgravel/Microsoft-Activation-Scripts",
      "url": "https://github.com/massgravel/Microsoft-Activation-Scripts",
      "descEn": "Open-source Windows and Office activator featuring HWID, Ohook, TSforge, and Online KMS activation methods, along with advanced troubleshooting.",
-     "stars": 199555,
-     "forks": 18873,
+     "stars": 199769,
+     "forks": 18891,
      "language": "Batchfile",
      "langCN": "Batchfile",
      "topics": [
@@ -1322,11 +1334,27 @@
     },
     {
      "rank": 2,
+     "name": "anthropics/skills",
+     "url": "https://github.com/anthropics/skills",
+     "descEn": "Public repository for Agent Skills",
+     "stars": 196180,
+     "forks": 23026,
+     "language": "Python",
+     "langCN": "Python",
+     "topics": [
+      "agent-skills"
+     ],
+     "industry": "其他 · 综合",
+     "avatar": "https://github.com/anthropics.png?size=64",
+     "desc": "客服代表技能的公共存储库"
+    },
+    {
+     "rank": 3,
      "name": "microsoft/markitdown",
      "url": "https://github.com/microsoft/markitdown",
      "descEn": "Python tool for converting files and office documents to Markdown.",
-     "stars": 195577,
-     "forks": 14783,
+     "stars": 195833,
+     "forks": 14809,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -1340,12 +1368,12 @@
      "desc": "用于将文件和办公文档转换为 Markdown 的 Python 工具。"
     },
     {
-     "rank": 3,
+     "rank": 4,
      "name": "microsoft/vscode",
      "url": "https://github.com/microsoft/vscode",
      "descEn": "Visual Studio Code",
-     "stars": 195438,
-     "forks": 43858,
+     "stars": 195514,
+     "forks": 43860,
      "language": "TypeScript",
      "langCN": "TypeScript",
      "topics": [
@@ -1359,42 +1387,26 @@
      "desc": "Visual Studio Code"
     },
     {
-     "rank": 4,
-     "name": "anthropics/skills",
-     "url": "https://github.com/anthropics/skills",
-     "descEn": "Public repository for Agent Skills",
-     "stars": 195426,
-     "forks": 22968,
-     "language": "Python",
-     "langCN": "Python",
-     "topics": [
-      "agent-skills"
-     ],
-     "industry": "其他 · 综合",
-     "avatar": "https://github.com/anthropics.png?size=64",
-     "desc": "客服代表技能的公共存储库"
-    },
-    {
      "rank": 5,
      "name": "ultraworkers/claw-code",
      "url": "https://github.com/ultraworkers/claw-code",
      "descEn": "An agent-managed museum exhibit, built in Rust with Gajae-Code / LazyCodex — developed and maintained with no human intervention.",
-     "stars": 194766,
-     "forks": 107290,
+     "stars": 194761,
+     "forks": 107260,
      "language": "Rust",
      "langCN": "Rust",
      "topics": [],
      "industry": "其他 · 综合",
      "avatar": "https://github.com/ultraworkers.png?size=64",
-     "desc": "由代理程序管理的博物馆展览，使用 Rust 和 Gajae-Code/LazyCodex 构建——开发和维护均无需人工干预。"
+     "desc": "由代理管理、使用 Rust 和 Gajae-Code/LazyCodex 构建的博物馆展览——开发和维护均无需人工干预。"
     },
     {
      "rank": 6,
      "name": "avelino/awesome-go",
      "url": "https://github.com/avelino/awesome-go",
      "descEn": "A curated list of awesome Go frameworks, libraries and software",
-     "stars": 194129,
-     "forks": 13751,
+     "stars": 194317,
+     "forks": 13757,
      "language": "Go",
      "langCN": "Go",
      "topics": [
@@ -1412,8 +1424,8 @@
      "name": "DietrichGebert/ponytail",
      "url": "https://github.com/DietrichGebert/ponytail",
      "descEn": "Makes your AI agent think like the laziest senior dev in the room. The best code is the code you never wrote.",
-     "stars": 191508,
-     "forks": 10724,
+     "stars": 192308,
+     "forks": 10789,
      "language": "JavaScript",
      "langCN": "JavaScript",
      "topics": [
@@ -1424,15 +1436,15 @@
      ],
      "industry": "AI · 大模型",
      "avatar": "https://github.com/DietrichGebert.png?size=64",
-     "desc": "让您的 AI 代理像房间里最懒的高级开发人员一样思考。最好的代码是您从未写过的代码。"
+     "desc": "让您的 AI 代理像房间里最懒的高级开发人员一样思考。最好的代码是你从未写过的代码。"
     },
     {
      "rank": 8,
      "name": "ohmyzsh/ohmyzsh",
      "url": "https://github.com/ohmyzsh/ohmyzsh",
      "descEn": "🙃   A delightful community-driven (with 2,500+ contributors) framework for managing your zsh configuration. Includes 300+ optional plugins (rails, git, macOS, hub, docker, homebrew, node, php, python,",
-     "stars": 190655,
-     "forks": 27288,
+     "stars": 190637,
+     "forks": 27277,
      "language": "Shell",
      "langCN": "Shell",
      "topics": [
@@ -1450,8 +1462,8 @@
      "name": "521xueweihan/HelloGitHub",
      "url": "https://github.com/521xueweihan/HelloGitHub",
      "descEn": ":octocat: 分享 GitHub 上有趣、入门级的开源项目。Share interesting, entry-level open source projects on GitHub.",
-     "stars": 189136,
-     "forks": 13305,
+     "stars": 189403,
+     "forks": 13315,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -1462,14 +1474,14 @@
      ],
      "industry": "学习 · 资源",
      "avatar": "https://github.com/521xueweihan.png?size=64",
-     "desc": ":octocat: 分享 GitHub 上有趣、入门级的开源项目。在 GitHub 上分享有趣、入门级的开源项目。"
+     "desc": ":octocat: 分享 GitHub 上有趣、入门级的开源项目。在 GitHub 上分享有趣、适合入门的开源项目。"
     },
     {
      "rank": 10,
      "name": "Significant-Gravitas/AutoGPT",
      "url": "https://github.com/Significant-Gravitas/AutoGPT",
      "descEn": "AutoGPT is the vision of accessible AI for everyone, to use and to build on. Our mission is to provide the tools, so that you can focus on what matters.",
-     "stars": 188046,
+     "stars": 188068,
      "forks": 45857,
      "language": "Python",
      "langCN": "Python",
@@ -1488,8 +1500,8 @@
      "name": "ollama/ollama",
      "url": "https://github.com/ollama/ollama",
      "descEn": "Get up and running with Kimi, GLM, MiniMax, DeepSeek, gpt-oss, Qwen, Gemma and other models.",
-     "stars": 187120,
-     "forks": 19110,
+     "stars": 187292,
+     "forks": 19116,
      "language": "Go",
      "langCN": "Go",
      "topics": [
@@ -1507,8 +1519,8 @@
      "name": "CyC2018/CS-Notes",
      "url": "https://github.com/CyC2018/CS-Notes",
      "descEn": ":books: 技术面试必备基础知识、Leetcode、计算机操作系统、计算机网络、系统设计",
-     "stars": 186518,
-     "forks": 50633,
+     "stars": 186526,
+     "forks": 50627,
      "language": "JavaScript",
      "langCN": "JavaScript",
      "topics": [
@@ -1527,7 +1539,7 @@
      "url": "https://github.com/getify/You-Dont-Know-JS",
      "descEn": "A book series (2 published editions) on the JS language.",
      "stars": 184856,
-     "forks": 33330,
+     "forks": 33326,
      "language": "",
      "langCN": "",
      "topics": [
@@ -1538,15 +1550,15 @@
      ],
      "industry": "其他 · 综合",
      "avatar": "https://github.com/getify.png?size=64",
-     "desc": "关于 JS 语言的书籍系列（已出版 2 版）。"
+     "desc": "一本关于 JS 语言的书籍系列（已出版 2 版）。"
     },
     {
      "rank": 14,
      "name": "flutter/flutter",
      "url": "https://github.com/flutter/flutter",
      "descEn": "Flutter makes it easy and fast to build beautiful apps for mobile and beyond",
-     "stars": 181286,
-     "forks": 32170,
+     "stars": 181273,
+     "forks": 32153,
      "language": "Dart",
      "langCN": "Dart",
      "topics": [
@@ -1564,8 +1576,8 @@
      "name": "f/prompts.chat",
      "url": "https://github.com/f/prompts.chat",
      "descEn": "f.k.a. Awesome ChatGPT Prompts. Share, discover, and collect prompts from the community. Free and open source — self-host for your organization with complete privacy.",
-     "stars": 177570,
-     "forks": 22643,
+     "stars": 177691,
+     "forks": 22664,
      "language": "MDX",
      "langCN": "MDX",
      "topics": [
@@ -1576,15 +1588,15 @@
      ],
      "industry": "AI · 大模型",
      "avatar": "https://github.com/f.png?size=64",
-     "desc": "原名：Awesome ChatGPT Prompts。分享、发现和收集来自社区的提示。免费且开源——为您的组织自托管，并享有完全的隐私。"
+     "desc": "原名：Awesome ChatGPT Prompts。分享、发现和收集来自社区的提示。免费且开源——为您的组织自托管，享有完全的隐私。"
     },
     {
      "rank": 16,
      "name": "github/gitignore",
      "url": "https://github.com/github/gitignore",
      "descEn": "A collection of useful .gitignore templates",
-     "stars": 176293,
-     "forks": 82019,
+     "stars": 176305,
+     "forks": 82018,
      "language": "",
      "langCN": "",
      "topics": [
@@ -1593,15 +1605,15 @@
      ],
      "industry": "后端 · 服务",
      "avatar": "https://github.com/github.png?size=64",
-     "desc": "实用 .gitignore 模板合集"
+     "desc": "有用的 .gitignore 模板集合"
     },
     {
      "rank": 17,
      "name": "twbs/bootstrap",
      "url": "https://github.com/twbs/bootstrap",
      "descEn": "The most popular HTML, CSS, and JavaScript framework for developing responsive, mobile first projects on the web.",
-     "stars": 175066,
-     "forks": 79414,
+     "stars": 175073,
+     "forks": 79557,
      "language": "MDX",
      "langCN": "MDX",
      "topics": [
@@ -1619,7 +1631,7 @@
      "name": "huggingface/transformers",
      "url": "https://github.com/huggingface/transformers",
      "descEn": "🤗 Transformers: the model-definition framework for state-of-the-art machine learning models in text, vision, audio, and multimodal models, for both inference and training.",
-     "stars": 169031,
+     "stars": 169098,
      "forks": 35215,
      "language": "Python",
      "langCN": "Python",
@@ -1638,22 +1650,22 @@
      "name": "msitarzewski/agency-agents",
      "url": "https://github.com/msitarzewski/agency-agents",
      "descEn": "A complete AI agency at your fingertips - From frontend wizards to Reddit community ninjas, from whimsy injectors to reality checkers. Each agent is a specialized expert with personality, processes, a",
-     "stars": 168608,
-     "forks": 27364,
+     "stars": 168877,
+     "forks": 27429,
      "language": "Shell",
      "langCN": "Shell",
      "topics": [],
      "industry": "游戏",
      "avatar": "https://github.com/msitarzewski.png?size=64",
-     "desc": "一个触手可及的完整人工智能代理机构——从前端巫师到 Reddit 社区忍者，从奇思妙想注入者到现实核查员。每个代理都是一位专业专家，具有个性、流程、"
+     "desc": "一个触手可及的完整人工智能代理——从前端巫师到 Reddit 社区忍者，从奇思妙想注入者到现实核查员。每个代理都是一位专业专家，具有个性、流程、"
     },
     {
      "rank": 20,
      "name": "langgenius/dify",
      "url": "https://github.com/langgenius/dify",
      "descEn": "Build Agentic workflows, RAG pipelines, with rich AI model and tool support on one collaborative workspace. Deploy on cloud, VPC, or self-hosted, so teams move from prototype to production without reb",
-     "stars": 161225,
-     "forks": 25512,
+     "stars": 161314,
+     "forks": 25516,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -1671,8 +1683,8 @@
      "name": "Snailclimb/JavaGuide",
      "url": "https://github.com/Snailclimb/JavaGuide",
      "descEn": "Java 面试 & 后端通用面试指南，覆盖计算机基础、数据库、分布式、高并发、系统设计与 AI 应用开发",
-     "stars": 159570,
-     "forks": 46112,
+     "stars": 159592,
+     "forks": 46106,
      "language": "JavaScript",
      "langCN": "JavaScript",
      "topics": [
@@ -1690,8 +1702,8 @@
      "name": "open-webui/open-webui",
      "url": "https://github.com/open-webui/open-webui",
      "descEn": "User-friendly AI Interface (Supports Ollama, OpenAI API, ...)",
-     "stars": 158771,
-     "forks": 23087,
+     "stars": 158872,
+     "forks": 23090,
      "language": "Svelte",
      "langCN": "Svelte",
      "topics": [
@@ -1709,8 +1721,8 @@
      "name": "clash-verge-rev/clash-verge-rev",
      "url": "https://github.com/clash-verge-rev/clash-verge-rev",
      "descEn": "A modern GUI client based on Tauri, designed to run in Windows, macOS and Linux for tailored proxy experience",
-     "stars": 158608,
-     "forks": 11419,
+     "stars": 158845,
+     "forks": 11435,
      "language": "Rust",
      "langCN": "Rust",
      "topics": [
@@ -1728,8 +1740,8 @@
      "name": "langflow-ai/langflow",
      "url": "https://github.com/langflow-ai/langflow",
      "descEn": "Langflow is a powerful tool for building and deploying AI-powered agents and workflows.",
-     "stars": 156686,
-     "forks": 10417,
+     "stars": 156720,
+     "forks": 10420,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -1747,22 +1759,22 @@
      "name": "anthropics/claude-code",
      "url": "https://github.com/anthropics/claude-code",
      "descEn": "Claude Code is an agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster by executing routine tasks, explaining complex code, and handling git workflows ",
-     "stars": 155801,
-     "forks": 25012,
+     "stars": 155942,
+     "forks": 25013,
      "language": "TypeScript",
      "langCN": "TypeScript",
      "topics": [],
      "industry": "AI · 大模型",
      "avatar": "https://github.com/anthropics.png?size=64",
-     "desc": "Claude Code 是一款智能编码工具，它驻留在您的终端中，能够理解您的代码库，并通过执行日常任务、解释复杂代码和处理 Git 工作流来帮助您更快地编写代码。"
+     "desc": "Claude Code 是一款智能编码工具，驻留在您的终端中，能够理解您的代码库，并通过执行日常任务、解释复杂代码和处理 Git 工作流来帮助您更快地编写代码。"
     },
     {
      "rank": 26,
      "name": "nextlevelbuilder/ui-ux-pro-max-skill",
      "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
      "descEn": "An AI skill that provides design intelligence for building professional UI/UX across multiple platforms.",
-     "stars": 149995,
-     "forks": 15862,
+     "stars": 150520,
+     "forks": 15912,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -1773,15 +1785,15 @@
      ],
      "industry": "AI · 大模型",
      "avatar": "https://github.com/nextlevelbuilder.png?size=64",
-     "desc": "一种 AI 技能，为跨多个平台构建专业的 UI/UX 提供设计智能。"
+     "desc": "一项 AI 技能，为跨多个平台构建专业的 UI/UX 提供设计智能。"
     },
     {
      "rank": 27,
      "name": "github/spec-kit",
      "url": "https://github.com/github/spec-kit",
      "descEn": "💫 Toolkit to help you get started with SDD or any other process!",
-     "stars": 149952,
-     "forks": 13473,
+     "stars": 150144,
+     "forks": 13488,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -1799,8 +1811,8 @@
      "name": "langchain-ai/langchain",
      "url": "https://github.com/langchain-ai/langchain",
      "descEn": "The agent engineering platform.",
-     "stars": 149591,
-     "forks": 25141,
+     "stars": 149735,
+     "forks": 25147,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -1818,8 +1830,8 @@
      "name": "Graphify-Labs/graphify",
      "url": "https://github.com/Graphify-Labs/graphify",
      "descEn": "Turn any codebase, with its docs, SQL schemas, configs, and PDFs, into a queryable knowledge graph. A /graphify skill for Claude Code, Cursor, Codex, and Gemini CLI: local deterministic AST parsing, e",
-     "stars": 148482,
-     "forks": 14248,
+     "stars": 149143,
+     "forks": 14334,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -1837,8 +1849,8 @@
      "name": "Comfy-Org/ComfyUI",
      "url": "https://github.com/Comfy-Org/ComfyUI",
      "descEn": "The most powerful and modular diffusion model GUI, api and backend with a graph/nodes interface. The fastest local inference engine in the world.",
-     "stars": 147047,
-     "forks": 17543,
+     "stars": 147221,
+     "forks": 17586,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -1856,8 +1868,8 @@
      "name": "Shubhamsaboo/awesome-llm-apps",
      "url": "https://github.com/Shubhamsaboo/awesome-llm-apps",
      "descEn": "100+ AI Agents, Agent Skills and RAG Apps - Free and Open Source.",
-     "stars": 144764,
-     "forks": 21309,
+     "stars": 144897,
+     "forks": 21337,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -1868,15 +1880,15 @@
      ],
      "industry": "AI · 大模型",
      "avatar": "https://github.com/Shubhamsaboo.png?size=64",
-     "desc": "100 多个 AI 代理、代理技能和 RAG 应用——免费且开源。"
+     "desc": "100 多个 AI 代理、代理技能和 RAG 应用 - 免费且开源。"
     },
     {
      "rank": 32,
      "name": "iptv-org/iptv",
      "url": "https://github.com/iptv-org/iptv",
      "descEn": "Collection of publicly available IPTV channels from all over the world",
-     "stars": 144131,
-     "forks": 8608,
+     "stars": 144196,
+     "forks": 8613,
      "language": "TypeScript",
      "langCN": "TypeScript",
      "topics": [
@@ -1894,8 +1906,8 @@
      "name": "harry0703/MoneyPrinterTurbo",
      "url": "https://github.com/harry0703/MoneyPrinterTurbo",
      "descEn": "利用 AI 大模型和自动化工作流，根据主题或关键词一键生成高清短视频。Generate HD short videos from a topic or keyword with an automated AI workflow.",
-     "stars": 143837,
-     "forks": 23042,
+     "stars": 144071,
+     "forks": 23095,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -1906,15 +1918,15 @@
      ],
      "industry": "多媒体 · 影音",
      "avatar": "https://github.com/harry0703.png?size=64",
-     "desc": "利用 AI 大模型和自动化工作流，根据主题或关键词一键生成高清短视频。利用自动化 AI 工作流，根据主题或关键词生成高清短视频。"
+     "desc": "利用 AI 大模型和自动化工作流，根据主题或关键词一键生成高清短视频。通过自动化的 AI 工作流，根据主题或关键词生成高清短视频。"
     },
     {
      "rank": 34,
      "name": "vercel/next.js",
      "url": "https://github.com/vercel/next.js",
      "descEn": "The React Framework",
-     "stars": 143547,
-     "forks": 32806,
+     "stars": 143656,
+     "forks": 32809,
      "language": "JavaScript",
      "langCN": "JavaScript",
      "topics": [
@@ -1932,8 +1944,8 @@
      "name": "garrytan/gstack",
      "url": "https://github.com/garrytan/gstack",
      "descEn": "Use Garry Tan's exact Claude Code setup: 23 opinionated tools that serve as CEO, Designer, Eng Manager, Release Manager, Doc Engineer, and QA",
-     "stars": 141712,
-     "forks": 20930,
+     "stars": 141834,
+     "forks": 20948,
      "language": "TypeScript",
      "langCN": "TypeScript",
      "topics": [],
@@ -1946,8 +1958,8 @@
      "name": "ytdl-org/youtube-dl",
      "url": "https://github.com/ytdl-org/youtube-dl",
      "descEn": "Command-line program to download videos from YouTube.com and other video sites",
-     "stars": 141571,
-     "forks": 10690,
+     "stars": 141584,
+     "forks": 10689,
      "language": "Python",
      "langCN": "Python",
      "topics": [],
@@ -1960,8 +1972,8 @@
      "name": "golang/go",
      "url": "https://github.com/golang/go",
      "descEn": "The Go programming language",
-     "stars": 139936,
-     "forks": 20282,
+     "stars": 139978,
+     "forks": 20263,
      "language": "Go",
      "langCN": "Go",
      "topics": [
@@ -1979,8 +1991,8 @@
      "name": "excalidraw/excalidraw",
      "url": "https://github.com/excalidraw/excalidraw",
      "descEn": "Virtual whiteboard for sketching hand-drawn like diagrams",
-     "stars": 135747,
-     "forks": 16185,
+     "stars": 135828,
+     "forks": 16195,
      "language": "TypeScript",
      "langCN": "TypeScript",
      "topics": [
@@ -1998,8 +2010,8 @@
      "name": "krahets/hello-algo",
      "url": "https://github.com/krahets/hello-algo",
      "descEn": "《Hello 算法》：动画图解、一键运行的数据结构与算法教程。支持简中、繁中、English、日本語，提供 Python, Java, C++, C, C#, JS, Go, Swift, Rust, Ruby, Kotlin, TS, Dart 等代码实现",
-     "stars": 132347,
-     "forks": 15621,
+     "stars": 132368,
+     "forks": 15623,
      "language": "Python",
      "langCN": "Python",
      "topics": [
@@ -2010,15 +2022,15 @@
      ],
      "industry": "学习 · 资源",
      "avatar": "https://github.com/krahets.png?size=64",
-     "desc": "《Hello 算法》：动画图解、一键运行的数据结构与算法教程。支持简体中文、繁体中文、英语、日语，提供 Python、Java、C++、C、C#、JS、Go、Swift、Rust、Ruby、Kotlin、TS、Dart 等代码实现。"
+     "desc": "《Hello 算法》：动画图解、一键运行的数据结构与算法教程。支持简体中文、繁体中文、英语、日语，提供 Python、Java、C++、C、C#、JS、Go、Swift、Rust、Ruby、Kotlin、TS、Dart 等代码实现"
     },
     {
      "rank": 40,
      "name": "Chalarangelo/30-seconds-of-code",
      "url": "https://github.com/Chalarangelo/30-seconds-of-code",
      "descEn": "Coding articles to level up your development skills",
-     "stars": 129523,
-     "forks": 12520,
+     "stars": 129533,
+     "forks": 12522,
      "language": "JavaScript",
      "langCN": "JavaScript",
      "topics": [
@@ -2029,7 +2041,7 @@
      ],
      "industry": "前端 · 网页",
      "avatar": "https://github.com/Chalarangelo.png?size=64",
-     "desc": "提升开发技能的编程文章"
+     "desc": "帮助您提升开发技能的编程文章"
     }
    ]
   }
